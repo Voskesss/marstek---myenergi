@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# External dependencies (not our code)
+external/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+
+# Temp files
+*.tmp
+*.log
