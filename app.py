@@ -236,6 +236,37 @@ class VenusEModbusClient:
             attempts.append({"unit": None, "ok": False, "error": str(e)})
             return False, attempts
 
+    def set_work_mode(self, mode: int) -> dict:
+        """Sets the main work mode of the battery.
+        - 42001: User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
+        """
+        REG_WORK_MODE = 42001
+        
+        result = {"ok": False, "attempts": []}
+        if mode not in {0, 1, 2, 3}:
+            result["error"] = "Invalid mode. Must be 0, 1, 2, or 3."
+            return result
+
+        try:
+            if not self.connected and not self.connect():
+                result["error"] = "connect failed"
+                return result
+
+            ok, tries = self.write_holding(REG_WORK_MODE, mode)
+            result["attempts"] += [{"addr": REG_WORK_MODE, "val": mode, **t} for t in tries]
+            
+            if ok:
+                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
+            else:
+                result["error"] = "Failed to set work mode."
+            
+            return result
+        finally:
+            try:
+                self.disconnect()
+            except Exception:
+                pass
+
     def set_control(self, action: str, power_w: Optional[int] = None) -> dict:
         """High-level control for charge/discharge/stop using community-provided registers.
         - 42000: Control mode (0x55AA to enable, 0x55BB to disable)
@@ -1741,8 +1772,9 @@ async def set_battery_work_mode(payload: Dict[str, Any] = Body(...)):
         return {"success": bool(result.get("ok")), **result}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 @app.post("/api/battery/control")
-async def battery_control(payload: Dict[str, Any] = Body(...)):
+async def set_battery_control(payload: Dict[str, Any] = Body(...)):
     """Force battery actions via Modbus controls.
     Payload: { action: 'charge'|'discharge'|'stop', power_w?: int }
     """

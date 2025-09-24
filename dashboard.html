@@ -99,10 +99,13 @@
             <div class="card">
                 <h3>🏠 Huis Verbruik</h3>
                 <div class="metric"><span class="metric-label">Verbruik</span><span class="metric-value" id="houseConsumption">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="houseStatus">-</span></div>
             </div>
             <div class="card">
                 <h3>🔥 Eddi (Warmwater)</h3>
                 <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="eddiPower">-</span></div>
+                <div class="metric"><span class="metric-label">Tank 1 Temp</span><span class="metric-value" id="tank1Temp">-</span></div>
+                <div class="metric"><span class="metric-label">Tank 2 Temp</span><span class="metric-value" id="tank2Temp">-</span></div>
             </div>
             <div class="card">
                 <h3>🚗 Zappi (Auto)</h3>
@@ -118,7 +121,8 @@
                 <div class="metric"><span class="metric-label">State of Charge</span><span class="metric-value status-info" id="battery78-soc">--</span></div>
                 <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="battery78-energy">--</span></div>
                 <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="battery78-power">--</span></div>
-                <div class="metric"><span class="metric-label">Work Mode</span><span class="metric-value" id="battery78-direction">--</span></div>
+                <div class="metric"><span class="metric-label">Hoofdmodus</span><span class="metric-value" id="battery78-work-mode">--</span></div>
+                <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="battery78-action">--</span></div>
 
                 <!-- CONTROLS -->
                 <div class="metric" style="flex-direction: column; align-items: flex-start; gap:12px; padding-top:15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
@@ -255,13 +259,17 @@
             if (batteryData.success && batteryData.data) {
                 setBatteryStatus('battery78', 'connected');
                 const d = batteryData.derived || {};
-                
+                const raw = batteryData.data;
+
+                // SoC
                 const socEl = document.getElementById('battery78-soc');
                 socEl.textContent = d.soc_percent != null ? `${d.soc_percent.toFixed(1)} %` : '--';
                 socEl.className = d.soc_percent > 80 ? 'metric-value status-good' : d.soc_percent > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
 
+                // Energy Remaining
                 document.getElementById('battery78-energy').textContent = d.remaining_kwh != null ? `${d.remaining_kwh.toFixed(2)} kWh` : '--';
 
+                // Power
                 const powerEl = document.getElementById('battery78-power');
                 const power_w = d.power_w;
                 if (power_w != null) {
@@ -271,7 +279,18 @@
                     powerEl.textContent = '--';
                 }
 
-                document.getElementById('battery78-direction').textContent = d.mode || '--';
+                // Main Work Mode (from register 42001, if available)
+                const workModeEl = document.getElementById('battery78-work-mode');
+                const workModeVal = raw.user_work_mode?.value;
+                const workModeMap = { 0: 'Auto', 1: 'Manual', 2: 'Trade Mode', 3: 'Backup Mode' };
+                workModeEl.textContent = workModeMap[workModeVal] || 'Onbekend';
+
+                // Current Action (from register 35100)
+                const actionEl = document.getElementById('battery78-action');
+                actionEl.textContent = d.mode || '--';
+                actionEl.className = d.mode === 'Charging' ? 'metric-value status-good' : d.mode === 'Discharging' ? 'metric-value status-danger' : 'metric-value';
+
+                // Timestamp
                 document.getElementById('battery78-timestamp').textContent = new Date().toLocaleTimeString();
 
             } else {
@@ -291,20 +310,30 @@
         }
 
         function updateSystemMetrics(data) {
+            // PV Generation
             const pv_w = data.pv_generation_w || 0;
-            const pvEl = document.getElementById('pvGeneration');
-            pvEl.textContent = `${pv_w}W`;
-            pvEl.className = `metric-value ${pv_w > 50 ? 'status-good' : ''}`;
+            document.getElementById('pvGeneration').textContent = `${pv_w}W`;
             document.getElementById('pvStatus').textContent = pv_w > 100 ? 'Actief' : 'Laag';
 
+            // Grid Export/Import
             const export_w = data.grid_export_w || 0;
             const gridEl = document.getElementById('gridExport');
             gridEl.textContent = export_w > 0 ? `+${export_w}W (Export)` : `${Math.abs(export_w)}W (Import)`;
             gridEl.className = `metric-value ${export_w > 10 ? 'status-good' : export_w < -10 ? 'status-danger' : ''}`;
             document.getElementById('gridStatus').textContent = export_w > 100 ? 'Exporteren' : export_w < -100 ? 'Importeren' : 'Neutraal';
 
-            document.getElementById('houseConsumption').textContent = `${data.house_consumption_w || 0}W`;
+            // House Consumption
+            const house_w = data.house_consumption_w || 0;
+            document.getElementById('houseConsumption').textContent = `${house_w}W`;
+            document.getElementById('houseStatus').textContent = house_w > 1000 ? 'Hoog' : 'Normaal';
+
+            // Eddi Status
             document.getElementById('eddiPower').textContent = `${data.eddi_power_w || 0}W`;
+            const temps = data.eddi_temperatures || {};
+            document.getElementById('tank1Temp').textContent = temps.tank1 != null ? `${temps.tank1}°C` : 'N/A';
+            document.getElementById('tank2Temp').textContent = temps.tank2 != null ? `${temps.tank2}°C` : 'N/A';
+
+            // Zappi Status
             document.getElementById('zappiPower').textContent = `${data.zappi_power_w || 0}W`;
         }
 
