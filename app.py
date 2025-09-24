@@ -1731,6 +1731,16 @@ async def get_battery_status():
             "source": "modbus"
         }
 
+@app.post("/api/battery/set_work_mode")
+async def set_battery_work_mode(payload: Dict[str, Any] = Body(...)):
+    """Sets the main work mode of the battery."""
+    try:
+        mode = int(payload.get("mode"))
+        async with modbus_lock:
+            result = venus_modbus.set_work_mode(mode)
+        return {"success": bool(result.get("ok")), **result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 @app.post("/api/battery/control")
 async def battery_control(payload: Dict[str, Any] = Body(...)):
     """Force battery actions via Modbus controls.

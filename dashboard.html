@@ -5,131 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>myenergi ↔ Marstek Live Dashboard</title>
     <style>
+        :root {
+            --bg-color: #0f172a; /* slate-900 */
+            --card-bg: #1e293b; /* slate-800 */
+            --border-color: #334155; /* slate-700 */
+            --text-primary: #f1f5f9; /* slate-100 */
+            --text-secondary: #94a3b8; /* slate-400 */
+            --text-tertiary: #64748b; /* slate-500 */
+            --accent-blue: #3b82f6;
+            --status-green: #22c55e;
+            --status-yellow: #f59e0b;
+            --status-red: #ef4444;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
-            background: #f5f5f7;
-            color: #1d1d1f;
+            background: var(--bg-color);
+            color: var(--text-primary);
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-            border: 1px solid #e5e5e7;
-        }
-        .card h3 {
-            margin: 0 0 15px 0;
-            color: #1d1d1f;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .metric:last-child {
-            border-bottom: none;
-        }
-        .metric-label {
-            font-weight: 500;
-            color: #666;
-        }
-        .metric-value {
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .status-good { color: #28a745; }
-        .status-warning { color: #ffc107; }
-        .status-danger { color: #dc3545; }
-        .status-info { color: #007bff; }
-        
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .btn-primary { background: #007bff; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-warning { background: #ffc107; color: black; }
-        .btn-secondary { background: #6c757d; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: var(--text-primary); }
+        .header p { color: var(--text-secondary); }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); }
+        .card h3 { margin: 0 0 15px 0; color: var(--text-primary); font-size: 18px; font-weight: 600; }
+        .metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+        .metric:last-child { border-bottom: none; }
+        .metric-label { font-weight: 500; color: var(--text-secondary); }
+        .metric-value { font-weight: 600; font-size: 18px; }
+        .status-good { color: var(--status-green); }
+        .status-warning { color: var(--status-yellow); }
+        .status-danger { color: var(--status-red); }
+        .status-info { color: var(--accent-blue); }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--accent-blue); color: white; }
+        .btn-success { background: var(--status-green); color: white; }
+        .btn-danger { background: var(--status-red); color: white; }
+        .btn-warning { background: var(--status-yellow); color: #1e293b; }
+        .btn-secondary { background: var(--border-color); color: var(--text-primary); }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        
-        .auto-refresh {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #e3f2fd;
-            border-radius: 8px;
-        }
-        .battery-card {
-            border: 2px solid #e5e5e7;
-        }
-        .battery-card.connected {
-            border-color: #28a745;
-            background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
-        }
-        .battery-card.error {
-            border-color: #dc3545;
-            background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
-        }
-        .battery-card.connecting {
-            border-color: #ffc107;
-            background: linear-gradient(135deg, #fffbf0 0%, #ffffff 100%);
-        }
-        
-        .battery-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        .battery-status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .battery-status-badge.connected { background: #28a745; color: white; }
-        .battery-status-badge.error { background: #dc3545; color: white; }
-        .battery-status-badge.connecting { background: #ffc107; color: black; }
-        
-        .modbus-info {
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #f0f0f0;
-        }
+        .auto-refresh { text-align: center; margin-bottom: 20px; padding: 10px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); }
+        .battery-card { border: 2px solid var(--border-color); transition: border-color 0.3s; }
+        .battery-card.connected { border-color: var(--status-green); }
+        .battery-card.error { border-color: var(--status-red); }
+        .battery-card.connecting { border-color: var(--status-yellow); }
+        .battery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .battery-status-badge { padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .battery-status-badge.connected { background: var(--status-green); color: var(--bg-color); }
+        .battery-status-badge.error { background: var(--status-red); color: white; }
+        .battery-status-badge.connecting { background: var(--status-yellow); color: var(--bg-color); }
+        .modbus-info { font-size: 12px; color: var(--text-tertiary); margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track { background: var(--border-color); height: 4px; border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--accent-blue); cursor: pointer; margin-top: -7px; }
+        pre { white-space:pre-wrap; word-break:break-word; background:#0b1220; padding:12px; border-radius:8px; border:1px solid #1f2937; color: var(--text-secondary); }
     </style>
 </head>
 <body>
@@ -152,176 +85,68 @@
         </div>
         
         <div class="status-grid">
-            <!-- PV Generation -->
+            <!-- MyEnergi Cards -->
             <div class="card">
                 <h3>☀️ PV Generatie</h3>
-                <div class="metric">
-                    <span class="metric-label">Opwekking</span>
-                    <span class="metric-value" id="pvGeneration">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value" id="pvStatus">-</span>
-                </div>
+                <div class="metric"><span class="metric-label">Opwekking</span><span class="metric-value" id="pvGeneration">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="pvStatus">-</span></div>
             </div>
-            
-            <!-- Grid Export -->
             <div class="card">
                 <h3>⚡ Grid</h3>
-                <div class="metric">
-                    <span class="metric-label">Export/Import</span>
-                    <span class="metric-value" id="gridExport">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value" id="gridStatus">-</span>
-                </div>
+                <div class="metric"><span class="metric-label">Export/Import</span><span class="metric-value" id="gridExport">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="gridStatus">-</span></div>
             </div>
-            
-            <!-- House Consumption -->
             <div class="card">
                 <h3>🏠 Huis Verbruik</h3>
-                <div class="metric">
-                    <span class="metric-label">Verbruik</span>
-                    <span class="metric-value" id="houseConsumption">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value" id="houseStatus">-</span>
-                </div>
+                <div class="metric"><span class="metric-label">Verbruik</span><span class="metric-value" id="houseConsumption">-</span></div>
             </div>
-            
-            <!-- Eddi Status -->
             <div class="card">
                 <h3>🔥 Eddi (Warmwater)</h3>
-                <div class="metric">
-                    <span class="metric-label">Vermogen</span>
-                    <span class="metric-value" id="eddiPower">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Tank 1 Temp</span>
-                    <span class="metric-value" id="tank1Temp">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Tank 2 Temp</span>
-                    <span class="metric-value" id="tank2Temp">-</span>
-                </div>
+                <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="eddiPower">-</span></div>
             </div>
-            
-            <!-- Zappi Status -->
             <div class="card">
                 <h3>🚗 Zappi (Auto)</h3>
-                <div class="metric">
-                    <span class="metric-label">Vermogen</span>
-                    <span class="metric-value" id="zappiPower">-</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value" id="zappiStatus">-</span>
-                </div>
+                <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="zappiPower">-</span></div>
             </div>
-            
-            <!-- Venus E Battery 78 (Modbus) -->
+
+            <!-- Simplified Battery Card -->
             <div class="card battery-card connecting" id="battery78-card">
                 <div class="battery-header">
                     <h3>🔋 Venus E Batterij 78</h3>
                     <span class="battery-status-badge connecting" id="battery78-badge">Connecting</span>
                 </div>
-                <div class="metric">
-                    <span class="metric-label">State of Charge</span>
-                    <span class="metric-value status-info" id="battery78-soc">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Voltage</span>
-                    <span class="metric-value" id="battery78-voltage">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Current</span>
-                    <span class="metric-value" id="battery78-current">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Battery Power</span>
-                    <span class="metric-value" id="battery78-calc-power">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Charge/Discharge</span>
-                    <span class="metric-value" id="battery78-direction">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Temperature</span>
-                    <span class="metric-value" id="battery78-temp">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Cycles</span>
-                    <span class="metric-value" id="battery78-cycles">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Energy Remaining</span>
-                    <span class="metric-value" id="battery78-energy">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Capacity</span>
-                    <span class="metric-value" id="battery78-capacity">--</span>
-                </div>
-                <div class="metric" style="flex-direction: column; align-items: flex-start; gap:8px; padding-top:12px;">
-                    <span class="metric-label">Manual Control (Modbus)</span>
-                    <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="min-width:160px; color:#666;">Power (0–2000 W)</label>
-                            <input id="powerSlider" type="range" min="0" max="2000" step="50" value="1000" style="flex:1;" oninput="document.getElementById('powerValue').textContent=this.value+' W'" />
-                            <span id="powerValue" style="min-width:80px; text-align:right; font-weight:600;">1000 W</span>
+                <div class="metric"><span class="metric-label">State of Charge</span><span class="metric-value status-info" id="battery78-soc">--</span></div>
+                <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="battery78-energy">--</span></div>
+                <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="battery78-power">--</span></div>
+                <div class="metric"><span class="metric-label">Work Mode</span><span class="metric-value" id="battery78-direction">--</span></div>
+
+                <!-- CONTROLS -->
+                <div class="metric" style="flex-direction: column; align-items: flex-start; gap:12px; padding-top:15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
+                    <span class="metric-label" style="margin-bottom: 8px;">Handmatige Controle</span>
+                    <div style="width:100%;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px;">
+                            <label style="color:var(--text-secondary);">Power</label>
+                            <input id="powerSlider" type="range" min="0" max="2000" step="50" value="500" oninput="document.getElementById('powerValue').textContent=this.value+' W'" />
+                            <span id="powerValue" style="min-width:60px; text-align:right; font-weight:600;">500 W</span>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            <button class="btn btn-success" onclick="batteryControl('charge')">Charge (slider)</button>
-                            <button class="btn btn-danger" onclick="batteryControl('discharge')">Discharge (slider)</button>
-                            <button class="btn btn-secondary" onclick="batteryControl('stop')">Stop</button>
-                            <button class="btn btn-secondary" onclick="batteryDiagnose()">Diagnose</button>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="min-width:160px; color:#666;">Min. reserve SoC (0–40%)</label>
-                            <input id="reserveSlider" type="range" min="0" max="40" step="1" value="10" style="flex:1;" oninput="document.getElementById('reserveValue').textContent=this.value+' %'" />
-                            <span id="reserveValue" style="min-width:60px; text-align:right; font-weight:600;">10 %</span>
-                            <button class="btn btn-primary" onclick="saveReserve()">Opslaan</button>
+                            <button class="btn btn-success" onclick="batteryControl('charge')">Force Charge</button>
+                            <button class="btn btn-danger" onclick="batteryControl('discharge')">Force Discharge</button>
+                            <button class="btn btn-secondary" onclick="batteryControl('stop')">Stop Force</button>
                         </div>
                     </div>
-                    <small id="battery78-control-msg" style="color:#666;">Gebruik voor lokaal testen. Auto-refresh na actie.</small>
-                    <pre id="battery78-diag" style="background:#f8fafc; color:#0f172a; padding:8px; border-radius:6px; border:1px solid #e5e7eb; margin-top:8px; display:none;"></pre>
+                    <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                         <label style="color:var(--text-secondary); margin-bottom: 10px;">Hoofd Werkmodus</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button class="btn btn-primary" onclick="setWorkMode(0)">Auto</button>
+                            <button class="btn btn-primary" onclick="setWorkMode(1)">Manual</button>
+                            <button class="btn btn-primary" onclick="setWorkMode(2)">Trade</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="modbus-info">
-                    <strong>Modbus TCP:</strong> 192.168.68.92:502<br>
+                    <span id="battery78-control-msg" style="font-size: 12px;"></span><br>
                     <strong>Last Update:</strong> <span id="battery78-timestamp">--</span>
-                </div>
-            </div>
-            
-            <!-- Venus E Battery 66 (Placeholder) -->
-            <div class="card battery-card error" id="battery66-card">
-                <div class="battery-header">
-                    <h3>🔋 Venus E Batterij 66</h3>
-                    <span class="battery-status-badge error" id="battery66-badge">No Converter</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value status-danger">Converter Needed</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Hardware</span>
-                    <span class="metric-value">RS-485 WiFi Converter</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Expected IP</span>
-                    <span class="metric-value">192.168.68.101:502</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Energy Remaining</span>
-                    <span class="metric-value" id="battery78-energy">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Capacity</span>
-                    <span class="metric-value" id="battery78-capacity">--</span>
-                </div>
-                <div class="modbus-info">
-                    <strong>Status:</strong> Waiting for hardware installation<br>
-                    <strong>Action:</strong> Install second USR-DR164 converter
                 </div>
             </div>
         </div>
@@ -346,351 +171,146 @@
 
     <script>
         let autoRefreshInterval;
-        
-        // Battery manual control API wrapper (global)
-        async function batteryControl(action, power_w) {
+
+        // --- API Wrappers ---
+        async function setWorkMode(mode) {
+            const el = document.getElementById('battery78-control-msg');
             try {
-                const payload = { action };
-                if (typeof power_w === 'number') payload.power_w = power_w;
+                const res = await fetch('/api/battery/set_work_mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode })
+                });
+                const j = await res.json();
+                if (j.success) {
+                    const modeMap = {0: 'Auto', 1: 'Manual', 2: 'Trade Mode'};
+                    el.textContent = `OK: Werkmodus ingesteld op ${modeMap[mode]}`;
+                    el.className = 'status-good';
+                } else {
+                    el.textContent = `Fout: ${j.error || 'onbekend'}`;
+                    el.className = 'status-danger';
+                }
+                setTimeout(refreshData, 1200);
+            } catch (e) {
+                el.textContent = `Fout bij instellen werkmodus: ${e}`;
+                el.className = 'status-danger';
+            }
+        }
+
+        async function batteryControl(action) {
+            const el = document.getElementById('battery78-control-msg');
+            try {
+                const power_w = parseInt(document.getElementById('powerSlider').value, 10);
+                const payload = { action, power_w };
                 const res = await fetch('/api/battery/control', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const j = await res.json();
-                const el = document.getElementById('battery78-control-msg');
                 if (j.success) {
-                    el.textContent = `OK: ${j.action}${j.power_w ? ' ' + j.power_w + 'W' : ''} @ ${new Date().toLocaleTimeString()}`;
-                    el.style.color = '#166534';
+                    el.textContent = `OK: ${j.action} commando verstuurd.`;
+                    el.className = 'status-good';
                 } else {
-                    let extra = '';
-                    if (Array.isArray(j.attempts) && j.attempts.length) {
-                        const parts = j.attempts.map(a => `u${a.unit}: ${a.ok ? 'ok' : (a.error ? a.error : 'fail')}`);
-                        extra = ` [${parts.join(', ')}]`;
-                    }
-                    el.textContent = `Fout: ${j.error || 'onbekend'}${extra} @ ${new Date().toLocaleTimeString()}`;
-                    el.style.color = '#9f1239';
+                    el.textContent = `Fout: ${j.error || 'onbekend'}`;
+                    el.className = 'status-danger';
                 }
-                // refresh after a short delay so UI catches up
                 setTimeout(refreshData, 1200);
             } catch (e) {
-                const el = document.getElementById('battery78-control-msg');
-                el.textContent = `Fout bij control: ${e}`;
-                el.style.color = '#9f1239';
+                el.textContent = `Fout bij geforceerde controle: ${e}`;
+                el.className = 'status-danger';
             }
         }
-        
-        // Auto-refresh functionality
-        document.getElementById('autoRefresh').addEventListener('change', function() {
-            if (this.checked) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        });
-        
+
+        // --- Main Refresh Logic ---
         function startAutoRefresh() {
-            refreshData(); // Initial load
-            autoRefreshInterval = setInterval(refreshData, 5000); // Every 5 seconds
+            refreshData();
+            autoRefreshInterval = setInterval(refreshData, 5000);
         }
-        
+
         function stopAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-            }
+            if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         }
-        
-        // Main data refresh function
+
         async function refreshData() {
             try {
-                // Get system status
-                const statusResponse = await fetch(`/api/status?ts=${Date.now()}`, { cache: 'no-store' });
-                const statusData = await statusResponse.json();
-                
-                // Update system metrics
+                const [statusRes, batteryRes] = await Promise.all([
+                    fetch(`/api/status?ts=${Date.now()}`, { cache: 'no-store' }),
+                    fetch(`/api/battery/status?ts=${Date.now()}`, { cache: 'no-store' })
+                ]);
+                const statusData = await statusRes.json();
+                const batteryData = await batteryRes.json();
+
                 updateSystemMetrics(statusData);
-                
-                // Get battery data via Modbus
-                await refreshBatteryData();
-                
-                // Update timestamp
+                updateBattery78(batteryData);
+
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-                
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
         }
-        
-        // Battery-specific data refresh with better error handling
-        async function refreshBatteryData() {
-            try {
-                const batteryResponse = await fetch(`/api/battery/status?ts=${Date.now()}`, { cache: 'no-store' });
-                const batteryData = await batteryResponse.json();
+
+        // --- UI Update Functions ---
+        function updateBattery78(batteryData) {
+            if (batteryData.success && batteryData.data) {
+                setBatteryStatus('battery78', 'connected');
+                const d = batteryData.derived || {};
                 
-                if (batteryData.success && batteryData.data) {
-                    if (batteryData.derived) { batteryData.data.derived = batteryData.derived; }
-            updateBattery78(batteryData.data);
-                    setBatteryStatus('battery78', 'connected');
-                    
-                    // Clear any previous error state
-                    const errorCount = window.batteryErrorCount || 0;
-                    if (errorCount > 0) {
-                        console.log('✅ Battery connection restored');
-                        window.batteryErrorCount = 0;
-                    }
+                const socEl = document.getElementById('battery78-soc');
+                socEl.textContent = d.soc_percent != null ? `${d.soc_percent.toFixed(1)} %` : '--';
+                socEl.className = d.soc_percent > 80 ? 'metric-value status-good' : d.soc_percent > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
+
+                document.getElementById('battery78-energy').textContent = d.remaining_kwh != null ? `${d.remaining_kwh.toFixed(2)} kWh` : '--';
+
+                const powerEl = document.getElementById('battery78-power');
+                const power_w = d.power_w;
+                if (power_w != null) {
+                    powerEl.textContent = `${power_w.toFixed(0)} W`;
+                    powerEl.className = power_w > 20 ? 'metric-value status-good' : power_w < -20 ? 'metric-value status-danger' : 'metric-value';
                 } else {
-                    setBatteryStatus('battery78', 'error');
-                    
-                    // Only log every 5th error to reduce spam
-                    window.batteryErrorCount = (window.batteryErrorCount || 0) + 1;
-                    if (window.batteryErrorCount % 5 === 1) {
-                        console.warn(`⚠️ Battery connection issues (${window.batteryErrorCount} errors):`, batteryData.error);
-                    }
+                    powerEl.textContent = '--';
                 }
-                
-            } catch (error) {
-                setBatteryStatus('battery78', 'error');
-                
-                // Only log every 5th error to reduce spam
-                window.batteryErrorCount = (window.batteryErrorCount || 0) + 1;
-                if (window.batteryErrorCount % 5 === 1) {
-                    console.warn(`⚠️ Battery fetch error (${window.batteryErrorCount} errors):`, error.message);
-                }
-            }
-        }
-        
-        // Update battery 78 display
-        function updateBattery78(data) {
-            const elements = {
-                'battery78-soc': (data.derived && typeof data.derived.soc_percent === 'number') ? `${data.derived.soc_percent.toFixed(1)} %` : '--',
-                'battery78-voltage': data.battery_voltage?.formatted || '--',
-                'battery78-current': data.battery_current?.formatted || '--',
-                'battery78-power': data.battery_power?.formatted || '--',
-                'battery78-temp': data.internal_temp?.formatted || '--',
-                'battery78-cycles': data.cycle_count?.formatted || '--'
-            };
-            // Prefer derived values from backend (Modbus)
-            const d = data.derived || {};
-            if (typeof d.power_w === 'number') {
-                elements['battery78-power'] = `${d.power_w.toFixed(0)}W`;
-            }
-            
-            // Calculate power from voltage and current
-            const voltage = data.battery_voltage?.value || 0;
-            const current = data.battery_current?.value || 0;
-            const calculatedPower = voltage * current;
-            
-            // Add calculated power to elements with clear indication
-            if (calculatedPower > 5) {
-                elements['battery78-calc-power'] = `+${calculatedPower.toFixed(1)}W 🔋 LADEN`;
-            } else if (calculatedPower < -5) {
-                elements['battery78-calc-power'] = `${calculatedPower.toFixed(1)}W ⚡ ONTLADEN`;
+
+                document.getElementById('battery78-direction').textContent = d.mode || '--';
+                document.getElementById('battery78-timestamp').textContent = new Date().toLocaleTimeString();
+
             } else {
-                elements['battery78-calc-power'] = `${calculatedPower.toFixed(1)}W ⏸️ STANDBY`;
-            }
-            
-            for (const [id, value] of Object.entries(elements)) {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.textContent = value;
-                    
-                    // Color coding for SoC
-                    if (id === 'battery78-soc' && typeof d.soc_percent === 'number') {
-                        const soc = d.soc_percent;
-                        element.className = soc > 80 ? 'metric-value status-good' :
-                                          soc > 20 ? 'metric-value status-warning' :
-                                          'metric-value status-danger';
-                    }
-                }
-            }
-            
-            // Update charge/discharge direction with Marstek mode if present
-            const directionElement = document.getElementById('battery78-direction');
-            if (directionElement) {
-                const current = data.battery_current?.value || 0;
-                const workMode = data.work_mode?.raw;
-                const derivedMode = (data.derived && data.derived.mode) ? String(data.derived.mode) : undefined;
-                
-                // Prefer derived mode from backend
-                if (derivedMode) {
-                    const name = derivedMode;
-                    directionElement.textContent = name;
-                    directionElement.className = 'metric-value ' + (name.includes('Charge') ? 'status-good' : name.includes('Discharge') ? 'status-warning' : 'status-info');
-                } else if (workMode !== undefined) {
-                    const modeNames = {
-                        0: '⏸️ Standby',
-                        1: '🔋 Charging', 
-                        2: '⚡ Discharging',
-                        3: '🔄 Backup',
-                        4: '❌ Fault',
-                        5: '⏸️ Idle',
-                        6: '🎛️ Self-Regulating'
-                    };
-                    
-                    const modeName = modeNames[workMode] || `Mode ${workMode}`;
-                    directionElement.textContent = modeName;
-                    
-                    // Color based on mode
-                    if (workMode === 1) {
-                        directionElement.className = 'metric-value status-good';
-                    } else if (workMode === 2) {
-                        directionElement.className = 'metric-value status-warning';
-                    } else if (workMode === 4) {
-                        directionElement.className = 'metric-value status-danger';
-                    } else {
-                        directionElement.className = 'metric-value status-info';
-                    }
-                } else {
-                    // Fallback to calculated power-based detection (|P| < 20W => Idle)
-                    const p = calculatedPower;
-                    if (p > 20) {
-                        directionElement.textContent = '🔋 Charging';
-                        directionElement.className = 'metric-value status-good';
-                    } else if (p < -20) {
-                        directionElement.textContent = '⚡ Discharging';
-                        directionElement.className = 'metric-value status-warning';
-                    } else {
-                        directionElement.textContent = '⏸️ Standby';
-                        directionElement.className = 'metric-value status-info';
-                    }
-                            }
-            }
-
-            // Hide temp/cycles rows if unknown
-            const hideIfUnknown = (valueId) => {
-                const el = document.getElementById(valueId);
-                if (el) {
-                    const row = el.closest('.metric');
-                    if (row) {
-                        const val = el.textContent?.trim() || '--';
-                        row.style.display = (val === '--') ? 'none' : '';
-                    }
-                }
-            };
-            hideIfUnknown('battery78-temp');
-            hideIfUnknown('battery78-cycles');
-
-            // Update energy/capacity from derived fields
-            const derived = data.derived || {};
-            const energyEl = document.getElementById('battery78-energy');
-            if (energyEl) {
-                energyEl.textContent = (derived.remaining_kwh != null) ? `${derived.remaining_kwh.toFixed(2)} kWh` : '--';
-            }
-            const capEl = document.getElementById('battery78-capacity');
-            if (capEl) {
-                capEl.textContent = (derived.full_kwh != null) ? `${derived.full_kwh.toFixed(2)} kWh` : '--';
-            }
-
-            // Update timestamp
-            const timestamp = document.getElementById('battery78-timestamp');
-            if (timestamp) {
-                timestamp.textContent = new Date().toLocaleTimeString();
+                setBatteryStatus('battery78', 'error');
+                console.warn('Battery data error:', batteryData.error);
             }
         }
-        
-        // Set battery connection status
+
         function setBatteryStatus(batteryId, status) {
-            const card = document.getElementById(batteryId + '-card');
-            const badge = document.getElementById(batteryId + '-badge');
-            
-            if (card && badge) {
-                // Remove all status classes
-                card.classList.remove('connected', 'error', 'connecting');
-                badge.classList.remove('connected', 'error', 'connecting');
-                
-                // Add new status
-                card.classList.add(status);
-                badge.classList.add(status);
-                
-                // Update badge text
-                const statusText = {
-                    'connected': 'Connected',
-                    'error': 'Error',
-                    'connecting': 'Connecting'
-                };
-                badge.textContent = statusText[status] || status;
-            }
+            const card = document.getElementById(`${batteryId}-card`);
+            const badge = document.getElementById(`${batteryId}-badge`);
+            if (!card || !badge) return;
+            ['connected', 'error', 'connecting'].forEach(c => { card.classList.remove(c); badge.classList.remove(c); });
+            card.classList.add(status);
+            badge.classList.add(status);
+            badge.textContent = status;
         }
-        
-        // Update system metrics
+
         function updateSystemMetrics(data) {
-            // PV Generation
             const pv_w = data.pv_generation_w || 0;
             const pvEl = document.getElementById('pvGeneration');
             pvEl.textContent = `${pv_w}W`;
-            // Color: green when generating
-            pvEl.className = `metric-value ${pv_w > 50 ? 'status-good' : 'status-info'}`;
+            pvEl.className = `metric-value ${pv_w > 50 ? 'status-good' : ''}`;
             document.getElementById('pvStatus').textContent = pv_w > 100 ? 'Actief' : 'Laag';
-            
-            // Grid Export/Import
+
             const export_w = data.grid_export_w || 0;
             const gridEl = document.getElementById('gridExport');
-            const isExport = export_w > 0;
-            gridEl.textContent = isExport ? `+${export_w}W (Export)` : `${Math.abs(export_w)}W (Import)`;
-            // Color: green for export, red for import
-            gridEl.className = `metric-value ${isExport ? 'status-good' : export_w < 0 ? 'status-danger' : 'status-info'}`;
-            document.getElementById('gridStatus').textContent = 
-                export_w > 100 ? 'Exporteren' : export_w < -100 ? 'Importeren' : 'Neutraal';
-            
-            // House Consumption
-            const house_w = data.house_consumption_w || 0;
-            const houseEl = document.getElementById('houseConsumption');
-            houseEl.textContent = `${house_w}W`;
-            houseEl.className = `metric-value ${house_w > 2000 ? 'status-danger' : house_w > 1000 ? 'status-warning' : 'status-info'}`;
-            document.getElementById('houseStatus').textContent = 
-                house_w > 2000 ? 'Hoog' : house_w > 1000 ? 'Normaal' : 'Laag';
-            
-            // Eddi Status
-            const eddi_w = data.eddi_power_w || 0;
-            document.getElementById('eddiPower').textContent = `${eddi_w}W`;
-            document.getElementById('eddiPower').className = `metric-value ${eddi_w > 200 ? 'status-warning' : 'status-info'}`;
-            
-            const temps = data.eddi_temperatures || {};
-            document.getElementById('tank1Temp').textContent = temps.tank1 ? `${temps.tank1}°C` : 'N/A';
-            document.getElementById('tank2Temp').textContent = temps.tank2 ? `${temps.tank2}°C` : 'N/A';
-            
-            // Zappi Status
-            const zappi_w = data.zappi_power_w || 0;
-            document.getElementById('zappiPower').textContent = `${zappi_w}W`;
-            document.getElementById('zappiPower').className = `metric-value ${zappi_w > 200 ? 'status-warning' : 'status-info'}`;
-            document.getElementById('zappiStatus').textContent = zappi_w > 200 ? 'Actief' : 'Idle';
+            gridEl.textContent = export_w > 0 ? `+${export_w}W (Export)` : `${Math.abs(export_w)}W (Import)`;
+            gridEl.className = `metric-value ${export_w > 10 ? 'status-good' : export_w < -10 ? 'status-danger' : ''}`;
+            document.getElementById('gridStatus').textContent = export_w > 100 ? 'Exporteren' : export_w < -100 ? 'Importeren' : 'Neutraal';
+
+            document.getElementById('houseConsumption').textContent = `${data.house_consumption_w || 0}W`;
+            document.getElementById('eddiPower').textContent = `${data.eddi_power_w || 0}W`;
+            document.getElementById('zappiPower').textContent = `${data.zappi_power_w || 0}W`;
         }
-        
-        // Restart application
-        async function restartApplication() {
-            if (!confirm('🔄 Weet je zeker dat je de applicatie wilt herstarten?')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/system/restart', { method: 'POST' });
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('🔄 Applicatie wordt herstart...\n\nDe pagina wordt over 5 seconden ververst.');
-                    
-                    // Wait 5 seconds then reload page
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 5000);
-                } else {
-                    alert(`❌ Restart failed: ${result.error || 'Unknown error'}`);
-                }
-            } catch (error) {
-                alert(`❌ Restart error: ${error.message}`);
-            }
-        }
-        
-        // Clear logs (placeholder)
-        function clearLogs() {
-            console.clear();
-            alert('✅ Logs cleared');
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            startAutoRefresh();
-        });
+
+        // --- Initializer ---
+        document.addEventListener('DOMContentLoaded', startAutoRefresh);
+        document.getElementById('autoRefresh').addEventListener('change', (e) => e.target.checked ? startAutoRefresh() : stopAutoRefresh());
     </script>
 </body>
 </html>
