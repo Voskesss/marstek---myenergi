@@ -6,45 +6,38 @@ Based on Home Assistant integration and our Modbus scan
 
 # Complete Venus E v2 Register Map
 VENUS_E_REGISTERS = {
-    # Status Registers (Read-only) - 30000 range
-    30000: {
+    # Preferred registers (v2 firmware)
+    32104: {
         "name": "soc_percent",
         "description": "Battery State of Charge",
-        "unit": "%", 
-        "scale": 0.5,  # Observed: raw 144 -> 72.0% (0.5% per unit)
+        "unit": "%",
+        "scale": 1.0,
         "type": "sensor"
     },
-    30001: {
-        "name": "battery_voltage", 
+    32100: {
+        "name": "battery_voltage",
         "description": "Battery Voltage",
         "unit": "V",
-        "scale": 0.01,  # 5375 = 53.75V
+        "scale": 0.1,  # raw 571 -> 57.1 V
         "type": "sensor"
     },
-    30002: {
+    32101: {
         "name": "battery_current",
-        "description": "Battery Current", 
+        "description": "Battery Current",
         "unit": "A",
         "scale": 0.01,
-        "signed": True,  # Can be negative (discharge)
+        "signed": True,
         "type": "sensor"
     },
-    30003: {
+    32102: {
         "name": "battery_power",
         "description": "Battery Power",
-        "unit": "W", 
+        "unit": "W",
         "scale": 1,
         "signed": True,
         "type": "sensor"
     },
-    30004: {
-        "name": "ac_power",
-        "description": "AC Power",
-        "unit": "W",
-        "scale": 1,
-        "type": "sensor"
-    },
-    30005: {
+    35100: {
         "name": "work_mode",
         "description": "Current Work Mode",
         "unit": "",
@@ -52,7 +45,7 @@ VENUS_E_REGISTERS = {
         "type": "sensor",
         "values": {
             0: "Standby",
-            1: "Charging", 
+            1: "Charging",
             2: "Discharging",
             3: "Backup",
             4: "Fault",
@@ -60,71 +53,14 @@ VENUS_E_REGISTERS = {
             6: "Self-Regulating"
         }
     },
-    30006: {
-        "name": "system_status",
-        "description": "System Status",
-        "unit": "",
-        "scale": 1, 
-        "type": "sensor"
-    },
-    30008: {
-        "name": "cycle_count",
-        "description": "Battery Cycle Count",
-        "unit": "cycles",
-        "scale": 1,
-        "type": "sensor"
-    },
-    30009: {
-        "name": "capacity_ah", 
-        "description": "Battery Capacity",
-        "unit": "Ah",
-        "scale": 1,
-        "type": "sensor"
-    },
-    30010: {
-        "name": "internal_temp",
-        "description": "Internal Temperature", 
-        "unit": "°C",
-        "scale": 0.1,  # 257 = 25.7°C
-        "type": "sensor"
-    },
-    
-    # Additional status registers (estimated addresses)
-    30011: {
-        "name": "ac_voltage",
-        "description": "AC Voltage",
-        "unit": "V",
-        "scale": 0.1,
-        "type": "sensor"
-    },
-    30012: {
-        "name": "ac_current", 
-        "description": "AC Current",
-        "unit": "A",
-        "scale": 0.01,
-        "type": "sensor"
-    },
-    30013: {
-        "name": "mosfet_temp_1",
-        "description": "MOSFET Temperature 1",
-        "unit": "°C", 
-        "scale": 0.1,
-        "type": "sensor"
-    },
-    30014: {
-        "name": "mosfet_temp_2",
-        "description": "MOSFET Temperature 2", 
-        "unit": "°C",
-        "scale": 0.1,
-        "type": "sensor"
-    },
-    30015: {
-        "name": "protection_status",
-        "description": "Protection Status Flags",
-        "unit": "",
-        "scale": 1,
-        "type": "sensor"
-    }
+
+    # Legacy registers (v1 firmware) — kept for reference
+    30000: {"name": "legacy_soc_percent", "description": "Legacy SoC", "unit": "%", "scale": 0.5, "type": "sensor"},
+    30001: {"name": "legacy_battery_voltage", "description": "Legacy Voltage", "unit": "V", "scale": 0.01, "type": "sensor"},
+    30002: {"name": "legacy_battery_current", "description": "Legacy Current", "unit": "A", "scale": 0.01, "signed": True, "type": "sensor"},
+    30003: {"name": "legacy_battery_power", "description": "Legacy Power", "unit": "W", "scale": 1, "signed": True, "type": "sensor"},
+    30005: {"name": "legacy_work_mode", "description": "Legacy Work Mode", "unit": "", "scale": 1, "type": "sensor"},
+    30010: {"name": "internal_temp", "description": "Internal Temperature", "unit": "°C", "scale": 0.1, "type": "sensor"},
 }
 
 # Control Registers (Read/Write) - 42000 range  

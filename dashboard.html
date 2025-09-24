@@ -90,7 +90,6 @@
             background: #e3f2fd;
             border-radius: 8px;
         }
-        
         .battery-card {
             border: 2px solid #e5e5e7;
         }
@@ -241,7 +240,7 @@
                     <span class="metric-value" id="battery78-current">--</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Battery Power (Marstek)</span>
+                    <span class="metric-label">Battery Power (Modbus)</span>
                     <span class="metric-value" id="battery78-power">--</span>
                 </div>
                 <div class="metric">
@@ -267,6 +266,30 @@
                 <div class="metric">
                     <span class="metric-label">Capacity</span>
                     <span class="metric-value" id="battery78-capacity">--</span>
+                </div>
+                <div class="metric" style="flex-direction: column; align-items: flex-start; gap:8px; padding-top:12px;">
+                    <span class="metric-label">Manual Control (Modbus)</span>
+                    <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="min-width:160px; color:#666;">Power (0–2000 W)</label>
+                            <input id="powerSlider" type="range" min="0" max="2000" step="50" value="1000" style="flex:1;" oninput="document.getElementById('powerValue').textContent=this.value+' W'" />
+                            <span id="powerValue" style="min-width:80px; text-align:right; font-weight:600;">1000 W</span>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button class="btn btn-success" onclick="batteryControl('charge')">Charge (slider)</button>
+                            <button class="btn btn-danger" onclick="batteryControl('discharge')">Discharge (slider)</button>
+                            <button class="btn btn-secondary" onclick="batteryControl('stop')">Stop</button>
+                            <button class="btn btn-secondary" onclick="batteryDiagnose()">Diagnose</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="min-width:160px; color:#666;">Min. reserve SoC (0–40%)</label>
+                            <input id="reserveSlider" type="range" min="0" max="40" step="1" value="10" style="flex:1;" oninput="document.getElementById('reserveValue').textContent=this.value+' %'" />
+                            <span id="reserveValue" style="min-width:60px; text-align:right; font-weight:600;">10 %</span>
+                            <button class="btn btn-primary" onclick="saveReserve()">Opslaan</button>
+                        </div>
+                    </div>
+                    <small id="battery78-control-msg" style="color:#666;">Gebruik voor lokaal testen. Auto-refresh na actie.</small>
+                    <pre id="battery78-diag" style="background:#f8fafc; color:#0f172a; padding:8px; border-radius:6px; border:1px solid #e5e7eb; margin-top:8px; display:none;"></pre>
                 </div>
                 <div class="modbus-info">
                     <strong>Modbus TCP:</strong> 192.168.68.92:502<br>
@@ -327,6 +350,39 @@
 
     <script>
         let autoRefreshInterval;
+        
+        // Battery manual control API wrapper (global)
+        async function batteryControl(action, power_w) {
+            try {
+                const payload = { action };
+                if (typeof power_w === 'number') payload.power_w = power_w;
+                const res = await fetch('/api/battery/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                const el = document.getElementById('battery78-control-msg');
+                if (j.success) {
+                    el.textContent = `OK: ${j.action}${j.power_w ? ' ' + j.power_w + 'W' : ''} @ ${new Date().toLocaleTimeString()}`;
+                    el.style.color = '#166534';
+                } else {
+                    let extra = '';
+                    if (Array.isArray(j.attempts) && j.attempts.length) {
+                        const parts = j.attempts.map(a => `u${a.unit}: ${a.ok ? 'ok' : (a.error ? a.error : 'fail')}`);
+                        extra = ` [${parts.join(', ')}]`;
+                    }
+                    el.textContent = `Fout: ${j.error || 'onbekend'}${extra} @ ${new Date().toLocaleTimeString()}`;
+                    el.style.color = '#9f1239';
+                }
+                // refresh after a short delay so UI catches up
+                setTimeout(refreshData, 1200);
+            } catch (e) {
+                const el = document.getElementById('battery78-control-msg');
+                el.textContent = `Fout bij control: ${e}`;
+                el.style.color = '#9f1239';
+            }
+        }
         
         // Auto-refresh functionality
         document.getElementById('autoRefresh').addEventListener('change', function() {
@@ -410,17 +466,17 @@
         // Update battery 78 display
         function updateBattery78(data) {
             const elements = {
-                'battery78-soc': (data.derived && typeof data.derived.marstek_soc === 'number') ? `${data.derived.marstek_soc.toFixed(1)} %` : '--',
+                'battery78-soc': (data.derived && typeof data.derived.soc_percent === 'number') ? `${data.derived.soc_percent.toFixed(1)} %` : '--',
                 'battery78-voltage': data.battery_voltage?.formatted || '--',
                 'battery78-current': data.battery_current?.formatted || '--',
                 'battery78-power': data.battery_power?.formatted || '--',
                 'battery78-temp': data.internal_temp?.formatted || '--',
                 'battery78-cycles': data.cycle_count?.formatted || '--'
             };
-            // Prefer Marstek SOC and power when present
+            // Prefer derived values from backend (Modbus)
             const d = data.derived || {};
-            if (typeof d.marstek_power_w === 'number') {
-                elements['battery78-power'] = `${d.marstek_power_w.toFixed(0)}W`;
+            if (typeof d.power_w === 'number') {
+                elements['battery78-power'] = `${d.power_w.toFixed(0)}W`;
             }
             
             // Calculate power from voltage and current
@@ -443,8 +499,8 @@
                     element.textContent = value;
                     
                     // Color coding for SoC
-                    if (id === 'battery78-soc' && typeof d.marstek_soc === 'number') {
-                        const soc = d.marstek_soc;
+                    if (id === 'battery78-soc' && typeof d.soc_percent === 'number') {
+                        const soc = d.soc_percent;
                         element.className = soc > 80 ? 'metric-value status-good' :
                                           soc > 20 ? 'metric-value status-warning' :
                                           'metric-value status-danger';
@@ -459,7 +515,7 @@
                 const workMode = data.work_mode?.raw;
                 const derivedMode = (data.derived && data.derived.mode) ? String(data.derived.mode) : undefined;
                 
-                // Prefer derived mode from Marstek
+                // Prefer derived mode from backend
                 if (derivedMode) {
                     const name = derivedMode;
                     directionElement.textContent = name;

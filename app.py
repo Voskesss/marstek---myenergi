@@ -1,3 +1,27 @@
+import os
+import logging
+
+# Logging configuration (must run after importing os/logging)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_FILE = os.getenv("LOG_FILE", "")
+
+if not logging.getLogger().handlers:
+    handlers = []
+    formatter = logging.Formatter(
+        fmt='%(asctime)s %(levelname)s %(name)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    handlers.append(stream_handler)
+    if LOG_FILE:
+        file_handler = logging.FileHandler(LOG_FILE)
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
+    logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO), handlers=handlers)
+
+logger = logging.getLogger("myenergi-marstek")
+
 """
 Windsurf prompt — 1-file app (FastAPI) voor myenergi + Marstek met automatische regellogica.
 
@@ -91,6 +115,8 @@ POLL_INTERVAL_S        = float(os.getenv("POLL_INTERVAL_S", "2"))
 
 # Battery capacity (kWh) for SoC → kWh calculations
 BATTERY_FULL_KWH      = float(os.getenv("BATTERY_FULL_KWH", "5.12"))
+# Minimum SoC reserve (%) that must remain in the battery (manual/auto rules)
+MIN_SOC_RESERVE       = int(os.getenv("MIN_SOC_RESERVE", "10"))
 
 USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
 
@@ -98,9 +124,14 @@ USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
 # Modbus Client for Venus E Battery 78
 # =========================
 class VenusEModbusClient:
-    def __init__(self, host='192.168.68.92', port=502):
-        self.host = host
-        self.port = port
+    def __init__(self, host=None, port=None):
+        env_host = os.getenv('VENUS_MODBUS_HOST')
+        env_port = os.getenv('VENUS_MODBUS_PORT')
+        self.host = (host or env_host or '192.168.68.92')
+        try:
+            self.port = int(port or env_port or 502)
+        except Exception:
+            self.port = 502
         self.client = None
         self.connected = False
     
@@ -118,27 +149,26 @@ class VenusEModbusClient:
         if self.client:
             self.client.close()
             self.connected = False
-    
+
     def read_battery_data(self):
         """Read all battery data from Venus E via Modbus"""
         if not self.connected:
             if not self.connect():
                 return None
-        
+
         battery_data = {}
-        
-        # Read key registers we discovered
+
+        # Read key registers (preferred v2 mapping + a few legacy extras)
         registers = {
-            30000: "soc_percent",
-            30001: "battery_voltage", 
-            30002: "battery_current",
-            30003: "battery_power",
-            30004: "ac_power",
-            30005: "work_mode",
+            32104: "soc_percent",      # %
+            32100: "battery_voltage",  # V
+            32101: "battery_current",  # A (signed)
+            32102: "battery_power",    # W (signed)
+            35100: "work_mode",        # enum
+            # Legacy/extras we still show if available
             30006: "system_status",
             30008: "cycle_count",
-            30009: "capacity_ah",
-            30010: "internal_temp"
+            30010: "internal_temp",
         }
         
         for reg_addr, param_name in registers.items():
@@ -167,6 +197,153 @@ class VenusEModbusClient:
                 logging.error(f"Error reading register {reg_addr}: {e}")
         
         return battery_data
+
+    # -------------------------
+    # Control helpers (holding registers)
+    # -------------------------
+    def write_holding(self, address: int, value: int) -> tuple[bool, list[dict]]:
+        attempts: list[dict] = []
+        try:
+            if not self.connected and not self.connect():
+                return False, attempts
+            # Try common unit IDs (1, 0, 247) and both keyword styles (unit/slave)
+            for unit in (1, 0, 247):
+                # First try 'unit='
+                ok = False
+                err = None
+                try:
+                    rr = self.client.write_register(address=address, value=value, unit=unit)
+                    ok = (not getattr(rr, 'isError', lambda: False)())
+                except Exception as ex:
+                    err = str(ex)
+                attempts.append({"unit": unit, "style": "unit", "ok": ok, "error": err})
+                if ok:
+                    return True, attempts
+                # Then try 'slave='
+                ok2 = False
+                err2 = None
+                try:
+                    rr2 = self.client.write_register(address=address, value=value, slave=unit)
+                    ok2 = (not getattr(rr2, 'isError', lambda: False)())
+                except Exception as ex2:
+                    err2 = str(ex2)
+                attempts.append({"unit": unit, "style": "slave", "ok": ok2, "error": err2})
+                if ok2:
+                    return True, attempts
+            return False, attempts
+        except Exception as e:
+            logging.error(f"Modbus write error @ {address}: {e}")
+            attempts.append({"unit": None, "ok": False, "error": str(e)})
+            return False, attempts
+
+    def set_control(self, action: str, power_w: Optional[int] = None) -> dict:
+        """High-level control for charge/discharge/stop using control map:
+        - 42000 rs485_control_enable: 1 = enable
+        - 42001 user_work_mode: 1 = Manual (optional)
+        - 42002 force_charge_power (W)
+        - 42003 force_discharge_power (W)
+        - 42008 force_charge_discharge: 0 Stop, 1 Charge, 2 Discharge
+        """
+        result = {"ok": False, "attempts": []}
+        try:
+            if power_w is None:
+                power_w = 0
+            power_w = max(0, int(power_w))
+
+            # Ensure connection
+            if not self.connected and not self.connect():
+                result["error"] = "connect failed"
+                return result
+
+            def do_command(primary: bool = True) -> tuple[bool, list[dict]]:
+                all_tries: list[dict] = []
+                if primary:
+                    # Primary map: 42002/42003 (power), 42008 (command)
+                    if action == "stop":
+                        ok, tries = self.write_holding(42008, 0)
+                        all_tries += [{"addr": 42008, **t} for t in tries]
+                        return ok, all_tries
+                    if action == "charge":
+                        okp, triesp = self.write_holding(42002, power_w)
+                        all_tries += [{"addr": 42002, **t} for t in triesp]
+                        okc, triesc = self.write_holding(42008, 1)
+                        all_tries += [{"addr": 42008, **t} for t in triesc]
+                        return (okp and okc), all_tries
+                    if action == "discharge":
+                        okp, triesp = self.write_holding(42003, power_w)
+                        all_tries += [{"addr": 42003, **t} for t in triesp]
+                        okd, triesd = self.write_holding(42008, 2)
+                        all_tries += [{"addr": 42008, **t} for t in triesd]
+                        return (okp and okd), all_tries
+                else:
+                    # Alternate map: 42010/42011 (power), 42020 (command)
+                    if action == "stop":
+                        ok, tries = self.write_holding(42020, 0)
+                        all_tries += [{"addr": 42020, **t} for t in tries]
+                        return ok, all_tries
+                    if action == "charge":
+                        okp, triesp = self.write_holding(42010, power_w)
+                        all_tries += [{"addr": 42010, **t} for t in triesp]
+                        okc, triesc = self.write_holding(42020, 1)
+                        all_tries += [{"addr": 42020, **t} for t in triesc]
+                        return (okp and okc), all_tries
+                    if action == "discharge":
+                        okp, triesp = self.write_holding(42011, power_w)
+                        all_tries += [{"addr": 42011, **t} for t in triesp]
+                        okd, triesd = self.write_holding(42020, 2)
+                        all_tries += [{"addr": 42020, **t} for t in triesd]
+                        return (okp and okd), all_tries
+                return False, all_tries
+
+            # 1) Try direct command first (sommige firmwares laten dit toe)
+            ok_cmd, tries_cmd = do_command(primary=True)
+            result["attempts"] += tries_cmd
+            if ok_cmd:
+                result.update({"ok": True, "action": action, "power_w": power_w})
+                return result
+
+            # 2) Try enabling RS485 control and manual mode, then retry command
+            ok_enable, tries_en = self.write_holding(42000, 1)
+            result["attempts"] += [{"addr": 42000, **t} for t in tries_en]
+            # optional manual mode
+            ok_manual, tries_manual = self.write_holding(42001, 1)
+            result["attempts"] += [{"addr": 42001, **t} for t in tries_manual]
+
+            ok_cmd2, tries_cmd2 = do_command(primary=True)
+            result["attempts"] += tries_cmd2
+            if ok_cmd2:
+                result.update({"ok": True, "action": action, "power_w": power_w})
+                return result
+
+            # 3) Try alternate mapping without and with enable/manual
+            ok_alt, tries_alt = do_command(primary=False)
+            result["attempts"] += tries_alt
+            if ok_alt:
+                result.update({"ok": True, "action": action, "power_w": power_w, "map": "alt"})
+                return result
+
+            ok_en_alt, tries_en_alt = self.write_holding(42000, 1)
+            result["attempts"] += [{"addr": 42000, **t} for t in tries_en_alt]
+            ok_man_alt, tries_man_alt = self.write_holding(42001, 1)
+            result["attempts"] += [{"addr": 42001, **t} for t in tries_man_alt]
+
+            ok_alt2, tries_alt2 = do_command(primary=False)
+            result["attempts"] += tries_alt2
+            if ok_alt2:
+                result.update({"ok": True, "action": action, "power_w": power_w, "map": "alt"})
+                return result
+
+            result["error"] = "command failed (primary+alt)"
+            return result
+
+            result["error"] = f"unknown action: {action}"
+            return result
+        finally:
+            # Keep connection policy consistent with reads: short session
+            try:
+                self.disconnect()
+            except Exception:
+                pass
 
 # Global Modbus client
 venus_modbus = VenusEModbusClient()
@@ -1426,6 +1603,28 @@ async def ble_connect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# =========================
+# Settings Endpoints
+# =========================
+@app.get("/api/settings")
+async def get_settings():
+    return {
+        "success": True,
+        "min_soc_reserve": MIN_SOC_RESERVE,
+        "battery_full_kwh": BATTERY_FULL_KWH,
+    }
+
+@app.post("/api/settings/reserve")
+async def set_min_soc_reserve(payload: Dict[str, Any] = Body(...)):
+    try:
+        val = int(payload.get("min_soc_reserve"))
+        val = max(0, min(val, 100))
+        global MIN_SOC_RESERVE
+        MIN_SOC_RESERVE = val
+        return {"success": True, "min_soc_reserve": MIN_SOC_RESERVE}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/ble/disconnect")
 async def ble_disconnect():
     """Manually disconnect BLE"""
@@ -1505,6 +1704,27 @@ async def get_battery_status():
                 soc = float(battery_data.get("soc_percent", {}).get("value"))
             except Exception:
                 soc = None
+            # Compute power from Modbus values
+            try:
+                v = float(battery_data.get("battery_voltage", {}).get("value", 0.0))
+            except Exception:
+                v = 0.0
+            try:
+                i = float(battery_data.get("battery_current", {}).get("value", 0.0))
+            except Exception:
+                i = 0.0
+            calc_power_w = v * i
+            # Prefer device-reported battery power if present
+            raw_bp = battery_data.get("battery_power", {})
+            power_w = raw_bp.get("value") if isinstance(raw_bp, dict) else None
+            if not isinstance(power_w, (int, float)):
+                power_w = calc_power_w
+            # Mode: prefer work_mode register, else derive from calculated power (more reliable sign)
+            work_mode_raw = battery_data.get("work_mode", {}).get("raw")
+            mode_map = {0: "Standby", 1: "Charging", 2: "Discharging", 3: "Backup", 4: "Fault", 5: "Idle", 6: "Self-Regulating"}
+            mode = mode_map.get(work_mode_raw)
+            if not mode:
+                mode = "Idle" if abs(calc_power_w) < 20 else ("Charging" if calc_power_w > 0 else "Discharging")
             remaining_kwh = (BATTERY_FULL_KWH * (soc/100.0)) if (soc is not None) else None
 
             return {
@@ -1513,9 +1733,15 @@ async def get_battery_status():
                 "derived": {
                     "full_kwh": BATTERY_FULL_KWH,
                     "remaining_kwh": remaining_kwh,
+                    "soc_percent": soc,
+                    "power_w": power_w,
+                    "calc_power_w": calc_power_w,
+                    "mode": mode,
+                    "min_soc_reserve": MIN_SOC_RESERVE,
                 },
                 "source": "modbus",
                 "host": venus_modbus.host,
+                "port": venus_modbus.port,
                 "timestamp": datetime.now().isoformat()
             }
         else:
@@ -1532,6 +1758,246 @@ async def get_battery_status():
             "error": str(e),
             "source": "modbus"
         }
+
+@app.post("/api/battery/control")
+async def battery_control(payload: Dict[str, Any] = Body(...)):
+    """Force battery actions via Modbus controls.
+    Payload: { action: 'charge'|'discharge'|'stop', power_w?: int }
+    """
+    try:
+        action = str(payload.get("action") or "").strip().lower()
+        power_w = payload.get("power_w")
+        if action not in {"charge", "discharge", "stop"}:
+            return {"success": False, "error": "invalid action"}
+        # Serialize reads/writes too
+        async with modbus_lock:
+            # Enforce SoC reserve for discharge
+            try:
+                bd = venus_modbus.read_battery_data()
+                try:
+                    venus_modbus.disconnect()
+                except Exception:
+                    pass
+            except Exception:
+                bd = None
+            current_soc = None
+            try:
+                if bd:
+                    current_soc = float(bd.get("soc_percent", {}).get("value"))
+            except Exception:
+                current_soc = None
+
+            if action == "discharge" and current_soc is not None and current_soc <= MIN_SOC_RESERVE:
+                return {"success": False, "error": f"blocked by reserve: SoC {current_soc:.1f}% <= {MIN_SOC_RESERVE}%"}
+
+            result = venus_modbus.set_control(action, power_w)
+        return {"success": bool(result.get("ok")), **result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/battery/raw")
+async def get_battery_raw():
+    """Return raw Modbus battery data for debugging mapping/scaling."""
+    try:
+        async with modbus_lock:
+            data = venus_modbus.read_battery_data()
+            try:
+                venus_modbus.disconnect()
+            except Exception:
+                pass
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/battery/ping")
+async def battery_ping():
+    """Quick connectivity probe: try to open Modbus TCP and read a trivial register.
+    Returns host/port and simple success flag.
+    """
+    try:
+        async with modbus_lock:
+            # Open connection
+            if not venus_modbus.connected:
+                venus_modbus.connect()
+            ok = venus_modbus.connected
+            # Try a lightweight read using both keyword styles
+            addr = 30000
+            val = None
+            try:
+                rr = venus_modbus.client.read_input_registers(address=addr, count=1, unit=1)
+                if hasattr(rr, 'registers') and not rr.isError():
+                    val = rr.registers[0]
+            except Exception:
+                pass
+            if val is None:
+                try:
+                    rr2 = venus_modbus.client.read_input_registers(address=addr, count=1, slave=1)
+                    if hasattr(rr2, 'registers') and not rr2.isError():
+                        val = rr2.registers[0]
+                except Exception:
+                    pass
+            try:
+                venus_modbus.disconnect()
+            except Exception:
+                pass
+        return {"success": ok, "host": venus_modbus.host, "port": venus_modbus.port, "sample": {"address": addr, "value": val}}
+    except Exception as e:
+        return {"success": False, "error": str(e), "host": venus_modbus.host, "port": venus_modbus.port}
+
+@app.get("/api/battery/read_many")
+async def modbus_read_many(addrs: str, fn: str = Query("holding"), unit: int = Query(1), delay_ms: int = Query(0)):
+    """Read many Modbus registers for diagnostics.
+    Query:
+      - addrs: comma-separated addresses, e.g. 42000,42001
+      - fn: only 'holding' supported
+      - unit: preferred unit/slave id
+      - delay_ms: optional delay between reads
+    """
+    try:
+        addresses = [int(x.strip()) for x in addrs.split(',') if x.strip()]
+        results = []
+        async with modbus_lock:
+            if not venus_modbus.connected:
+                venus_modbus.connect()
+            for a in addresses:
+                val = None
+                attempts = []
+                # Try 'unit' style
+                try:
+                    rr = venus_modbus.client.read_holding_registers(address=a, count=1, unit=unit)
+                    ok = (not getattr(rr, 'isError', lambda: False)()) and hasattr(rr, 'registers')
+                    attempts.append({"style": "unit", "ok": ok})
+                    if ok:
+                        val = rr.registers[0]
+                except Exception as ex:
+                    attempts.append({"style": "unit_exception", "ok": False, "error": str(ex)})
+                # If still no val, try 'slave' style
+                if val is None:
+                    try:
+                        rr2 = venus_modbus.client.read_holding_registers(address=a, count=1, slave=unit)
+                        ok2 = (not getattr(rr2, 'isError', lambda: False)()) and hasattr(rr2, 'registers')
+                        attempts.append({"style": "slave", "ok": ok2})
+                        if ok2:
+                            val = rr2.registers[0]
+                    except Exception as ex2:
+                        attempts.append({"style": "slave_exception", "ok": False, "error": str(ex2)})
+                results.append({"address": a, "value": val, "attempts": attempts})
+                if delay_ms:
+                    await asyncio.sleep(delay_ms/1000.0)
+            try:
+                venus_modbus.disconnect()
+            except Exception:
+                pass
+        return {"success": True, "values": results}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/battery/scan")
+async def scan_battery_registers(start: int = 30000, count: int = 80, kind: str = "input"):
+    """Scan a window of Modbus registers (input or holding) and return raw values.
+    Reuses the same Modbus client/config as read_battery_data for maximum compatibility.
+    Params:
+      - start: first register address
+      - count: number of registers to read (capped to 120)
+      - kind: 'input' (function 4) or 'holding' (function 3)
+    """
+    count = max(1, min(int(count), 120))
+    start = int(start)
+    kind = (kind or "input").lower().strip()
+
+    result = {"success": False, "host": venus_modbus.host, "port": venus_modbus.port, "start": start, "count": count, "kind": kind, "values": {}}
+    try:
+        async with modbus_lock:
+            if not venus_modbus.connect():
+                result["error"] = "connect failed"
+                return result
+            try:
+                client = venus_modbus.client
+                for addr in range(start, start + count):
+                    try:
+                        if kind == "holding":
+                            rr = client.read_holding_registers(addr, 1, unit=1)
+                        else:
+                            rr = client.read_input_registers(addr, 1, unit=1)
+                        if rr and not rr.isError():
+                            result["values"][addr] = rr.registers[0]
+                    except Exception:
+                        continue
+            finally:
+                try:
+                    venus_modbus.disconnect()
+                except Exception:
+                    pass
+        result["success"] = True
+        return result
+    except Exception as e:
+        result["error"] = str(e)
+        return result
+
+@app.get("/api/battery/read_many")
+async def read_many(addrs: str, fn: str = "input", unit: int = 1, delay_ms: int = 0):
+    """Read a comma-separated list of Modbus register addresses one-by-one using the same
+    client configuration as normal reads. Returns both raw and formatted values.
+    Params:
+      - addrs: comma-separated addresses (e.g. 29990,29991,...)
+      - fn: 'input' (function 4) or 'holding' (function 3)
+      - unit: Modbus unit id (commonly 1, some devices use 0)
+      - delay_ms: optional delay between reads
+    """
+    try:
+        # Parse addresses
+        addresses = []
+        for part in (addrs or "").split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                addresses.append(int(part))
+            except ValueError:
+                pass
+        if not addresses:
+            return {"success": False, "error": "No addresses provided"}
+
+        out = {}
+        fn = (fn or "input").lower().strip()
+        unit_id = int(unit)
+        wait = max(0, int(delay_ms)) / 1000.0
+        async with modbus_lock:
+            if not venus_modbus.connect():
+                return {"success": False, "error": "connect failed"}
+            try:
+                client = venus_modbus.client
+                for addr in addresses:
+                    raw = None
+                    try:
+                        if fn == "holding":
+                            rr = client.read_holding_registers(addr, 1, unit=unit_id)
+                        else:
+                            rr = client.read_input_registers(addr, 1, unit=unit_id)
+                        if rr and not rr.isError():
+                            raw = rr.registers[0]
+                    except Exception:
+                        raw = None
+
+                    if raw is None:
+                        out[addr] = {"ok": False}
+                    else:
+                        try:
+                            fmt = format_value(addr, raw)
+                        except Exception:
+                            fmt = {"value": raw, "formatted": str(raw)}
+                        out[addr] = {"ok": True, "raw": raw, "formatted": fmt}
+                    if wait:
+                        import time as _t
+                        _t.sleep(wait)
+            finally:
+                try:
+                    venus_modbus.disconnect()
+                except Exception:
+                    pass
+        return {"success": True, "values": out}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/api/battery/test")
 async def test_battery_connection():
