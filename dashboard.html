@@ -279,21 +279,20 @@
                 }
 
 
-                // Current Action (based on actual power)
+                // Current Action (from register 35100)
                 const actionEl = document.getElementById('battery78-action');
-                if (power_w != null) {
-                    if (power_w > 5) {
-                        actionEl.textContent = `Laden (${power_w.toFixed(0)} W)`;
+                if (raw && raw.work_mode && raw.work_mode.formatted) {
+                    const modeText = raw.work_mode.formatted;
+                    actionEl.textContent = modeText;
+                    if (modeText === 'Charging') {
                         actionEl.className = 'metric-value status-good';
-                    } else if (power_w < -5) {
-                        actionEl.textContent = `Ontladen (${power_w.toFixed(0)} W)`;
+                    } else if (modeText === 'Discharging') {
                         actionEl.className = 'metric-value status-danger';
                     } else {
-                        actionEl.textContent = 'Standby';
                         actionEl.className = 'metric-value';
                     }
                 } else {
-                    actionEl.textContent = '--';
+                    actionEl.textContent = 'Onbekend';
                 }
 
                 // Timestamp

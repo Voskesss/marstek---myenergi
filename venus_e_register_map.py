@@ -45,9 +45,9 @@ VENUS_E_REGISTERS = {
         "type": "sensor",
         "values": {
             0: "Standby",
-            1: "Charging",
-            2: "Discharging",
-            3: "Backup",
+            1: "Standby",
+            2: "Charging",
+            3: "Discharging",
             4: "Fault",
             5: "Idle",
             6: "Self-Regulating"
