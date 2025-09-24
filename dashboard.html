@@ -121,7 +121,6 @@
                 <div class="metric"><span class="metric-label">State of Charge</span><span class="metric-value status-info" id="battery78-soc">--</span></div>
                 <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="battery78-energy">--</span></div>
                 <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="battery78-power">--</span></div>
-                <div class="metric"><span class="metric-label">Hoofdmodus</span><span class="metric-value" id="battery78-work-mode">--</span></div>
                 <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="battery78-action">--</span></div>
 
                 <!-- CONTROLS -->
@@ -279,15 +278,6 @@
                     powerEl.textContent = '--';
                 }
 
-                // Main Work Mode (from register 42001)
-                const workModeEl = document.getElementById('battery78-work-mode');
-                if (raw && raw.user_work_mode && raw.user_work_mode.value !== undefined) {
-                    const workModeVal = raw.user_work_mode.value;
-                    const workModeMap = { 0: 'Auto', 1: 'Manual', 2: 'Trade Mode', 3: 'Backup Mode' };
-                    workModeEl.textContent = workModeMap[workModeVal] !== undefined ? workModeMap[workModeVal] : `Onbekend (${workModeVal})`;
-                } else {
-                    workModeEl.textContent = 'Niet Beschikbaar';
-                }
 
                 // Current Action (based on actual power)
                 const actionEl = document.getElementById('battery78-action');

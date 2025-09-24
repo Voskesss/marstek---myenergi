@@ -169,7 +169,6 @@ class VenusEModbusClient:
             30006: "system_status",
             30008: "cycle_count",
             30010: "internal_temp",
-            42001: "user_work_mode",   # User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
         }
         
         for reg_addr, param_name in registers.items():
@@ -236,37 +235,6 @@ class VenusEModbusClient:
             logging.error(f"Modbus write error @ {address}: {e}")
             attempts.append({"unit": None, "ok": False, "error": str(e)})
             return False, attempts
-
-    def set_work_mode(self, mode: int) -> dict:
-        """Sets the main work mode of the battery.
-        - 42001: User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
-        """
-        REG_WORK_MODE = 42001
-        
-        result = {"ok": False, "attempts": []}
-        if mode not in {0, 1, 2, 3}:
-            result["error"] = "Invalid mode. Must be 0, 1, 2, or 3."
-            return result
-
-        try:
-            if not self.connected and not self.connect():
-                result["error"] = "connect failed"
-                return result
-
-            ok, tries = self.write_holding(REG_WORK_MODE, mode)
-            result["attempts"] += [{"addr": REG_WORK_MODE, "val": mode, **t} for t in tries]
-            
-            if ok:
-                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
-            else:
-                result["error"] = "Failed to set work mode."
-            
-            return result
-        finally:
-            try:
-                self.disconnect()
-            except Exception:
-                pass
 
     def set_work_mode(self, mode: int) -> dict:
         """Sets the main work mode of the battery.
@@ -384,6 +352,9 @@ class VenusEModbusClient:
 venus_modbus = VenusEModbusClient()
 # Ensure only one Modbus read at a time
 modbus_lock = asyncio.Lock()
+
+# Lock to prevent concurrent requests to the MyEnergi API, which can cause auth issues
+myenergi_lock = asyncio.Lock()
 
 # =========================
 # Clients
@@ -1107,7 +1078,8 @@ async def get_status():
     """Samengevoegde status van myenergi + marstek."""
     try:
         # myenergi data (always try this first)
-        m = await myenergi.status_all()
+        async with myenergi_lock:
+            m = await myenergi.status_all()
         export_w = extract_grid_export_w(m)
         eddi_w = extract_eddi_power_w(m)
         zappi_w = extract_zappi_power_w(m)
@@ -1537,7 +1509,8 @@ async def control_loop():
     """
     while True:
         try:
-            m = await myenergi.status_all()
+            async with myenergi_lock:
+                m = await myenergi.status_all()
             export_w = extract_grid_export_w(m)  # >0 = export
             now = time.time()
             
@@ -1651,24 +1624,6 @@ async def get_settings():
         "min_soc_reserve": MIN_SOC_RESERVE,
         "battery_full_kwh": BATTERY_FULL_KWH,
     }
-
-@app.post("/api/settings/reserve")
-async def set_min_soc_reserve(payload: Dict[str, Any] = Body(...)):
-    try:
-        val = int(payload.get("min_soc_reserve"))
-        val = max(0, min(val, 100))
-        global MIN_SOC_RESERVE
-        MIN_SOC_RESERVE = val
-        return {"success": True, "min_soc_reserve": MIN_SOC_RESERVE}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.post("/api/ble/disconnect")
-async def ble_disconnect():
-    """Manually disconnect BLE"""
-    if not BLE_AVAILABLE:
-        return {"success": False, "error": "BLE not available"}
-    
     try:
         ble_client = get_ble_client()
         await ble_client.disconnect()
@@ -1796,17 +1751,6 @@ async def get_battery_status():
             "error": str(e),
             "source": "modbus"
         }
-
-@app.post("/api/battery/set_work_mode")
-async def set_battery_work_mode(payload: Dict[str, Any] = Body(...)):
-    """Sets the main work mode of the battery."""
-    try:
-        mode = int(payload.get("mode"))
-        async with modbus_lock:
-            result = venus_modbus.set_work_mode(mode)
-        return {"success": bool(result.get("ok")), **result}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 @app.post("/api/battery/control")
 async def set_battery_control(payload: Dict[str, Any] = Body(...)):
