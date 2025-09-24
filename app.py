@@ -300,6 +300,53 @@ class MarstekClient:
                 continue
         raise RuntimeError(last_err or "No endpoints matched")
 
+    # -------------------------
+    # UDP JSON-RPC (per Open API)
+    # -------------------------
+    async def _udp_call(self, method: str, params: Optional[Dict[str, Any]] = None, timeout: float = 1.0) -> Dict[str, Any]:
+        """Send a JSON-RPC message over UDP to the device. Host derived from base_url, port default 30000.
+        Returns result dict or raises RuntimeError.
+        """
+        import socket, json as _json
+        # Derive host from base_url
+        try:
+            host = self.base_url.split("//", 1)[-1].split(":", 1)[0]
+        except Exception:
+            host = self.base_url
+        port = int(os.getenv("MARSTEK_UDP_PORT", "30000"))
+
+        req = {"id": 1, "method": method, "params": {"id": 0} | (params or {})}
+        data = _json.dumps(req).encode("utf-8")
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(timeout)
+            sock.sendto(data, (host, port))
+            try:
+                buf, _ = sock.recvfrom(4096)
+            except socket.timeout:
+                raise RuntimeError(f"UDP timeout calling {method}")
+        try:
+            resp = _json.loads(buf.decode("utf-8", errors="ignore"))
+        except Exception as e:
+            raise RuntimeError(f"UDP parse error: {e}")
+        if "result" in resp:
+            return resp["result"]
+        raise RuntimeError(resp.get("error", {"message": "Unknown UDP error"}))
+
+    async def es_get_status(self) -> Optional[Dict[str, Any]]:
+        """Call ES.GetStatus to retrieve overall power and battery info."""
+        try:
+            return await self._udp_call("ES.GetStatus")
+        except Exception:
+            return None
+
+    async def bat_get_status(self) -> Optional[Dict[str, Any]]:
+        """Call Bat.GetStatus to retrieve detailed battery info (soc, capacities in Wh)."""
+        try:
+            return await self._udp_call("Bat.GetStatus")
+        except Exception:
+            return None
+
     async def probe(self, ports: Optional[list[int]] = None) -> Dict[str, Any]:
         """Probe multiple ports and paths, return first working sample and the url.
         """
