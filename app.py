@@ -347,6 +347,13 @@ class MarstekClient:
         except Exception:
             return None
 
+    async def es_get_mode(self) -> Optional[Dict[str, Any]]:
+        """Call ES.GetMode to retrieve operating mode and optional powers."""
+        try:
+            return await self._udp_call("ES.GetMode")
+        except Exception:
+            return None
+
     async def probe(self, ports: Optional[list[int]] = None) -> Dict[str, Any]:
         """Probe multiple ports and paths, return first working sample and the url.
         """

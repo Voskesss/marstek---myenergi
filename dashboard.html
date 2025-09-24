@@ -241,11 +241,11 @@
                     <span class="metric-value" id="battery78-current">--</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Battery Power</span>
+                    <span class="metric-label">Battery Power (Marstek)</span>
                     <span class="metric-value" id="battery78-power">--</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Calculated Power</span>
+                    <span class="metric-label">Calculated Power (V×I)</span>
                     <span class="metric-value" id="battery78-calc-power">--</span>
                 </div>
                 <div class="metric">
@@ -352,7 +352,7 @@
         async function refreshData() {
             try {
                 // Get system status
-                const statusResponse = await fetch('/api/status');
+                const statusResponse = await fetch(`/api/status?ts=${Date.now()}`, { cache: 'no-store' });
                 const statusData = await statusResponse.json();
                 
                 // Update system metrics
@@ -372,7 +372,7 @@
         // Battery-specific data refresh with better error handling
         async function refreshBatteryData() {
             try {
-                const batteryResponse = await fetch('/api/battery/status');
+                const batteryResponse = await fetch(`/api/battery/status?ts=${Date.now()}`, { cache: 'no-store' });
                 const batteryData = await batteryResponse.json();
                 
                 if (batteryData.success && batteryData.data) {
@@ -410,7 +410,7 @@
         // Update battery 78 display
         function updateBattery78(data) {
             const elements = {
-                'battery78-soc': (data.soc_percent?.value != null) ? `${data.soc_percent.value.toFixed(1)} %` : '--',
+                'battery78-soc': (data.derived && typeof data.derived.marstek_soc === 'number') ? `${data.derived.marstek_soc.toFixed(1)} %` : '--',
                 'battery78-voltage': data.battery_voltage?.formatted || '--',
                 'battery78-current': data.battery_current?.formatted || '--',
                 'battery78-power': data.battery_power?.formatted || '--',
@@ -419,9 +419,6 @@
             };
             // Prefer Marstek SOC and power when present
             const d = data.derived || {};
-            if (typeof d.marstek_soc === 'number') {
-                elements['battery78-soc'] = `${d.marstek_soc.toFixed(1)} %`;
-            }
             if (typeof d.marstek_power_w === 'number') {
                 elements['battery78-power'] = `${d.marstek_power_w.toFixed(0)}W`;
             }
@@ -446,8 +443,8 @@
                     element.textContent = value;
                     
                     // Color coding for SoC
-                    if (id === 'battery78-soc' && data.soc_percent?.value) {
-                        const soc = data.soc_percent.value;
+                    if (id === 'battery78-soc' && typeof d.marstek_soc === 'number') {
+                        const soc = d.marstek_soc;
                         element.className = soc > 80 ? 'metric-value status-good' :
                                           soc > 20 ? 'metric-value status-warning' :
                                           'metric-value status-danger';
@@ -455,14 +452,19 @@
                 }
             }
             
-            // Update charge/discharge direction with better logic
+            // Update charge/discharge direction with Marstek mode if present
             const directionElement = document.getElementById('battery78-direction');
             if (directionElement) {
                 const current = data.battery_current?.value || 0;
                 const workMode = data.work_mode?.raw;
+                const derivedMode = (data.derived && data.derived.mode) ? String(data.derived.mode) : undefined;
                 
-                // Use work mode if available, otherwise fall back to current
-                if (workMode !== undefined) {
+                // Prefer derived mode from Marstek
+                if (derivedMode) {
+                    const name = derivedMode;
+                    directionElement.textContent = name;
+                    directionElement.className = 'metric-value ' + (name.includes('Charge') ? 'status-good' : name.includes('Discharge') ? 'status-warning' : 'status-info');
+                } else if (workMode !== undefined) {
                     const modeNames = {
                         0: '⏸️ Standby',
                         1: '🔋 Charging', 
@@ -499,9 +501,23 @@
                         directionElement.textContent = '⏸️ Standby';
                         directionElement.className = 'metric-value status-info';
                     }
-                }
+                            }
             }
-            
+
+            // Hide temp/cycles rows if unknown
+            const hideIfUnknown = (valueId) => {
+                const el = document.getElementById(valueId);
+                if (el) {
+                    const row = el.closest('.metric');
+                    if (row) {
+                        const val = el.textContent?.trim() || '--';
+                        row.style.display = (val === '--') ? 'none' : '';
+                    }
+                }
+            };
+            hideIfUnknown('battery78-temp');
+            hideIfUnknown('battery78-cycles');
+
             // Update energy/capacity from derived fields
             const derived = data.derived || {};
             const energyEl = document.getElementById('battery78-energy');
