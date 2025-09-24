@@ -206,8 +206,8 @@ class VenusEModbusClient:
         try:
             if not self.connected and not self.connect():
                 return False, attempts
-            # Try common unit IDs (1, 0, 247) and both keyword styles (unit/slave)
-            for unit in (1, 0, 247):
+            # Try a range of common unit IDs (1-10) and both keyword styles (unit/slave)
+            for unit in range(1, 11):
                 # First try 'unit='
                 ok = False
                 err = None
@@ -237,106 +237,78 @@ class VenusEModbusClient:
             return False, attempts
 
     def set_control(self, action: str, power_w: Optional[int] = None) -> dict:
-        """High-level control for charge/discharge/stop using control map:
-        - 42000 rs485_control_enable: 1 = enable
-        - 42001 user_work_mode: 1 = Manual (optional)
-        - 42002 force_charge_power (W)
-        - 42003 force_discharge_power (W)
-        - 42008 force_charge_discharge: 0 Stop, 1 Charge, 2 Discharge
+        """High-level control for charge/discharge/stop using community-provided registers.
+        - 42000: Control mode (0x55AA to enable, 0x55BB to disable)
+        - 42010: Mode (1=Charge, 2=Discharge, 0=Stop)
+        - 42020: Charge power (W)
+        - 42021: Discharge power (W)
         """
+        CONTROL_ENABLE = 21930  # 0x55AA
+        CONTROL_DISABLE = 21947 # 0x55BB
+        REG_CONTROL_MODE = 42000
+        REG_SET_MODE = 42010
+        REG_CHARGE_POWER = 42020
+        REG_DISCHARGE_POWER = 42021
+
         result = {"ok": False, "attempts": []}
         try:
-            if power_w is None:
-                power_w = 0
-            power_w = max(0, int(power_w))
+            power_w = max(0, int(power_w or 0))
 
-            # Ensure connection
             if not self.connected and not self.connect():
                 result["error"] = "connect failed"
                 return result
 
-            def do_command(primary: bool = True) -> tuple[bool, list[dict]]:
-                all_tries: list[dict] = []
-                if primary:
-                    # Primary map: 42002/42003 (power), 42008 (command)
-                    if action == "stop":
-                        ok, tries = self.write_holding(42008, 0)
-                        all_tries += [{"addr": 42008, **t} for t in tries]
-                        return ok, all_tries
-                    if action == "charge":
-                        okp, triesp = self.write_holding(42002, power_w)
-                        all_tries += [{"addr": 42002, **t} for t in triesp]
-                        okc, triesc = self.write_holding(42008, 1)
-                        all_tries += [{"addr": 42008, **t} for t in triesc]
-                        return (okp and okc), all_tries
-                    if action == "discharge":
-                        okp, triesp = self.write_holding(42003, power_w)
-                        all_tries += [{"addr": 42003, **t} for t in triesp]
-                        okd, triesd = self.write_holding(42008, 2)
-                        all_tries += [{"addr": 42008, **t} for t in triesd]
-                        return (okp and okd), all_tries
-                else:
-                    # Alternate map: 42010/42011 (power), 42020 (command)
-                    if action == "stop":
-                        ok, tries = self.write_holding(42020, 0)
-                        all_tries += [{"addr": 42020, **t} for t in tries]
-                        return ok, all_tries
-                    if action == "charge":
-                        okp, triesp = self.write_holding(42010, power_w)
-                        all_tries += [{"addr": 42010, **t} for t in triesp]
-                        okc, triesc = self.write_holding(42020, 1)
-                        all_tries += [{"addr": 42020, **t} for t in triesc]
-                        return (okp and okc), all_tries
-                    if action == "discharge":
-                        okp, triesp = self.write_holding(42011, power_w)
-                        all_tries += [{"addr": 42011, **t} for t in triesp]
-                        okd, triesd = self.write_holding(42020, 2)
-                        all_tries += [{"addr": 42020, **t} for t in triesd]
-                        return (okp and okd), all_tries
-                return False, all_tries
+            # Step 1: Enable control mode (unless we are stopping)
+            if action != "stop":
+                ok_en, tries_en = self.write_holding(REG_CONTROL_MODE, CONTROL_ENABLE)
+                result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": CONTROL_ENABLE, **t} for t in tries_en]
+                if not ok_en:
+                    result["error"] = "Failed to enable control mode"
+                    return result
+                time.sleep(0.1) # Wait a moment after enabling control
 
-            # 1) Try direct command first (sommige firmwares laten dit toe)
-            ok_cmd, tries_cmd = do_command(primary=True)
-            result["attempts"] += tries_cmd
+            # Step 2: Set power and mode
+            ok_cmd = False
+            if action == "charge":
+                ok_p, tries_p = self.write_holding(REG_CHARGE_POWER, power_w)
+                result["attempts"] += [{"addr": REG_CHARGE_POWER, "val": power_w, **t} for t in tries_p]
+                ok_m, tries_m = self.write_holding(REG_SET_MODE, 1)
+                result["attempts"] += [{"addr": REG_SET_MODE, "val": 1, **t} for t in tries_m]
+                ok_cmd = ok_p and ok_m
+
+            elif action == "discharge":
+                ok_p, tries_p = self.write_holding(REG_DISCHARGE_POWER, power_w)
+                result["attempts"] += [{"addr": REG_DISCHARGE_POWER, "val": power_w, **t} for t in tries_p]
+                ok_m, tries_m = self.write_holding(REG_SET_MODE, 2)
+                result["attempts"] += [{"addr": REG_SET_MODE, "val": 2, **t} for t in tries_m]
+                ok_cmd = ok_p and ok_m
+
+            elif action == "stop":
+                # Explicitly set powers to 0 first for a clean stop
+                ok_pc, tries_pc = self.write_holding(REG_CHARGE_POWER, 0)
+                result["attempts"] += [{"addr": REG_CHARGE_POWER, "val": 0, **t} for t in tries_pc]
+                ok_pd, tries_pd = self.write_holding(REG_DISCHARGE_POWER, 0)
+                result["attempts"] += [{"addr": REG_DISCHARGE_POWER, "val": 0, **t} for t in tries_pd]
+                
+                # Then, set mode to stop
+                ok_m, tries_m = self.write_holding(REG_SET_MODE, 0)
+                result["attempts"] += [{"addr": REG_SET_MODE, "val": 0, **t} for t in tries_m]
+                time.sleep(0.1)
+                
+                # Finally, disable remote control to return to normal operation
+                ok_dis, tries_dis = self.write_holding(REG_CONTROL_MODE, CONTROL_DISABLE)
+                result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": CONTROL_DISABLE, **t} for t in tries_dis]
+                ok_cmd = ok_pc and ok_pd and ok_m and ok_dis
+            else:
+                result["error"] = f"unknown action: {action}"
+                return result
+
+            # Final result
             if ok_cmd:
                 result.update({"ok": True, "action": action, "power_w": power_w})
-                return result
-
-            # 2) Try enabling RS485 control and manual mode, then retry command
-            ok_enable, tries_en = self.write_holding(42000, 1)
-            result["attempts"] += [{"addr": 42000, **t} for t in tries_en]
-            # optional manual mode
-            ok_manual, tries_manual = self.write_holding(42001, 1)
-            result["attempts"] += [{"addr": 42001, **t} for t in tries_manual]
-
-            ok_cmd2, tries_cmd2 = do_command(primary=True)
-            result["attempts"] += tries_cmd2
-            if ok_cmd2:
-                result.update({"ok": True, "action": action, "power_w": power_w})
-                return result
-
-            # 3) Try alternate mapping without and with enable/manual
-            ok_alt, tries_alt = do_command(primary=False)
-            result["attempts"] += tries_alt
-            if ok_alt:
-                result.update({"ok": True, "action": action, "power_w": power_w, "map": "alt"})
-                return result
-
-            ok_en_alt, tries_en_alt = self.write_holding(42000, 1)
-            result["attempts"] += [{"addr": 42000, **t} for t in tries_en_alt]
-            ok_man_alt, tries_man_alt = self.write_holding(42001, 1)
-            result["attempts"] += [{"addr": 42001, **t} for t in tries_man_alt]
-
-            ok_alt2, tries_alt2 = do_command(primary=False)
-            result["attempts"] += tries_alt2
-            if ok_alt2:
-                result.update({"ok": True, "action": action, "power_w": power_w, "map": "alt"})
-                return result
-
-            result["error"] = "command failed (primary+alt)"
-            return result
-
-            result["error"] = f"unknown action: {action}"
+            else:
+                result["error"] = f"Command '{action}' failed."
+            
             return result
         finally:
             # Keep connection policy consistent with reads: short session
