@@ -11,7 +11,7 @@ VENUS_E_REGISTERS = {
         "name": "soc_percent",
         "description": "Battery State of Charge",
         "unit": "%", 
-        "scale": 0.68,  # 144 raw = 98% actual
+        "scale": 0.5,  # Observed: raw 144 -> 72.0% (0.5% per unit)
         "type": "sensor"
     },
     30001: {
@@ -52,10 +52,12 @@ VENUS_E_REGISTERS = {
         "type": "sensor",
         "values": {
             0: "Standby",
-            1: "Charge", 
-            2: "Discharge",
+            1: "Charging", 
+            2: "Discharging",
             3: "Backup",
-            4: "Fault"
+            4: "Fault",
+            5: "Idle",
+            6: "Self-Regulating"
         }
     },
     30006: {
@@ -246,15 +248,22 @@ def format_value(address: int, raw_value: int) -> dict:
     # Apply scaling
     scaled_value = raw_value * reg_info["scale"]
     
-    # Format with unit
-    if reg_info["unit"]:
-        formatted = f"{scaled_value} {reg_info['unit']}"
-    else:
-        formatted = str(scaled_value)
-    
-    # Handle enumerated values
+    # Format with max 1 decimal place
     if "values" in reg_info and raw_value in reg_info["values"]:
+        # Use enumerated value
         formatted = reg_info["values"][raw_value]
+    elif reg_info["unit"]:
+        # Format number with max 1 decimal
+        if isinstance(scaled_value, float):
+            formatted = f"{scaled_value:.1f} {reg_info['unit']}"
+        else:
+            formatted = f"{scaled_value} {reg_info['unit']}"
+    else:
+        # No unit, just format number
+        if isinstance(scaled_value, float):
+            formatted = f"{scaled_value:.1f}"
+        else:
+            formatted = str(scaled_value)
     
     return {
         "value": scaled_value,

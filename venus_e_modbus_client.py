@@ -37,9 +37,10 @@ class VenusEModbusClient:
             print("🔌 Disconnected from Venus E")
     
     def read_register(self, address, count=1, unit=1):
-        """Read holding registers"""
+        """Read holding registers with connection recovery"""
         if not self.connected:
-            return None
+            if not self.connect():
+                return None
         
         try:
             result = self.client.read_holding_registers(address, count, unit=unit)
@@ -47,6 +48,19 @@ class VenusEModbusClient:
                 return None
             return result.registers
         except Exception as e:
+            # Handle broken pipe and connection errors
+            if "Broken pipe" in str(e) or "Connection" in str(e):
+                print(f"⚠️ Connection lost to {self.host}:{self.port} - attempting reconnect")
+                self.disconnect()
+                # Try to reconnect once
+                if self.connect():
+                    try:
+                        result = self.client.read_holding_registers(address, count, unit=unit)
+                        if not result.isError():
+                            return result.registers
+                    except:
+                        pass
+            
             print(f"❌ Read error at {address}: {e}")
             return None
     

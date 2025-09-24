@@ -89,6 +89,9 @@ MIN_SWITCH_COOLDOWN_S  = int(os.getenv("MIN_SWITCH_COOLDOWN_S", "60"))
 SOC_FAILSAFE_MIN       = int(os.getenv("SOC_FAILSAFE_MIN", "15"))
 POLL_INTERVAL_S        = float(os.getenv("POLL_INTERVAL_S", "2"))
 
+# Battery capacity (kWh) for SoC → kWh calculations
+BATTERY_FULL_KWH      = float(os.getenv("BATTERY_FULL_KWH", "5.12"))
+
 USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
 
 # =========================
@@ -103,7 +106,8 @@ class VenusEModbusClient:
     
     def connect(self):
         try:
-            self.client = ModbusTcpClient(self.host, port=self.port)
+            # Add a short timeout to avoid hanging sockets
+            self.client = ModbusTcpClient(self.host, port=self.port, timeout=2)
             self.connected = self.client.connect()
             return self.connected
         except Exception as e:
@@ -140,6 +144,11 @@ class VenusEModbusClient:
         for reg_addr, param_name in registers.items():
             try:
                 result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
+                if (not hasattr(result, 'registers')) or result.isError():
+                    # retry once after reconnect
+                    self.disconnect()
+                    if self.connect():
+                        result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
                 
                 if hasattr(result, 'registers') and not result.isError():
                     raw_value = result.registers[0]
@@ -161,6 +170,8 @@ class VenusEModbusClient:
 
 # Global Modbus client
 venus_modbus = VenusEModbusClient()
+# Ensure only one Modbus read at a time
+modbus_lock = asyncio.Lock()
 
 # =========================
 # Clients
@@ -456,8 +467,8 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int
     raw = myenergi_status.get("raw", myenergi_status)
     try:
         if isinstance(raw, list):
-            # Get Harvi CT data
-            total_consumption = 0
+            # Prefer CT consumption from Harvi if available
+            ct_consumption = 0
             pv_generation = 0
             
             for section in raw:
@@ -472,33 +483,32 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int
                             ct_type_key = f"ectt{i}"
                             
                             if ct_power_key in harvi and ct_type_key in harvi:
-                                power = int(harvi[ct_power_key])
-                                ct_type = harvi[ct_type_key]
+                                try:
+                                    power = int(harvi[ct_power_key])
+                                except Exception:
+                                    continue
+                                ct_type = str(harvi[ct_type_key] or "").lower()
                                 
-                                if ct_type == "Generation":
+                                if ct_type == "generation":
                                     pv_generation += power
                                 else:
-                                    # Assume consumption if not generation
-                                    total_consumption += power
+                                    # Treat non-generation clamps as house load; abs guards against sign config
+                                    ct_consumption += abs(power)
             
-            # Calculate house consumption
-            # House = Total consumption - (Eddi + Zappi)
+            # If we have CT-based house load, use it directly
+            if ct_consumption > 0:
+                return ct_consumption
+            
+            # Fallback: derive from grid and device loads
             eddi_w = extract_eddi_power_w(myenergi_status) or 0
             zappi_w = extract_zappi_power_w(myenergi_status) or 0
-            
-            # If we have CT data, use that
-            if total_consumption > 0:
-                house_consumption = total_consumption - eddi_w - zappi_w
-                return max(0, house_consumption)  # Don't return negative
-            
-            # Fallback: use grid calculation
             grid_w = extract_grid_export_w(myenergi_status) or 0
             if grid_w < 0:  # Importing
-                # House consumption = Import + Eddi + Zappi
-                return abs(grid_w) + eddi_w + zappi_w
+                # Approximate total house load
+                return max(0, abs(grid_w) + max(0, eddi_w) + max(0, zappi_w))
             else:
-                # Exporting, estimate house load
-                return max(0, pv_generation - grid_w - eddi_w - zappi_w)
+                # Exporting: estimate from PV minus export and device loads
+                return max(0, (pv_generation or 0) - grid_w - max(0, eddi_w) - max(0, zappi_w))
                 
     except Exception:
         pass
@@ -878,8 +888,20 @@ async def get_status():
                 "marstek_use_ble": MARSTEK_USE_BLE
             }
         }
+        # no-store headers to prevent caching in browsers/proxies
+        cache_headers = {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return JSONResponse(content=payload, headers=cache_headers)
     except Exception as e:
-        return {"error": str(e), "timestamp": time.time()}
+        cache_headers = {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return JSONResponse(content={"error": str(e), "timestamp": time.time()}, headers=cache_headers)
 
 @app.get("/dashboard")
 async def live_dashboard():
@@ -913,12 +935,6 @@ async def dashboard():
       <h1>myenergi ↔ marstek</h1>
       <div style=\"margin:8px 0\">
         <a href=\"/setup\" style=\"color:#93c5fd\">⚙️ Setup</a>
-        &nbsp;•&nbsp;
-        <a href=\"/ble/\" style=\"color:#93c5fd\">🔗 BLE-tool (lokaal)</a>
-        &nbsp;•&nbsp;
-        <a href=\"/ble-set-meter-ip\" style=\"color:#93c5fd\">🌐 Set Meter IP (0x21)</a>
-        &nbsp;•&nbsp;
-        <a href=\"/ble-legacy\" style=\"color:#93c5fd\">🕰️ BLE v1 (legacy)</a>
       </div>
       <div id=\"msg\"></div>
       <div class=\"row\">
@@ -1394,23 +1410,21 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     print("🛑 Shutting down myenergi-marstek integration...")
     
-    # Cancel all running tasks
     try:
-        import asyncio
-        tasks = [task for task in asyncio.all_tasks() if not task.done()]
-        if tasks:
-            print(f"🔄 Cancelling {len(tasks)} running tasks...")
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # Disconnect Modbus client
+        if venus_modbus and venus_modbus.connected:
+            venus_modbus.disconnect()
+            print("📡 Modbus client disconnected")
     except Exception as e:
-        print(f"⚠️  Task cleanup warning: {e}")
+        print(f"⚠️  Modbus cleanup warning: {e}")
     
-    if BLE_AVAILABLE:
-        try:
+    try:
+        # BLE cleanup if available
+        if BLE_AVAILABLE:
             await cleanup_ble_client()
-        except Exception as e:
-            print(f"⚠️  BLE cleanup warning: {e}")
+            print("🔵 BLE client cleaned up")
+    except Exception as e:
+        print(f"⚠️  BLE cleanup warning: {e}")
     
     print("✅ Shutdown complete")
 
@@ -1421,12 +1435,31 @@ async def shutdown_event():
 async def get_battery_status():
     """Get real-time battery status via Modbus"""
     try:
-        battery_data = venus_modbus.read_battery_data()
+        # Serialize access to the Modbus client to avoid broken pipes
+        async with modbus_lock:
+            battery_data = venus_modbus.read_battery_data()
+            # Use short session: disconnect after a full read to prevent stale sockets
+            try:
+                venus_modbus.disconnect()
+            except Exception:
+                pass
         
         if battery_data:
+            # Derived energy metrics
+            soc = None
+            try:
+                soc = float(battery_data.get("soc_percent", {}).get("value"))
+            except Exception:
+                soc = None
+            remaining_kwh = (BATTERY_FULL_KWH * (soc/100.0)) if (soc is not None) else None
+
             return {
                 "success": True,
                 "data": battery_data,
+                "derived": {
+                    "full_kwh": BATTERY_FULL_KWH,
+                    "remaining_kwh": remaining_kwh,
+                },
                 "source": "modbus",
                 "host": venus_modbus.host,
                 "timestamp": datetime.now().isoformat()
@@ -1479,6 +1512,51 @@ async def test_battery_connection():
             "success": False,
             "connected": False,
             "error": str(e)
+        }
+
+# =========================
+# System Control Endpoints
+# =========================
+@app.post("/api/system/restart")
+async def restart_application():
+    """Restart the application"""
+    try:
+        import os
+        import signal
+        import asyncio
+        
+        # Clean shutdown first
+        print("🔄 Restart requested via API")
+        
+        # Schedule restart after response is sent
+        async def delayed_restart():
+            await asyncio.sleep(2)  # Give time for response to be sent
+            print("🔄 Initiating restart...")
+            
+            # Clean disconnect
+            try:
+                if venus_modbus and venus_modbus.connected:
+                    venus_modbus.disconnect()
+            except:
+                pass
+            
+            # Send SIGTERM for clean shutdown
+            os.kill(os.getpid(), signal.SIGTERM)
+        
+        # Start the delayed restart task
+        asyncio.create_task(delayed_restart())
+        
+        return {
+            "success": True,
+            "message": "Application restart initiated",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
         }
 
 # =========================
