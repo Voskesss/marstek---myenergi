@@ -21,14 +21,20 @@ Run:
 import os
 import time
 import asyncio
+import json
+import logging
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import FastAPI, BackgroundTasks, Query, Body
+from fastapi import FastAPI, BackgroundTasks, Request, Query, Body, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pymodbus.client import ModbusTcpClient
+from venus_e_register_map import format_value, get_all_sensors
 from dotenv import load_dotenv
 
 # BLE integration
@@ -84,6 +90,77 @@ SOC_FAILSAFE_MIN       = int(os.getenv("SOC_FAILSAFE_MIN", "15"))
 POLL_INTERVAL_S        = float(os.getenv("POLL_INTERVAL_S", "2"))
 
 USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
+
+# =========================
+# Modbus Client for Venus E Battery 78
+# =========================
+class VenusEModbusClient:
+    def __init__(self, host='192.168.68.92', port=502):
+        self.host = host
+        self.port = port
+        self.client = None
+        self.connected = False
+    
+    def connect(self):
+        try:
+            self.client = ModbusTcpClient(self.host, port=self.port)
+            self.connected = self.client.connect()
+            return self.connected
+        except Exception as e:
+            logging.error(f"Modbus connection error: {e}")
+            return False
+    
+    def disconnect(self):
+        if self.client:
+            self.client.close()
+            self.connected = False
+    
+    def read_battery_data(self):
+        """Read all battery data from Venus E via Modbus"""
+        if not self.connected:
+            if not self.connect():
+                return None
+        
+        battery_data = {}
+        
+        # Read key registers we discovered
+        registers = {
+            30000: "soc_percent",
+            30001: "battery_voltage", 
+            30002: "battery_current",
+            30003: "battery_power",
+            30004: "ac_power",
+            30005: "work_mode",
+            30006: "system_status",
+            30008: "cycle_count",
+            30009: "capacity_ah",
+            30010: "internal_temp"
+        }
+        
+        for reg_addr, param_name in registers.items():
+            try:
+                result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
+                
+                if hasattr(result, 'registers') and not result.isError():
+                    raw_value = result.registers[0]
+                    formatted = format_value(reg_addr, raw_value)
+                    
+                    battery_data[param_name] = {
+                        "value": formatted.get("value", raw_value),
+                        "formatted": formatted.get("formatted", str(raw_value)),
+                        "unit": formatted.get("unit", ""),
+                        "description": formatted.get("description", param_name),
+                        "register": reg_addr,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+            except Exception as e:
+                logging.error(f"Error reading register {reg_addr}: {e}")
+        
+        return battery_data
+
+# Global Modbus client
+venus_modbus = VenusEModbusClient()
 
 # =========================
 # Clients
@@ -374,6 +451,87 @@ def extract_zappi_power_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
         pass
     return None
 
+def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
+    """Huis verbruik (W) - berekend uit CT clamps en devices."""
+    raw = myenergi_status.get("raw", myenergi_status)
+    try:
+        if isinstance(raw, list):
+            # Get Harvi CT data
+            total_consumption = 0
+            pv_generation = 0
+            
+            for section in raw:
+                if isinstance(section, dict) and "harvi" in section:
+                    arr = section.get("harvi") or []
+                    if arr and isinstance(arr[0], dict):
+                        harvi = arr[0]
+                        
+                        # CT clamps power (ectp1, ectp2, ectp3)
+                        for i in range(1, 4):
+                            ct_power_key = f"ectp{i}"
+                            ct_type_key = f"ectt{i}"
+                            
+                            if ct_power_key in harvi and ct_type_key in harvi:
+                                power = int(harvi[ct_power_key])
+                                ct_type = harvi[ct_type_key]
+                                
+                                if ct_type == "Generation":
+                                    pv_generation += power
+                                else:
+                                    # Assume consumption if not generation
+                                    total_consumption += power
+            
+            # Calculate house consumption
+            # House = Total consumption - (Eddi + Zappi)
+            eddi_w = extract_eddi_power_w(myenergi_status) or 0
+            zappi_w = extract_zappi_power_w(myenergi_status) or 0
+            
+            # If we have CT data, use that
+            if total_consumption > 0:
+                house_consumption = total_consumption - eddi_w - zappi_w
+                return max(0, house_consumption)  # Don't return negative
+            
+            # Fallback: use grid calculation
+            grid_w = extract_grid_export_w(myenergi_status) or 0
+            if grid_w < 0:  # Importing
+                # House consumption = Import + Eddi + Zappi
+                return abs(grid_w) + eddi_w + zappi_w
+            else:
+                # Exporting, estimate house load
+                return max(0, pv_generation - grid_w - eddi_w - zappi_w)
+                
+    except Exception:
+        pass
+    return None
+
+def extract_pv_generation_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
+    """PV generatie (W) - uit Harvi CT clamps."""
+    raw = myenergi_status.get("raw", myenergi_status)
+    try:
+        if isinstance(raw, list):
+            total_generation = 0
+            
+            for section in raw:
+                if isinstance(section, dict) and "harvi" in section:
+                    arr = section.get("harvi") or []
+                    if arr and isinstance(arr[0], dict):
+                        harvi = arr[0]
+                        
+                        # Look for Generation CT clamps
+                        for i in range(1, 4):
+                            ct_power_key = f"ectp{i}"
+                            ct_type_key = f"ectt{i}"
+                            
+                            if ct_power_key in harvi and ct_type_key in harvi:
+                                if harvi[ct_type_key] == "Generation":
+                                    total_generation += int(harvi[ct_power_key])
+            
+            return total_generation if total_generation > 0 else None
+                
+    except Exception:
+        pass
+    return None
+
 def extract_eddi_temperatures(myenergi_status: Dict[str, Any]) -> Dict[str, Optional[int]]:
     """Eddi tank temperaturen (°C)."""
     raw = myenergi_status.get("raw", myenergi_status)
@@ -387,18 +545,18 @@ def extract_eddi_temperatures(myenergi_status: Dict[str, Any]) -> Dict[str, Opti
                     arr = section.get("eddi") or []
                     if arr and isinstance(arr[0], dict):
                         eddi = arr[0]
-                        # Tank temperaturen: tp1, tp2 (in 0.1°C, dus delen door 10)
+                        # Tank temperaturen: tp1, tp2 (al in hele graden)
                         if "tp1" in eddi and eddi["tp1"] != -1:
-                            temps["tank1"] = int(eddi["tp1"]) // 10
+                            temps["tank1"] = int(eddi["tp1"])
                         if "tp2" in eddi and eddi["tp2"] != -1:
-                            temps["tank2"] = int(eddi["tp2"]) // 10
+                            temps["tank2"] = int(eddi["tp2"])
         else:
             # Lokale response
             items = raw if isinstance(raw, dict) else {}
             if "tp1" in items and items["tp1"] != -1:
-                temps["tank1"] = int(items["tp1"]) // 10
+                temps["tank1"] = int(items["tp1"])
             if "tp2" in items and items["tp2"] != -1:
-                temps["tank2"] = int(items["tp2"]) // 10
+                temps["tank2"] = int(items["tp2"])
                 
     except Exception:
         pass
@@ -669,14 +827,30 @@ async def health():
 async def get_status():
     """Samengevoegde status van myenergi + marstek."""
     try:
+        # myenergi data (always try this first)
         m = await myenergi.status_all()
-        soc = await marstek.get_soc()
-        power = await marstek.get_power()
         export_w = extract_grid_export_w(m)
         eddi_w = extract_eddi_power_w(m)
         zappi_w = extract_zappi_power_w(m)
+        house_w = extract_house_consumption_w(m)
+        pv_w = extract_pv_generation_w(m)
         eddi_temps = extract_eddi_temperatures(m)
         should_block, block_reason = should_block_battery_for_priority(m, state.battery_blocked)
+        
+        # Marstek data (with timeout protection)
+        soc = None
+        power = None
+        marstek_error = None
+        
+        try:
+            # Try to get battery data with short timeout
+            import asyncio
+            soc = await asyncio.wait_for(marstek.get_soc(), timeout=2.0)
+            power = await asyncio.wait_for(marstek.get_power(), timeout=2.0)
+        except asyncio.TimeoutError:
+            marstek_error = "Battery connection timeout"
+        except Exception as e:
+            marstek_error = f"Battery error: {str(e)[:50]}"
         
         return {
             "timestamp": time.time(),
@@ -684,11 +858,14 @@ async def get_status():
             "grid_export_w": export_w,
             "eddi_power_w": eddi_w,
             "zappi_power_w": zappi_w,
+            "house_consumption_w": house_w,
+            "pv_generation_w": pv_w,
             "eddi_temperatures": eddi_temps,
             "should_block": should_block,
             "block_reason": block_reason,
             "marstek_soc": soc,
             "marstek_power_w": power,
+            "marstek_error": marstek_error,
             "battery_blocked": state.battery_blocked,
             "last_switch": state.last_switch,
             "config": {
@@ -1076,9 +1253,15 @@ async def control_loop():
     while True:
         try:
             m = await myenergi.status_all()
-            soc = await marstek.get_soc()
             export_w = extract_grid_export_w(m)  # >0 = export
             now = time.time()
+            
+            # Try to get battery SoC with timeout
+            soc = None
+            try:
+                soc = await asyncio.wait_for(marstek.get_soc(), timeout=1.0)
+            except:
+                pass  # Continue without battery data
 
             # Failsafe: Batterij beschermen bij lage SoC
             if soc is not None and soc < SOC_FAILSAFE_MIN:
@@ -1211,11 +1394,92 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     print("🛑 Shutting down myenergi-marstek integration...")
     
+    # Cancel all running tasks
+    try:
+        import asyncio
+        tasks = [task for task in asyncio.all_tasks() if not task.done()]
+        if tasks:
+            print(f"🔄 Cancelling {len(tasks)} running tasks...")
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        print(f"⚠️  Task cleanup warning: {e}")
+    
     if BLE_AVAILABLE:
         try:
             await cleanup_ble_client()
         except Exception as e:
             print(f"⚠️  BLE cleanup warning: {e}")
+    
+    print("✅ Shutdown complete")
+
+# =========================
+# Battery Modbus Endpoints
+# =========================
+@app.get("/api/battery/status")
+async def get_battery_status():
+    """Get real-time battery status via Modbus"""
+    try:
+        battery_data = venus_modbus.read_battery_data()
+        
+        if battery_data:
+            return {
+                "success": True,
+                "data": battery_data,
+                "source": "modbus",
+                "host": venus_modbus.host,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No battery data available",
+                "source": "modbus",
+                "host": venus_modbus.host
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "source": "modbus"
+        }
+
+@app.get("/api/battery/test")
+async def test_battery_connection():
+    """Test Modbus connection to battery"""
+    try:
+        connected = venus_modbus.connect()
+        
+        if connected:
+            # Quick test read
+            test_data = venus_modbus.read_battery_data()
+            venus_modbus.disconnect()
+            
+            return {
+                "success": True,
+                "connected": True,
+                "host": venus_modbus.host,
+                "port": venus_modbus.port,
+                "data_available": test_data is not None,
+                "register_count": len(test_data) if test_data else 0
+            }
+        else:
+            return {
+                "success": False,
+                "connected": False,
+                "host": venus_modbus.host,
+                "port": venus_modbus.port,
+                "error": "Connection failed"
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "connected": False,
+            "error": str(e)
+        }
 
 # =========================
 # Manual Control Endpoints
@@ -1245,3 +1509,101 @@ async def marstek_inhibit_manual():
         return {"ok": result, "action": "inhibit", "timestamp": time.time()}
     except Exception as e:
         return {"ok": False, "error": str(e), "action": "inhibit"}
+
+# =========================
+# MQTT Integration
+# =========================
+@app.post("/api/mqtt/publish")
+async def mqtt_publish(payload: Dict[str, str] = Body(...)):
+    """Publish MQTT message via external mosquitto_pub"""
+    try:
+        topic = payload.get("topic")
+        message = payload.get("message")
+        
+        if not topic or not message:
+            return {"success": False, "error": "Missing topic or message"}
+        
+        # Use mosquitto_pub command to publish
+        import subprocess
+        result = subprocess.run([
+            "mosquitto_pub", 
+            "-h", "localhost", 
+            "-t", topic, 
+            "-m", message
+        ], capture_output=True, text=True, timeout=5)
+        
+        if result.returncode == 0:
+            print(f"📡 MQTT Published: {topic} = {message}")
+            return {"success": True, "topic": topic, "message": message}
+        else:
+            print(f"❌ MQTT Publish failed: {result.stderr}")
+            return {"success": False, "error": result.stderr}
+            
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "MQTT publish timeout"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# =========================
+# Multi-Battery Discovery
+# =========================
+@app.get("/api/batteries/discover")
+async def discover_batteries():
+    """Discover all available batteries"""
+    print("🔍 API: Starting battery discovery...")
+    try:
+        # Import battery discovery
+        import sys
+        sys.path.insert(0, '.')
+        from battery_discovery import BatteryDiscovery
+        
+        discovery = BatteryDiscovery()
+        batteries = await discovery.discover_all()
+        
+        print(f"✅ API: Discovery complete - {batteries.get('total', 0)} batteries found")
+        print(f"📊 API: BLE: {len(batteries.get('ble', []))}, Network: {len(batteries.get('network', []))}")
+        
+        return batteries
+    except Exception as e:
+        print(f"❌ API: Discovery failed - {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "ble": [], "network": [], "total": 0}
+
+@app.post("/api/batteries/connect")
+async def connect_to_battery(payload: Dict[str, str] = Body(...)):
+    """Connect to specific battery"""
+    try:
+        battery_type = payload.get("type")
+        address = payload.get("address")
+        name = payload.get("name", "Unknown")
+        
+        if battery_type == "ble":
+            # Connect to BLE battery
+            if BLE_AVAILABLE:
+                ble_client = get_ble_client()
+                # Update client to use specific address
+                ble_client.device_address = address
+                ble_client.device_name = name
+                success = await ble_client.connect()
+                return {"success": success, "type": "ble", "name": name}
+            else:
+                return {"success": False, "error": "BLE not available"}
+        
+        elif battery_type == "network":
+            # Connect to network battery
+            ip_port = address.split(":")
+            if len(ip_port) == 2:
+                ip, port = ip_port
+                # Update marstek client to use this IP
+                global marstek
+                marstek = MarstekClient(f"http://{ip}:{port}", "")
+                return {"success": True, "type": "network", "name": f"{ip}:{port}"}
+            else:
+                return {"success": False, "error": "Invalid address format"}
+        
+        else:
+            return {"success": False, "error": "Unknown battery type"}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}

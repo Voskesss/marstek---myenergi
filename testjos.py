@@ -1,7 +1,7 @@
 import socket
 import json
 
-BATTERY_IP = "192.168.68.72"   # vervang door jouw batterij-IP
+BATTERY_IP = "192.168.68.66"   # vervang door jouw batterij-IP
 BATTERY_PORT = 30000
 
 # JSON commando om status op te vragen
