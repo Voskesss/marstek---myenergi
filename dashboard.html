@@ -279,16 +279,32 @@
                     powerEl.textContent = '--';
                 }
 
-                // Main Work Mode (from register 42001, if available)
+                // Main Work Mode (from register 42001)
                 const workModeEl = document.getElementById('battery78-work-mode');
-                const workModeVal = raw.user_work_mode?.value;
-                const workModeMap = { 0: 'Auto', 1: 'Manual', 2: 'Trade Mode', 3: 'Backup Mode' };
-                workModeEl.textContent = workModeMap[workModeVal] || 'Onbekend';
+                if (raw && raw.user_work_mode && raw.user_work_mode.value !== undefined) {
+                    const workModeVal = raw.user_work_mode.value;
+                    const workModeMap = { 0: 'Auto', 1: 'Manual', 2: 'Trade Mode', 3: 'Backup Mode' };
+                    workModeEl.textContent = workModeMap[workModeVal] !== undefined ? workModeMap[workModeVal] : `Onbekend (${workModeVal})`;
+                } else {
+                    workModeEl.textContent = 'Niet Beschikbaar';
+                }
 
-                // Current Action (from register 35100)
+                // Current Action (based on actual power)
                 const actionEl = document.getElementById('battery78-action');
-                actionEl.textContent = d.mode || '--';
-                actionEl.className = d.mode === 'Charging' ? 'metric-value status-good' : d.mode === 'Discharging' ? 'metric-value status-danger' : 'metric-value';
+                if (power_w != null) {
+                    if (power_w > 20) {
+                        actionEl.textContent = `Laden (${power_w.toFixed(0)} W)`;
+                        actionEl.className = 'metric-value status-good';
+                    } else if (power_w < -20) {
+                        actionEl.textContent = `Ontladen (${power_w.toFixed(0)} W)`;
+                        actionEl.className = 'metric-value status-danger';
+                    } else {
+                        actionEl.textContent = 'Standby';
+                        actionEl.className = 'metric-value';
+                    }
+                } else {
+                    actionEl.textContent = '--';
+                }
 
                 // Timestamp
                 document.getElementById('battery78-timestamp').textContent = new Date().toLocaleTimeString();

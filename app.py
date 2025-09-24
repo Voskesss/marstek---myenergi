@@ -169,6 +169,7 @@ class VenusEModbusClient:
             30006: "system_status",
             30008: "cycle_count",
             30010: "internal_temp",
+            42001: "user_work_mode",   # User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
         }
         
         for reg_addr, param_name in registers.items():
@@ -235,6 +236,37 @@ class VenusEModbusClient:
             logging.error(f"Modbus write error @ {address}: {e}")
             attempts.append({"unit": None, "ok": False, "error": str(e)})
             return False, attempts
+
+    def set_work_mode(self, mode: int) -> dict:
+        """Sets the main work mode of the battery.
+        - 42001: User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
+        """
+        REG_WORK_MODE = 42001
+        
+        result = {"ok": False, "attempts": []}
+        if mode not in {0, 1, 2, 3}:
+            result["error"] = "Invalid mode. Must be 0, 1, 2, or 3."
+            return result
+
+        try:
+            if not self.connected and not self.connect():
+                result["error"] = "connect failed"
+                return result
+
+            ok, tries = self.write_holding(REG_WORK_MODE, mode)
+            result["attempts"] += [{"addr": REG_WORK_MODE, "val": mode, **t} for t in tries]
+            
+            if ok:
+                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
+            else:
+                result["error"] = "Failed to set work mode."
+            
+            return result
+        finally:
+            try:
+                self.disconnect()
+            except Exception:
+                pass
 
     def set_work_mode(self, mode: int) -> dict:
         """Sets the main work mode of the battery.
@@ -737,12 +769,15 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int
             eddi_w = extract_eddi_power_w(myenergi_status) or 0
             zappi_w = extract_zappi_power_w(myenergi_status) or 0
             grid_w = extract_grid_export_w(myenergi_status) or 0
-            if grid_w < 0:  # Importing
-                # Approximate total house load
-                return max(0, abs(grid_w) + max(0, eddi_w) + max(0, zappi_w))
-            else:
-                # Exporting: estimate from PV minus export and device loads
-                return max(0, (pv_generation or 0) - grid_w - max(0, eddi_w) - max(0, zappi_w))
+            pv_gen = extract_pv_generation_w(myenergi_status) or 0
+
+            # Huisverbruik = PV Generatie - Grid Export - Eddi Verbruik - Zappi Verbruik
+            # Let op: grid_w is positief bij export, negatief bij import.
+            # De formule `pv_gen - grid_w` dekt dus zowel import als export correct.
+            # Voorbeeld Export: 5000 (pv) - 3000 (grid) = 2000 (verbruik)
+            # Voorbeeld Import: 0 (pv) - (-1000) (grid) = 1000 (verbruik)
+            house_consumption = pv_gen - grid_w - eddi_w - zappi_w
+            return max(0, int(house_consumption))
                 
     except Exception:
         pass
