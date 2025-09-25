@@ -1,9 +1,9 @@
 {
   "venus_e_78": {
-    "minimum_soc_percent": 15,
-    "auto_charge_enabled": false,
+    "minimum_soc_percent": 40,
+    "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false,
-    "last_updated": "2025-09-25T18:46:26.392601"
+    "last_updated": "2025-09-25T19:23:39.617798"
   }
 }
