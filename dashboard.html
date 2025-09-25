@@ -122,6 +122,10 @@
                 <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="battery78-energy">--</span></div>
                 <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="battery78-power">--</span></div>
                 <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="battery78-action">--</span></div>
+                <div class="metric"><span class="metric-label">RS485 Control</span><span class="metric-value" id="battery78-rs485">--</span></div>
+                <div class="metric"><span class="metric-label">Mode Cmd</span><span class="metric-value" id="battery78-cmd">--</span></div>
+                <div class="metric"><span class="metric-label">Setpoint Charge</span><span class="metric-value" id="battery78-sp-charge">--</span></div>
+                <div class="metric"><span class="metric-label">Setpoint Discharge</span><span class="metric-value" id="battery78-sp-discharge">--</span></div>
 
                 <!-- CONTROLS -->
                 <div class="metric" style="flex-direction: column; align-items: flex-start; gap:12px; padding-top:15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
@@ -297,6 +301,16 @@
 
                 // Timestamp
                 document.getElementById('battery78-timestamp').textContent = new Date().toLocaleTimeString();
+
+                // RS485 control and setpoints (formatted if available)
+                const rs = raw.rs485_control_enable;
+                const cmd = raw.control_mode_command;
+                const spc = raw.charge_setpoint_power;
+                const spd = raw.discharge_setpoint_power;
+                document.getElementById('battery78-rs485').textContent = rs ? (rs.formatted || rs.value || '--') : '--';
+                document.getElementById('battery78-cmd').textContent = cmd ? (cmd.formatted || cmd.value || '--') : '--';
+                document.getElementById('battery78-sp-charge').textContent = spc ? (spc.formatted || `${spc.value} W`) : '--';
+                document.getElementById('battery78-sp-discharge').textContent = spd ? (spd.formatted || `${spd.value} W`) : '--';
 
             } else {
                 setBatteryStatus('battery78', 'error');

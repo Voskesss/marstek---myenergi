@@ -71,7 +71,8 @@ VENUS_E_CONTROLS = {
         "unit": "",
         "scale": 1,
         "type": "control",
-        "values": {0: "Disable", 1: "Enable"}
+        # Some firmwares use simple 0/1, others expect magic tokens 0x55AA/0x55BB
+        "values": {0: "Disable", 1: "Enable", 21930: "Enable", 21947: "Disable"}
     },
     42001: {
         "name": "user_work_mode",
@@ -147,9 +148,36 @@ VENUS_E_CONTROLS = {
         "type": "control",
         "values": {
             0: "Stop",
-            1: "Force Charge", 
+            1: "Force Charge",
             2: "Force Discharge"
         }
+    },
+    # Alternative/extended control set used by some firmwares
+    42010: {
+        "name": "control_mode_command",
+        "description": "Control Command (0=Stop,1=Charge,2=Discharge)",
+        "unit": "",
+        "scale": 1,
+        "type": "control",
+        "values": {0: "Stop", 1: "Force Charge", 2: "Force Discharge"}
+    },
+    42020: {
+        "name": "charge_setpoint_power",
+        "description": "Charge Setpoint Power",
+        "unit": "W",
+        "scale": 1,
+        "type": "control",
+        "min": 0,
+        "max": 2500
+    },
+    42021: {
+        "name": "discharge_setpoint_power",
+        "description": "Discharge Setpoint Power",
+        "unit": "W",
+        "scale": 1,
+        "type": "control",
+        "min": 0,
+        "max": 2500
     }
 }
 
@@ -159,8 +187,7 @@ def get_register_info(address: int) -> dict:
         return VENUS_E_REGISTERS[address]
     elif address in VENUS_E_CONTROLS:
         return VENUS_E_CONTROLS[address]
-    else:
-        return None
+    return None
 
 def get_all_sensors() -> dict:
     """Get all sensor registers"""

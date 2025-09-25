@@ -165,6 +165,11 @@ class VenusEModbusClient:
             32101: "battery_current",  # A (signed)
             32102: "battery_power",    # W (signed)
             35100: "work_mode",        # enum
+            # Control/Setpoint registers (holding)
+            42000: "rs485_control_enable",     # 0/1 or magic token
+            42010: "control_mode_command",     # 0=Stop,1=Charge,2=Discharge
+            42020: "charge_setpoint_power",    # W
+            42021: "discharge_setpoint_power", # W
             # Legacy/extras we still show if available
             30006: "system_status",
             30008: "cycle_count",
@@ -206,8 +211,9 @@ class VenusEModbusClient:
         try:
             if not self.connected and not self.connect():
                 return False, attempts
-            # Try a range of common unit IDs (1-10) and both keyword styles (unit/slave)
-            for unit in range(1, 11):
+            # Try a range of common unit IDs and both keyword styles (unit/slave)
+            units_to_try = list(range(1, 11)) + [0, 247]
+            for unit in units_to_try:
                 # First try 'unit='
                 ok = False
                 err = None
@@ -241,6 +247,9 @@ class VenusEModbusClient:
         - 42001: User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
         """
         REG_WORK_MODE = 42001
+        REG_CONTROL_MODE = 42000
+        CONTROL_ENABLE_TOKENS = [21930, 43605, 1]  # 0x55AA, 0xAA55, or simple 1
+        CONTROL_DISABLE_TOKENS = [21947, 0]        # 0x55BB or simple 0
         
         result = {"ok": False, "attempts": []}
         if mode not in {0, 1, 2, 3}:
@@ -252,10 +261,71 @@ class VenusEModbusClient:
                 result["error"] = "connect failed"
                 return result
 
+            # Mode 0 (Auto): disable remote control to hand control back to device
+            if mode == 0:
+                dis_ok_any = False
+                for tok in CONTROL_DISABLE_TOKENS:
+                    ok_dis, tries_dis = self.write_holding(REG_CONTROL_MODE, tok)
+                    result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_dis]
+                    if ok_dis:
+                        dis_ok_any = True
+                        break
+                if not dis_ok_any:
+                    result["error"] = "Failed to disable control mode"
+                    return result
+                # Readback attempt (optional)
+                try:
+                    rr = self.client.read_holding_registers(address=REG_CONTROL_MODE, count=1, slave=1)
+                    if hasattr(rr, 'registers') and not rr.isError():
+                        result["readback"] = rr.registers[0]
+                except Exception:
+                    pass
+                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
+                return result
+
+            # Mode 1 (Manual): enable remote control; do not force 42001 if FW ignores it
+            if mode == 1:
+                en_ok_any = False
+                for tok in CONTROL_ENABLE_TOKENS:
+                    ok_en, tries_en = self.write_holding(REG_CONTROL_MODE, tok)
+                    result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_en]
+                    if ok_en:
+                        en_ok_any = True
+                        break
+                if not en_ok_any:
+                    result["error"] = "Failed to enable control mode"
+                    return result
+                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
+                return result
+
+            # Mode 2/3 (Trade/Backup): enable control and try to write 42001
+            en_ok_any = False
+            for tok in CONTROL_ENABLE_TOKENS:
+                ok_en, tries_en = self.write_holding(REG_CONTROL_MODE, tok)
+                result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_en]
+                if ok_en:
+                    en_ok_any = True
+                    break
+            if not en_ok_any:
+                result["error"] = "Failed to enable control mode"
+                return result
+
+            # Small settle delay after enabling control mode
+            try:
+                import time as _t
+                _t.sleep(0.1)
+            except Exception:
+                pass
+
             ok, tries = self.write_holding(REG_WORK_MODE, mode)
             result["attempts"] += [{"addr": REG_WORK_MODE, "val": mode, **t} for t in tries]
-            
             if ok:
+                try:
+                    rr = self.client.read_holding_registers(address=REG_WORK_MODE, count=1, slave=1)
+                    if hasattr(rr, 'registers') and not rr.isError():
+                        result["readback"] = rr.registers[0]
+                except Exception:
+                    pass
                 result.update({"ok": True, "action": "set_work_mode", "mode": mode})
             else:
                 result["error"] = "Failed to set work mode."
@@ -1604,6 +1674,115 @@ async def ble_connect():
         ble_client = get_ble_client()
         success = await ble_client.connect()
         return {"success": success, "connected": ble_client.is_connected}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/battery/diagnostics/work_mode")
+async def diagnostics_work_mode(payload: Dict[str, Any] = Body(default={})):  
+    """Diagnose setting user work mode by trying multiple unit IDs and tokens.
+    Optional payload: { "mode": 0|1|2|3 }
+    Returns attempts and readbacks for 42000/42001/35100.
+    """
+    try:
+        mode = payload.get("mode")
+        if mode is None:
+            mode = 1
+        try:
+            mode = int(mode)
+        except Exception:
+            return {"success": False, "error": "invalid mode"}
+
+        report = {"attempts": [], "reads_before": {}, "reads_after": {}, "mode": mode}
+        async with modbus_lock:
+            if not venus_modbus.connected and not venus_modbus.connect():
+                return {"success": False, "error": "connect failed"}
+
+            client = venus_modbus.client
+            # Read before
+            for addr in (42000, 42001, 35100):
+                try:
+                    if addr >= 40000:
+                        rr = client.read_holding_registers(address=addr, count=1, slave=1)
+                    else:
+                        rr = client.read_input_registers(address=addr, count=1, slave=1)
+                    if hasattr(rr, 'registers') and not rr.isError():
+                        report["reads_before"][addr] = rr.registers[0]
+                except Exception:
+                    report["reads_before"][addr] = None
+
+            # Try control enable tokens for units
+            units_to_try = list(range(1, 11)) + [0, 247]
+            en_tokens = [21930, 43605, 1]
+            for unit in units_to_try:
+                for tok in en_tokens:
+                    try:
+                        rr = client.write_register(address=42000, value=tok, unit=unit)
+                        ok = (not getattr(rr, 'isError', lambda: False)())
+                        report["attempts"].append({"addr": 42000, "val": tok, "unit": unit, "ok": ok})
+                        if ok:
+                            break
+                    except Exception as e:
+                        report["attempts"].append({"addr": 42000, "val": tok, "unit": unit, "ok": False, "err": str(e)})
+                else:
+                    continue
+                break
+
+            # Try writing 42001
+            wrote = False
+            for unit in units_to_try:
+                try:
+                    rr = client.write_register(address=42001, value=mode, unit=unit)
+                    ok = (not getattr(rr, 'isError', lambda: False)())
+                    report["attempts"].append({"addr": 42001, "val": mode, "unit": unit, "ok": ok})
+                    if ok:
+                        wrote = True
+                        break
+                except Exception as e:
+                    report["attempts"].append({"addr": 42001, "val": mode, "unit": unit, "ok": False, "err": str(e)})
+
+            # Read after
+            for addr in (42000, 42001, 35100):
+                try:
+                    if addr >= 40000:
+                        rr = client.read_holding_registers(address=addr, count=1, slave=1)
+                    else:
+                        rr = client.read_input_registers(address=addr, count=1, slave=1)
+                    if hasattr(rr, 'registers') and not rr.isError():
+                        report["reads_after"][addr] = rr.registers[0]
+                except Exception:
+                    report["reads_after"][addr] = None
+
+            try:
+                venus_modbus.disconnect()
+            except Exception:
+                pass
+        report["success"] = True
+        report["wrote"] = wrote
+        return report
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/battery/set_work_mode")
+async def api_set_work_mode(payload: Dict[str, Any] = Body(...)):
+    """Set the main work mode using Modbus register 42001.
+    Payload: { mode: 0|1|2|3 } where 0=Auto, 1=Manual, 2=Trade, 3=Backup
+    """
+    try:
+        # Validate payload
+        if payload is None or "mode" not in payload:
+            return {"success": False, "error": "missing 'mode'"}
+        try:
+            mode = int(payload.get("mode"))
+        except Exception:
+            return {"success": False, "error": "invalid 'mode'"}
+
+        if mode not in {0, 1, 2, 3}:
+            return {"success": False, "error": "mode must be 0,1,2,3"}
+
+        # Serialize Modbus access like other endpoints
+        async with modbus_lock:
+            result = venus_modbus.set_work_mode(mode)
+        return {"success": bool(result.get("ok")), **result}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
