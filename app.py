@@ -207,16 +207,19 @@ class VenusEModbusClient:
             current = battery_data["battery_current"]["value"] 
             calculated_power = voltage * current
             
-            # Override battery_power with calculated value
+            # Apply scaling to match Marstek app (divide by ~10)
+            scaled_power = calculated_power * 0.1
+            
+            # Override battery_power with scaled calculated value
             battery_data["battery_power"] = {
-                "value": calculated_power,
-                "formatted": f"{calculated_power:.1f} W",
+                "value": scaled_power,
+                "formatted": f"{scaled_power:.0f} W",
                 "unit": "W", 
                 "description": "Battery Power (calculated)",
                 "register": "calc",
                 "timestamp": datetime.now().isoformat()
             }
-            logging.info(f"Calculated power: {voltage}V × {current}A = {calculated_power}W")
+            logging.info(f"Calculated power: {voltage}V × {current}A = {calculated_power}W, scaled = {scaled_power}W")
         
         return battery_data
 
