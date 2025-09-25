@@ -94,7 +94,7 @@
                 </div>
                 <div class="card">
                     <h3>⚡ Grid</h3>
-                    <div class="metric"><span class="metric-label">Export/Import</span><span class="metric-value" id="gridExport">-</span></div>
+                    <div class="metric"><span class="metric-label">Import/Export</span><span class="metric-value" id="gridExport">-</span></div>
                     <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="gridStatus">-</span></div>
                 </div>
                 <div class="card">
@@ -219,7 +219,17 @@
         // --- API Wrappers ---
         async function setWorkMode(mode) {
             const el = document.getElementById('battery78-control-msg');
+            const workModeButtons = document.querySelectorAll('[id^="work-mode-"]');
+            
             try {
+                // Disable work mode buttons and show loading
+                workModeButtons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                });
+                el.textContent = `⏳ Werkmodus wordt ingesteld...`;
+                el.className = 'status-info';
+                
                 const res = await fetch('/api/battery/set_work_mode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -228,22 +238,40 @@
                 const j = await res.json();
                 if (j.success) {
                     const modeMap = {0: 'Manual', 1: 'Anti-Feed', 2: 'Trade Mode'};
-                    el.textContent = `OK: Werkmodus ingesteld op ${modeMap[mode]}`;
+                    el.textContent = `✅ Werkmodus: ${modeMap[mode]}`;
                     el.className = 'status-good';
                 } else {
-                    el.textContent = `Fout: ${j.error || 'onbekend'}`;
+                    el.textContent = `❌ Fout: ${j.error || 'onbekend'}`;
                     el.className = 'status-danger';
                 }
                 setTimeout(refreshData, 1200);
             } catch (e) {
-                el.textContent = `Fout bij instellen werkmodus: ${e}`;
+                el.textContent = `❌ Fout bij werkmodus: ${e}`;
                 el.className = 'status-danger';
+            } finally {
+                // Re-enable work mode buttons after 2 seconds
+                setTimeout(() => {
+                    workModeButtons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    });
+                }, 2000);
             }
         }
 
         async function batteryControl(action) {
             const el = document.getElementById('battery78-control-msg');
+            const buttons = document.querySelectorAll('.btn');
+            
             try {
+                // Disable all buttons and show loading
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                });
+                el.textContent = `⏳ ${action} wordt uitgevoerd...`;
+                el.className = 'status-info';
+                
                 const power_w = parseInt(document.getElementById('powerSlider').value, 10);
                 const payload = { action, power_w };
                 const res = await fetch('/api/battery/control', {
@@ -253,16 +281,24 @@
                 });
                 const j = await res.json();
                 if (j.success) {
-                    el.textContent = `OK: ${j.action} commando verstuurd.`;
+                    el.textContent = `✅ ${j.action} succesvol uitgevoerd`;
                     el.className = 'status-good';
                 } else {
-                    el.textContent = `Fout: ${j.error || 'onbekend'}`;
+                    el.textContent = `❌ Fout: ${j.error || 'onbekend'}`;
                     el.className = 'status-danger';
                 }
                 setTimeout(refreshData, 1200);
             } catch (e) {
-                el.textContent = `Fout bij geforceerde controle: ${e}`;
+                el.textContent = `❌ Fout bij ${action}: ${e}`;
                 el.className = 'status-danger';
+            } finally {
+                // Re-enable buttons after 2 seconds
+                setTimeout(() => {
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    });
+                }, 2000);
             }
         }
 
@@ -298,7 +334,17 @@
 
         async function setMinimumSoc() {
             const el = document.getElementById('battery78-control-msg');
+            const socButtons = document.querySelectorAll('[onclick*="MinimumSoc"], [onclick*="resetToFactory"]');
+            
             try {
+                // Disable SoC buttons and show loading
+                socButtons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                });
+                el.textContent = `⏳ Minimum SoC wordt ingesteld...`;
+                el.className = 'status-info';
+                
                 const minSoc = parseFloat(document.getElementById('minSocSlider').value);
                 
                 const payload = { 
@@ -318,7 +364,7 @@
                         el.textContent = `⚠️ SoC te laag (${j.current_soc}%) - Noodlading gestart!`;
                         el.className = 'status-warning';
                     } else {
-                        el.textContent = `✅ Min SoC ingesteld op ${minSoc}% - Status OK`;
+                        el.textContent = `✅ Min SoC: ${minSoc}% ingesteld`;
                         el.className = 'status-good';
                     }
                 } else {
@@ -327,8 +373,16 @@
                 }
                 setTimeout(refreshData, 1200);
             } catch (e) {
-                el.textContent = `Fout bij instellen min SoC: ${e}`;
+                el.textContent = `❌ Fout bij min SoC: ${e}`;
                 el.className = 'status-danger';
+            } finally {
+                // Re-enable SoC buttons after 2 seconds
+                setTimeout(() => {
+                    socButtons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    });
+                }, 2000);
             }
         }
 
@@ -525,12 +579,12 @@
             document.getElementById('pvGeneration').textContent = `${pv_w}W`;
             document.getElementById('pvStatus').textContent = pv_w > 100 ? 'Actief' : 'Laag';
 
-            // Grid Export/Import
-            const export_w = data.grid_export_w || 0;
+            // Grid Import/Export (positive = import from grid, negative = export to grid)
+            const grid_w = data.grid_export_w || 0;
             const gridEl = document.getElementById('gridExport');
-            gridEl.textContent = export_w > 0 ? `+${export_w}W (Export)` : `${Math.abs(export_w)}W (Import)`;
-            gridEl.className = `metric-value ${export_w > 10 ? 'status-good' : export_w < -10 ? 'status-danger' : ''}`;
-            document.getElementById('gridStatus').textContent = export_w > 100 ? 'Exporteren' : export_w < -100 ? 'Importeren' : 'Neutraal';
+            gridEl.textContent = grid_w > 0 ? `${grid_w}W (Import)` : grid_w < 0 ? `${Math.abs(grid_w)}W (Export)` : '0W';
+            gridEl.className = `metric-value ${grid_w > 10 ? 'status-warning' : grid_w < -10 ? 'status-good' : ''}`;
+            document.getElementById('gridStatus').textContent = grid_w > 100 ? 'Importeren' : grid_w < -100 ? 'Exporteren' : 'Neutraal';
 
             // House Consumption
             const house_w = data.house_consumption_w || 0;

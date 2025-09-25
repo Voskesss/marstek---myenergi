@@ -853,7 +853,7 @@ def extract_zappi_power_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
         pass
     return None
 
-def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
+def extract_house_consumption_w(myenergi_status: Dict[str, Any], battery_power_w: int = 0) -> Optional[int]:
     """Huis verbruik (W) - berekend uit CT clamps en devices."""
     raw = myenergi_status.get("raw", myenergi_status)
     try:
@@ -888,6 +888,7 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int
             
             # If we have CT-based house load, use it directly
             if ct_consumption > 0:
+                logger.info(f"House consumption from CT clamps: {ct_consumption}W")
                 return ct_consumption
             
             # Fallback: derive from grid and device loads
@@ -896,12 +897,14 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any]) -> Optional[int
             grid_w = extract_grid_export_w(myenergi_status) or 0
             pv_gen = extract_pv_generation_w(myenergi_status) or 0
 
-            # Huisverbruik = PV Generatie - Grid Export - Eddi Verbruik - Zappi Verbruik
-            # Let op: grid_w is positief bij export, negatief bij import.
-            # De formule `pv_gen - grid_w` dekt dus zowel import als export correct.
-            # Voorbeeld Export: 5000 (pv) - 3000 (grid) = 2000 (verbruik)
-            # Voorbeeld Import: 0 (pv) - (-1000) (grid) = 1000 (verbruik)
-            house_consumption = pv_gen - grid_w - eddi_w - zappi_w
+            # Huisverbruik = PV Generatie + Grid Import - Eddi Verbruik - Zappi Verbruik - Batterij Laden
+            # Let op: grid_w is positief bij import (vanuit huis perspectief), negatief bij export.
+            # Batterij laden is positief (verbruikt energie), ontladen is negatief (levert energie)
+            # De formule `pv_gen + grid_w` dekt dus zowel import als export correct.
+            # Voorbeeld Import: 0 (pv) + 2000 (grid import) - 0 - 0 - 500 (batterij laden) = 1500 (huis verbruik)
+            # Voorbeeld Export: 5000 (pv) + (-1000) (grid export) - 0 - 0 - 0 = 4000 (huis verbruik)
+            house_consumption = pv_gen + grid_w - eddi_w - zappi_w - battery_power_w
+            logger.info(f"House consumption fallback: pv={pv_gen}, grid={grid_w}, eddi={eddi_w}, zappi={zappi_w}, battery={battery_power_w} -> house={house_consumption}")
             return max(0, int(house_consumption))
                 
     except Exception:
@@ -1237,7 +1240,6 @@ async def get_status():
         export_w = extract_grid_export_w(m)
         eddi_w = extract_eddi_power_w(m)
         zappi_w = extract_zappi_power_w(m)
-        house_w = extract_house_consumption_w(m)
         pv_w = extract_pv_generation_w(m)
         eddi_temps = extract_eddi_temperatures(m)
         should_block, block_reason = should_block_battery_for_priority(m, state.battery_blocked)
@@ -1246,16 +1248,24 @@ async def get_status():
         soc = None
         power = None
         marstek_error = None
+        battery_power_w = 0
         
         try:
             # Try to get battery data with short timeout
             import asyncio
             soc = await asyncio.wait_for(marstek.get_soc(), timeout=2.0)
             power = await asyncio.wait_for(marstek.get_power(), timeout=2.0)
+            
+            # Extract battery power for house consumption calculation
+            if power and hasattr(power, 'value'):
+                battery_power_w = int(power.value)  # Positive = charging (consuming), Negative = discharging (providing)
         except asyncio.TimeoutError:
             marstek_error = "Battery connection timeout"
         except Exception as e:
             marstek_error = f"Battery error: {str(e)[:50]}"
+        
+        # Calculate house consumption with battery power included
+        house_w = extract_house_consumption_w(m, battery_power_w)
         
         return {
             "timestamp": time.time(),
