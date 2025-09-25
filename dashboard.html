@@ -153,6 +153,27 @@
                             <button id="work-mode-2" class="btn btn-primary" onclick="setWorkMode(2)">Trade</button>
                         </div>
                     </div>
+                    <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                         <label style="color:var(--text-secondary); margin-bottom: 5px;">Minimum SoC Bescherming</label>
+                         <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                            Huidig SoC: <span id="current-soc-display" style="font-weight: bold; color: var(--success-color);">-</span> |
+                            Actieve Min: <span id="active-min-soc" style="font-weight: bold; color: var(--warning-color);">-</span>
+                         </div>
+                         <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                            Status: <span id="soc-protection-status" style="font-weight: bold;">-</span>
+                         </div>
+                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                            <label style="min-width:80px; font-size:14px;">Min SoC:</label>
+                            <input id="minSocSlider" type="range" min="15" max="100" step="1" value="20" 
+                                   oninput="document.getElementById('minSocValue').textContent=this.value+'%'" 
+                                   style="flex:1;" />
+                            <span id="minSocValue" style="min-width:50px; text-align:right; font-weight:600;">20%</span>
+                         </div>
+                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button class="btn btn-primary" onclick="setMinimumSoc()">Instellen</button>
+                            <button class="btn btn-warning" onclick="resetToFactory()">Reset naar Fabrikant</button>
+                         </div>
+                    </div>
                 </div>
                 <div class="modbus-info">
                     <span id="battery78-control-msg" style="font-size: 12px;"></span><br>
@@ -262,6 +283,122 @@
             }
         }
 
+        async function setMinimumSoc() {
+            const el = document.getElementById('battery78-control-msg');
+            try {
+                const minSoc = parseFloat(document.getElementById('minSocSlider').value);
+                
+                const payload = { 
+                    min_soc_percent: minSoc, 
+                    auto_charge: true  // Always enable auto charge when setting minimum
+                };
+                
+                const res = await fetch('/api/battery/minimum_soc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                
+                if (j.success) {
+                    if (j.action_taken === 'emergency_charge') {
+                        el.textContent = `⚠️ SoC te laag (${j.current_soc}%) - Noodlading gestart!`;
+                        el.className = 'status-warning';
+                    } else {
+                        el.textContent = `✅ Min SoC ingesteld op ${minSoc}% - Status OK`;
+                        el.className = 'status-good';
+                    }
+                } else {
+                    el.textContent = `Fout: ${j.error || 'onbekend'}`;
+                    el.className = 'status-danger';
+                }
+                setTimeout(refreshData, 1200);
+            } catch (e) {
+                el.textContent = `Fout bij instellen min SoC: ${e}`;
+                el.className = 'status-danger';
+            }
+        }
+
+
+        async function updateSocProtectionDisplay(batteryData) {
+            try {
+                // Get current battery config
+                const configRes = await fetch('/api/battery/config');
+                const configData = await configRes.json();
+                
+                if (configData.success && batteryData && batteryData.soc_percent) {
+                    const currentSoc = batteryData.soc_percent.value;
+                    const minSoc = configData.config.minimum_soc_percent;
+                    const autoCharge = configData.config.auto_charge_enabled;
+                    
+                    // Update displays
+                    document.getElementById('current-soc-display').textContent = `${currentSoc.toFixed(1)}%`;
+                    document.getElementById('active-min-soc').textContent = `${minSoc}%`;
+                    
+                    // Update slider to match saved config
+                    document.getElementById('minSocSlider').value = minSoc;
+                    document.getElementById('minSocValue').textContent = `${minSoc}%`;
+                    
+                    // Update status
+                    const statusEl = document.getElementById('soc-protection-status');
+                    if (currentSoc <= minSoc) {
+                        statusEl.textContent = '⚠️ Te laag - Emergency charge';
+                        statusEl.style.color = 'var(--danger-color)';
+                    } else if (currentSoc <= minSoc + 2) {
+                        statusEl.textContent = '⚡ Hysteresis zone';
+                        statusEl.style.color = 'var(--warning-color)';
+                    } else {
+                        statusEl.textContent = '✅ Veilig';
+                        statusEl.style.color = 'var(--success-color)';
+                    }
+                }
+            } catch (e) {
+                console.error('Error updating SoC protection display:', e);
+            }
+        }
+
+        async function resetToFactory() {
+            const el = document.getElementById('battery78-control-msg');
+            try {
+                // Reset to factory settings: no minimum SoC protection
+                const payload = { 
+                    min_soc_percent: 15.0,  // Just above hardware limit
+                    auto_charge: false      // Disable our protection
+                };
+                
+                // Stop any active force charge first
+                const stopRes = await fetch('/api/battery/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop' })
+                });
+                
+                // Set factory settings
+                const res = await fetch('/api/battery/minimum_soc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                
+                if (j.success) {
+                    el.textContent = `🔄 Reset naar fabrikant - Batterij bepaalt zelf wanneer te stoppen`;
+                    el.className = 'status-good';
+                    
+                    // Update UI
+                    document.getElementById('minSocSlider').value = 15;
+                    document.getElementById('minSocValue').textContent = '15%';
+                } else {
+                    el.textContent = `Fout bij reset: ${j.error || 'onbekend'}`;
+                    el.className = 'status-danger';
+                }
+                setTimeout(refreshData, 1200);
+            } catch (e) {
+                el.textContent = `Fout bij reset naar fabrikant: ${e}`;
+                el.className = 'status-danger';
+            }
+        }
+
         // --- Main Refresh Logic ---
         function startAutoRefresh() {
             refreshData();
@@ -319,6 +456,9 @@
                 if (raw && raw.user_work_mode && raw.user_work_mode.value !== null) {
                     updateWorkModeButtons(raw.user_work_mode.value);
                 }
+
+                // Update SoC protection display
+                updateSocProtectionDisplay(raw);
 
 
                 // Current Action (from register 35100)

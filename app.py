@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 
 # Logging configuration (must run after importing os/logging)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -340,6 +341,59 @@ class VenusEModbusClient:
             except Exception:
                 pass
 
+    def check_minimum_soc(self, min_soc_percent: float = 20.0, hysteresis: float = 2.0) -> dict:
+        """Check if current SoC is above minimum and take action if needed
+        Uses hysteresis to prevent toggling around the threshold
+        """
+        try:
+            # Get current battery data
+            battery_data = self.read_battery_data()
+            if not battery_data or "soc_percent" not in battery_data:
+                return {"ok": False, "error": "Could not read SoC data"}
+            
+            current_soc = battery_data["soc_percent"]["value"]
+            stop_threshold = min_soc_percent + hysteresis  # e.g. 20% + 2% = 22%
+            
+            result = {
+                "ok": True,
+                "current_soc": current_soc,
+                "min_soc_limit": min_soc_percent,
+                "stop_threshold": stop_threshold,
+                "action_taken": None
+            }
+            
+            if current_soc <= min_soc_percent:
+                # SoC too low - activate emergency charge
+                emergency_power = 500  # Conservative charging power
+                charge_result = self.set_control("charge", emergency_power)
+                
+                result.update({
+                    "action_taken": "emergency_charge",
+                    "emergency_power": emergency_power,
+                    "charge_result": charge_result,
+                    "warning": f"SoC {current_soc}% ≤ {min_soc_percent}% - Emergency charging activated"
+                })
+            elif current_soc >= stop_threshold:
+                # SoC is safe with hysteresis - stop emergency charge and return to previous mode
+                stop_result = self.set_control("stop")
+                
+                result.update({
+                    "action_taken": "stop_emergency_charge",
+                    "stop_result": stop_result,
+                    "status": f"SoC {current_soc}% ≥ {stop_threshold}% - Emergency charge stopped, returning to previous mode"
+                })
+            else:
+                # In hysteresis zone - no action to prevent toggling
+                result.update({
+                    "action_taken": "hysteresis_zone",
+                    "status": f"SoC {current_soc}% in hysteresis zone ({min_soc_percent}% - {stop_threshold}%) - No action"
+                })
+            
+            return result
+            
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def set_control(self, action: str, power_w: Optional[int] = None) -> dict:
         """High-level control for charge/discharge/stop using community-provided registers.
         - 42000: Control mode (0x55AA to enable, 0x55BB to disable)
@@ -418,6 +472,40 @@ class VenusEModbusClient:
 venus_modbus = VenusEModbusClient()
 # Ensure only one Modbus read at a time
 modbus_lock = asyncio.Lock()
+
+# Battery configuration management
+BATTERY_CONFIG_FILE = "battery_config.json"
+
+def load_battery_config() -> dict:
+    """Load battery configuration from file"""
+    try:
+        if os.path.exists(BATTERY_CONFIG_FILE):
+            with open(BATTERY_CONFIG_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logging.warning(f"Could not load battery config: {e}")
+    
+    # Default config
+    return {
+        "venus_e_78": {
+            "minimum_soc_percent": 20.0,
+            "auto_charge_enabled": True,
+            "original_work_mode": None,
+            "emergency_charge_active": False,
+            "last_updated": datetime.now().isoformat()
+        }
+    }
+
+def save_battery_config(config: dict) -> bool:
+    """Save battery configuration to file"""
+    try:
+        config["venus_e_78"]["last_updated"] = datetime.now().isoformat()
+        with open(BATTERY_CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        return True
+    except Exception as e:
+        logging.error(f"Could not save battery config: {e}")
+        return False
 
 # Lock to prevent concurrent requests to the MyEnergi API, which can cause auth issues
 myenergi_lock = asyncio.Lock()
@@ -1926,6 +2014,55 @@ async def get_battery_status():
             "error": str(e),
             "source": "modbus"
         }
+
+@app.get("/api/battery/config")
+async def get_battery_config():
+    """Get current battery configuration"""
+    try:
+        config = load_battery_config()
+        return {"success": True, "config": config["venus_e_78"]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/battery/minimum_soc")
+async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
+    """Check and enforce minimum SoC limit.
+    Payload: { min_soc_percent: float, auto_charge?: bool }
+    """
+    try:
+        min_soc = payload.get("min_soc_percent", 20.0)
+        auto_charge = payload.get("auto_charge", True)
+        
+        if not (15.0 <= min_soc <= 100.0):
+            return {"success": False, "error": "min_soc_percent must be between 15% (hardware limit) and 100%"}
+        
+        # Save configuration
+        config = load_battery_config()
+        config["venus_e_78"]["minimum_soc_percent"] = min_soc
+        config["venus_e_78"]["auto_charge_enabled"] = auto_charge
+        save_battery_config(config)
+        
+        if auto_charge:
+            result = venus_modbus.check_minimum_soc(min_soc)
+        else:
+            # Just check, don't take action
+            battery_data = venus_modbus.read_battery_data()
+            if not battery_data or "soc_percent" not in battery_data:
+                return {"success": False, "error": "Could not read SoC data"}
+            
+            current_soc = battery_data["soc_percent"]["value"]
+            result = {
+                "ok": True,
+                "current_soc": current_soc,
+                "min_soc_limit": min_soc,
+                "below_limit": current_soc <= min_soc,
+                "action_taken": None
+            }
+        
+        return {"success": result["ok"], **result}
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/battery/control")
 async def set_battery_control(payload: Dict[str, Any] = Body(...)):
