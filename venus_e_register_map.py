@@ -62,6 +62,20 @@ VENUS_E_REGISTERS = {
     30003: {"name": "legacy_battery_power", "description": "Battery Power", "unit": "W", "scale": 0.2, "signed": True, "type": "sensor"},
     30005: {"name": "legacy_work_mode", "description": "Legacy Work Mode", "unit": "", "scale": 1, "type": "sensor"},
     30010: {"name": "internal_temp", "description": "Internal Temperature", "unit": "°C", "scale": 0.1, "type": "sensor"},
+    
+    # User Work Mode register
+    43000: {
+        "name": "user_work_mode",
+        "description": "User Work Mode",
+        "unit": "",
+        "scale": 1,
+        "type": "sensor",
+        "values": {
+            0: "Manual",
+            1: "Anti-Feed", 
+            2: "Trade Mode"
+        }
+    },
 }
 
 # Control Registers (Read/Write) - 42000 range  

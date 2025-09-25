@@ -170,6 +170,7 @@ class VenusEModbusClient:
             42010: "control_mode_command",     # 0=Stop,1=Charge,2=Discharge
             42020: "charge_setpoint_power",    # W
             42021: "discharge_setpoint_power", # W
+            43000: "user_work_mode",           # 0=Manual, 1=Anti-Feed, 2=Trade Mode
             # Legacy/extras we still show if available
             30006: "system_status",
             30008: "cycle_count",
@@ -266,10 +267,10 @@ class VenusEModbusClient:
         """Sets the main work mode of the battery.
         - 42001: User Work Mode (0=Auto, 1=Manual, 2=Trade, 3=Backup)
         """
-        REG_WORK_MODE = 42001
-        REG_CONTROL_MODE = 42000
-        CONTROL_ENABLE_TOKENS = [21930, 43605, 1]  # 0x55AA, 0xAA55, or simple 1
-        CONTROL_DISABLE_TOKENS = [21947, 0]        # 0x55BB or simple 0
+        REG_USER_WORK_MODE = 43000  # Correct register for user work mode
+        REG_CONTROL_MODE = 42000    # RS485 control enable/disable
+        CONTROL_ENABLE = 21930      # 0x55AA
+        CONTROL_DISABLE = 21947     # 0x55BB
         
         result = {"ok": False, "attempts": []}
         if mode not in {0, 1, 2, 3}:
@@ -281,75 +282,57 @@ class VenusEModbusClient:
                 result["error"] = "connect failed"
                 return result
 
-            # Mode 0 (Auto): disable remote control to hand control back to device
-            if mode == 0:
-                dis_ok_any = False
-                for tok in CONTROL_DISABLE_TOKENS:
-                    ok_dis, tries_dis = self.write_holding(REG_CONTROL_MODE, tok)
-                    result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_dis]
-                    if ok_dis:
-                        dis_ok_any = True
-                        break
-                if not dis_ok_any:
-                    result["error"] = "Failed to disable control mode"
-                    return result
-                # Readback attempt (optional)
-                try:
-                    rr = self.client.read_holding_registers(address=REG_CONTROL_MODE, count=1, slave=1)
-                    if hasattr(rr, 'registers') and not rr.isError():
-                        result["readback"] = rr.registers[0]
-                except Exception:
-                    pass
-                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
+            # Step 1: Enable RS485 control
+            ok_enable, tries_enable = self.write_holding(REG_CONTROL_MODE, CONTROL_ENABLE)
+            result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": CONTROL_ENABLE, **t} for t in tries_enable]
+            
+            if not ok_enable:
+                result["error"] = "Failed to enable RS485 control"
                 return result
 
-            # Mode 1 (Manual): enable remote control; do not force 42001 if FW ignores it
-            if mode == 1:
-                en_ok_any = False
-                for tok in CONTROL_ENABLE_TOKENS:
-                    ok_en, tries_en = self.write_holding(REG_CONTROL_MODE, tok)
-                    result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_en]
-                    if ok_en:
-                        en_ok_any = True
-                        break
-                if not en_ok_any:
-                    result["error"] = "Failed to enable control mode"
-                    return result
-                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
-                return result
-
-            # Mode 2/3 (Trade/Backup): enable control and try to write 42001
-            en_ok_any = False
-            for tok in CONTROL_ENABLE_TOKENS:
-                ok_en, tries_en = self.write_holding(REG_CONTROL_MODE, tok)
-                result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": tok, **t} for t in tries_en]
-                if ok_en:
-                    en_ok_any = True
-                    break
-            if not en_ok_any:
-                result["error"] = "Failed to enable control mode"
-                return result
-
-            # Small settle delay after enabling control mode
+            # Small delay after enabling control
             try:
                 import time as _t
                 _t.sleep(0.1)
             except Exception:
                 pass
 
-            ok, tries = self.write_holding(REG_WORK_MODE, mode)
-            result["attempts"] += [{"addr": REG_WORK_MODE, "val": mode, **t} for t in tries]
-            if ok:
-                try:
-                    rr = self.client.read_holding_registers(address=REG_WORK_MODE, count=1, slave=1)
-                    if hasattr(rr, 'registers') and not rr.isError():
-                        result["readback"] = rr.registers[0]
-                except Exception:
-                    pass
-                result.update({"ok": True, "action": "set_work_mode", "mode": mode})
-            else:
-                result["error"] = "Failed to set work mode."
+            # Step 2: Set user work mode to register 43000
+            ok_mode, tries_mode = self.write_holding(REG_USER_WORK_MODE, mode)
+            result["attempts"] += [{"addr": REG_USER_WORK_MODE, "val": mode, **t} for t in tries_mode]
             
+            if not ok_mode:
+                result["error"] = "Failed to set work mode"
+                return result
+
+            # Small delay after setting mode
+            try:
+                import time as _t
+                _t.sleep(0.1)
+            except Exception:
+                pass
+
+            # Step 3: Disable RS485 control (let app manage battery again)
+            ok_disable, tries_disable = self.write_holding(REG_CONTROL_MODE, CONTROL_DISABLE)
+            result["attempts"] += [{"addr": REG_CONTROL_MODE, "val": CONTROL_DISABLE, **t} for t in tries_disable]
+            
+            # Note: We don't fail if disable fails, as the mode was already set
+
+            # Readback attempt from register 43000
+            try:
+                rr = self.client.read_holding_registers(address=REG_USER_WORK_MODE, count=1, slave=1)
+                if hasattr(rr, 'registers') and not rr.isError():
+                    result["readback"] = rr.registers[0]
+            except Exception:
+                pass
+
+            mode_names = {0: "Manual", 1: "Anti-Feed", 2: "Trade Mode"}
+            result.update({
+                "ok": True, 
+                "action": "set_work_mode", 
+                "mode": mode,
+                "mode_name": mode_names.get(mode, f"Mode {mode}")
+            })
             return result
         finally:
             try:

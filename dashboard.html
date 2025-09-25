@@ -143,11 +143,14 @@
                         </div>
                     </div>
                     <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                         <label style="color:var(--text-secondary); margin-bottom: 10px;">Hoofd Werkmodus</label>
+                         <label style="color:var(--text-secondary); margin-bottom: 5px;">Hoofd Werkmodus</label>
+                         <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                            Huidig: <span id="current-work-mode" style="font-weight: bold; color: var(--success-color);">-</span>
+                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            <button class="btn btn-primary" onclick="setWorkMode(0)">Auto</button>
-                            <button class="btn btn-primary" onclick="setWorkMode(1)">Manual</button>
-                            <button class="btn btn-primary" onclick="setWorkMode(2)">Trade</button>
+                            <button id="work-mode-0" class="btn btn-primary" onclick="setWorkMode(0)">Manual</button>
+                            <button id="work-mode-1" class="btn btn-primary" onclick="setWorkMode(1)">Anti-Feed</button>
+                            <button id="work-mode-2" class="btn btn-primary" onclick="setWorkMode(2)">Trade</button>
                         </div>
                     </div>
                 </div>
@@ -190,7 +193,7 @@
                 });
                 const j = await res.json();
                 if (j.success) {
-                    const modeMap = {0: 'Auto', 1: 'Manual', 2: 'Trade Mode'};
+                    const modeMap = {0: 'Manual', 1: 'Anti-Feed', 2: 'Trade Mode'};
                     el.textContent = `OK: Werkmodus ingesteld op ${modeMap[mode]}`;
                     el.className = 'status-good';
                 } else {
@@ -226,6 +229,36 @@
             } catch (e) {
                 el.textContent = `Fout bij geforceerde controle: ${e}`;
                 el.className = 'status-danger';
+            }
+        }
+
+        function updateWorkModeButtons(currentMode) {
+            const modeMap = {0: 'Manual', 1: 'Anti-Feed', 2: 'Trade Mode'};
+            
+            // Update current mode display
+            const currentModeEl = document.getElementById('current-work-mode');
+            if (currentModeEl && currentMode !== null && currentMode !== undefined) {
+                currentModeEl.textContent = modeMap[currentMode] || `Mode ${currentMode}`;
+            }
+            
+            // Update button styles
+            for (let i = 0; i <= 2; i++) {
+                const btn = document.getElementById(`work-mode-${i}`);
+                if (btn) {
+                    if (i === currentMode) {
+                        // Active button: green, pressed, disabled
+                        btn.className = 'btn btn-success';
+                        btn.style.opacity = '0.8';
+                        btn.style.transform = 'scale(0.95)';
+                        btn.disabled = true;
+                    } else {
+                        // Inactive button: normal blue, clickable
+                        btn.className = 'btn btn-primary';
+                        btn.style.opacity = '1';
+                        btn.style.transform = 'scale(1)';
+                        btn.disabled = false;
+                    }
+                }
             }
         }
 
@@ -280,6 +313,11 @@
                     powerEl.className = power_w > 20 ? 'metric-value status-good' : power_w < -20 ? 'metric-value status-danger' : 'metric-value';
                 } else {
                     powerEl.textContent = '--';
+                }
+
+                // Update work mode buttons
+                if (raw && raw.user_work_mode && raw.user_work_mode.value !== null) {
+                    updateWorkModeButtons(raw.user_work_mode.value);
                 }
 
 
