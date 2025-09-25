@@ -1,0 +1,23 @@
+{
+  "boiler_priority": {
+    "enabled": true,
+    "tank": "tank2",
+    "min_temp": 36
+  },
+  "surplus_charging": {
+    "enabled": true,
+    "min_export_w": 100
+  },
+  "emergency_charge": {
+    "enabled": true,
+    "power_w": 2000
+  },
+  "smart_control": {
+    "enabled": true,
+    "check_interval_seconds": 10,
+    "step_size_w": 200,
+    "min_eddi_power_for_scaling": 3000,
+    "hysteresis_seconds": 120
+  },
+  "last_updated": null
+}

@@ -2520,3 +2520,209 @@ async def connect_to_battery(payload: Dict[str, str] = Body(...)):
             
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# =========================
+# Energy Rules Management
+# =========================
+
+ENERGY_RULES_CONFIG_FILE = "energy_rules_config.json"
+
+def load_energy_rules():
+    """Load energy rules configuration from file."""
+    try:
+        if os.path.exists(ENERGY_RULES_CONFIG_FILE):
+            with open(ENERGY_RULES_CONFIG_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load energy rules config: {e}")
+    
+    # Default configuration
+    return {
+        "boiler_priority": {"enabled": True, "tank": "tank2", "min_temp": 36},
+        "surplus_charging": {"enabled": True, "min_export_w": 100},
+        "emergency_charge": {"enabled": True, "power_w": 2000},
+        "smart_control": {
+            "enabled": True,
+            "check_interval_seconds": 10,
+            "step_size_w": 200,
+            "min_eddi_power_for_scaling": 3000,
+            "hysteresis_seconds": 120
+        },
+        "last_updated": None
+    }
+
+def save_energy_rules(rules):
+    """Save energy rules configuration to file."""
+    try:
+        rules["last_updated"] = time.time()
+        with open(ENERGY_RULES_CONFIG_FILE, "w") as f:
+            json.dump(rules, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save energy rules config: {e}")
+        return False
+
+@app.post("/api/energy_rules")
+async def update_energy_rules(request: dict):
+    """Update energy management rules."""
+    try:
+        current_rules = load_energy_rules()
+        
+        # Update rules from request
+        for rule_type, rule_config in request.items():
+            if rule_type in current_rules:
+                current_rules[rule_type].update(rule_config)
+        
+        if save_energy_rules(current_rules):
+            # Determine active rule
+            active_rule = determine_active_rule(current_rules)
+            return {
+                "success": True,
+                "active_rule": active_rule,
+                "rules": current_rules
+            }
+        else:
+            return {"success": False, "error": "Failed to save rules"}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/energy_rules")
+async def get_energy_rules():
+    """Get current energy management rules."""
+    try:
+        rules = load_energy_rules()
+        active_rule = determine_active_rule(rules)
+        return {
+            "success": True,
+            "active_rule": active_rule,
+            "rules": rules
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def determine_active_rule(rules):
+    """Determine which energy rule should be active based on current conditions."""
+    try:
+        # This will be called from the control loop with real data
+        # For now, return a placeholder
+        if rules.get("emergency_charge", {}).get("enabled"):
+            return "Emergency Charge"
+        elif rules.get("boiler_priority", {}).get("enabled"):
+            return "Boiler Priority"
+        elif rules.get("surplus_charging", {}).get("enabled"):
+            return "Surplus Charging"
+        else:
+            return "Standby"
+    except Exception:
+        return "Unknown"
+
+
+
+# =========================
+# Smart Battery Control Logic
+# =========================
+
+class SmartBatteryController:
+    def __init__(self):
+        self.last_adjustment_time = 0
+        self.current_battery_power = 0
+        self.adjustment_history = []
+    
+    async def evaluate_and_adjust(self, pv_w, grid_export_w, eddi_w, zappi_w, battery_power_w, tank_temps, rules):
+        """Jip en Janneke batterij controle - Eddi krijgt voorrang!"""
+        try:
+            current_time = time.time()
+            
+            # Hysterese: Wacht tussen aanpassingen
+            if current_time - self.last_adjustment_time < rules.get("smart_control", {}).get("hysteresis_seconds", 120):
+                return None
+            
+            # Stap 1: Kijk of er een probleem is
+            sun_shining = pv_w > 500  # Er is zon
+            exporting_to_grid = grid_export_w > 50  # Er gaat nog energie naar net
+            eddi_underperforming = eddi_w < rules.get("smart_control", {}).get("min_eddi_power_for_scaling", 3000)
+            battery_is_charging = battery_power_w > 100
+            
+            logger.info(f"Smart Control Check: sun={sun_shining}, export={exporting_to_grid}, eddi_low={eddi_underperforming}, battery_charging={battery_is_charging}")
+            
+            # Probleem detectie: Batterij "steelt" van Eddi
+            if sun_shining and exporting_to_grid and eddi_underperforming and battery_is_charging:
+                # Batterij moet minder laden zodat Eddi meer kan pakken
+                step_size = rules.get("smart_control", {}).get("step_size_w", 200)
+                new_power = max(0, battery_power_w - step_size)
+                
+                logger.info(f"🔥 EDDI PRIORITY: Reducing battery power from {battery_power_w}W to {new_power}W")
+                
+                # Stuur commando naar batterij
+                result = await self.adjust_battery_power(new_power)
+                if result:
+                    self.last_adjustment_time = current_time
+                    self.adjustment_history.append({
+                        "time": current_time,
+                        "action": "reduce_for_eddi",
+                        "old_power": battery_power_w,
+                        "new_power": new_power,
+                        "reason": f"Eddi only {eddi_w}W, export {grid_export_w}W"
+                    })
+                return result
+            
+            # Opschaling: Eddi is tevreden, batterij mag meer
+            elif sun_shining and exporting_to_grid and (eddi_w >= 3400 or self.tank_is_warm(tank_temps, rules)):
+                step_size = rules.get("smart_control", {}).get("step_size_w", 200)
+                new_power = min(3000, battery_power_w + step_size)  # Max 3kW batterij laden
+                
+                if new_power > battery_power_w:
+                    logger.info(f"🌞 SURPLUS CHARGING: Increasing battery power from {battery_power_w}W to {new_power}W")
+                    
+                    result = await self.adjust_battery_power(new_power)
+                    if result:
+                        self.last_adjustment_time = current_time
+                        self.adjustment_history.append({
+                            "time": current_time,
+                            "action": "increase_surplus",
+                            "old_power": battery_power_w,
+                            "new_power": new_power,
+                            "reason": f"Eddi satisfied {eddi_w}W, export {grid_export_w}W"
+                        })
+                    return result
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Smart battery control error: {e}")
+            return None
+    
+    def tank_is_warm(self, tank_temps, rules):
+        """Check if selected tank is warm enough."""
+        try:
+            tank = rules.get("boiler_priority", {}).get("tank", "tank2")
+            min_temp = rules.get("boiler_priority", {}).get("min_temp", 36)
+            current_temp = tank_temps.get(tank)
+            
+            if current_temp is not None:
+                return current_temp >= min_temp
+            return False
+        except Exception:
+            return False
+    
+    async def adjust_battery_power(self, new_power_w):
+        """Adjust battery charging power."""
+        try:
+            global marstek
+            if new_power_w <= 0:
+                # Stop charging
+                result = marstek.set_control("stop")
+            else:
+                # Set charging power
+                result = marstek.set_control("charge", new_power_w)
+            
+            return result.get("ok", False)
+        except Exception as e:
+            logger.error(f"Failed to adjust battery power: {e}")
+            return False
+
+# Global smart controller instance
+smart_controller = SmartBatteryController()
+
