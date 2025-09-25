@@ -33,7 +33,7 @@ VENUS_E_REGISTERS = {
         "name": "battery_power",
         "description": "Battery Power",
         "unit": "W",
-        "scale": 0.1,
+        "scale": 0.08,
         "signed": True,
         "data_type": "int32",
         "type": "sensor"
