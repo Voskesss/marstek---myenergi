@@ -1221,11 +1221,6 @@ async def ble_set_meter_ip_page2():
 myenergi = MyEnergiClient(MYENERGI_BASE_URL, MYENERGI_HUB_SERIAL, MYENERGI_API_KEY)
 marstek  = MarstekClient(MARSTEK_BASE_URL, MARSTEK_API_TOKEN)
 
-@app.on_event("startup")
-async def _startup():
-    # Start background loop
-    asyncio.create_task(control_loop())
-
 @app.get("/health")
 async def health():
     return {"ok": True}
@@ -1907,23 +1902,6 @@ async def get_settings():
 # =========================
 # App lifecycle
 # =========================
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    print("🚀 Starting myenergi-marstek integration...")
-    
-    if MARSTEK_USE_BLE and BLE_AVAILABLE:
-        print("🔵 BLE mode enabled - will use integrated BLE client")
-        # Pre-initialize BLE client
-        try:
-            ble_client = get_ble_client()
-            await ble_client.discover_device()
-        except Exception as e:
-            print(f"⚠️  BLE initialization warning: {e}")
-    
-    # Start background control loop
-    asyncio.create_task(control_loop())
-
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
@@ -2523,206 +2501,587 @@ async def connect_to_battery(payload: Dict[str, str] = Body(...)):
 
 
 # =========================
-# Energy Rules Management
+
+
+
+# =========================
+# Simple Energy Rules Engine
 # =========================
 
-ENERGY_RULES_CONFIG_FILE = "energy_rules_config.json"
+import json
+import time
+from datetime import datetime
+
+ENERGY_RULES_FILE = "energy_rules.json"
 
 def load_energy_rules():
-    """Load energy rules configuration from file."""
+    """Load energy rules from JSON file."""
     try:
-        if os.path.exists(ENERGY_RULES_CONFIG_FILE):
-            with open(ENERGY_RULES_CONFIG_FILE, "r") as f:
-                return json.load(f)
+        with open(ENERGY_RULES_FILE, "r") as f:
+            return json.load(f)
     except Exception as e:
-        logger.error(f"Failed to load energy rules config: {e}")
-    
-    # Default configuration
-    return {
-        "boiler_priority": {"enabled": True, "tank": "tank2", "min_temp": 36},
-        "surplus_charging": {"enabled": True, "min_export_w": 100},
-        "emergency_charge": {"enabled": True, "power_w": 2000},
-        "smart_control": {
-            "enabled": True,
-            "check_interval_seconds": 10,
-            "step_size_w": 200,
-            "min_eddi_power_for_scaling": 3000,
-            "hysteresis_seconds": 120
-        },
-        "last_updated": None
-    }
+        logger.error(f"Failed to load energy rules: {e}")
+        return {"rules": [], "global_settings": {}}
 
-def save_energy_rules(rules):
-    """Save energy rules configuration to file."""
+def save_energy_rules(rules_data):
+    """Save energy rules to JSON file."""
     try:
-        rules["last_updated"] = time.time()
-        with open(ENERGY_RULES_CONFIG_FILE, "w") as f:
-            json.dump(rules, f, indent=2)
+        rules_data["global_settings"]["last_updated"] = time.time()
+        with open(ENERGY_RULES_FILE, "w") as f:
+            json.dump(rules_data, f, indent=2)
         return True
     except Exception as e:
-        logger.error(f"Failed to save energy rules config: {e}")
+        logger.error(f"Failed to save energy rules: {e}")
         return False
 
-@app.post("/api/energy_rules")
-async def update_energy_rules(request: dict):
-    """Update energy management rules."""
-    try:
-        current_rules = load_energy_rules()
+class SimpleRulesEngine:
+    def __init__(self):
+        self.last_execution = {}
+        self.last_battery_commands = {}
+        self.running = False
+
+    async def start_rules_loop(self):
+        """Start the rules execution loop."""
+        self.running = True
+        logger.info("🎯 Rules Engine started")
         
-        # Update rules from request
-        for rule_type, rule_config in request.items():
-            if rule_type in current_rules:
-                current_rules[rule_type].update(rule_config)
-        
-        if save_energy_rules(current_rules):
-            # Determine active rule
-            active_rule = determine_active_rule(current_rules)
-            return {
-                "success": True,
-                "active_rule": active_rule,
-                "rules": current_rules
-            }
-        else:
-            return {"success": False, "error": "Failed to save rules"}
+        while self.running:
+            try:
+                await self.execute_active_rules()
+                await asyncio.sleep(2)  # Check every 2 seconds
+            except Exception as e:
+                logger.error(f"Rules loop error: {e}")
+                await asyncio.sleep(10)  # Wait longer on error
+    
+    def stop_rules_loop(self):
+        """Stop the rules execution loop."""
+        self.running = False
+        logger.info("🛑 Rules Engine stopped")
+
+    async def execute_active_rules(self):
+        """Execute all active rules with mode management."""
+        try:
+            rules_data = load_energy_rules()
+            active_rules = [r for r in rules_data.get("rules", []) if r.get("active", False)]
             
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+            # Determine target mode
+            target_mode = await mode_manager.determine_target_mode(len(active_rules) > 0)
+            
+            # Ensure correct mode
+            mode_ok = await mode_manager.ensure_correct_mode(target_mode)
+            
+            if not mode_ok:
+                return  # Mode switch failed, try again later
+            
+            # Only execute rules if we are in rules mode
+            if target_mode == "manual_rules" and active_rules:
+                # Get current system data
+                myenergi_data = await self.get_myenergi_data()
+                battery_data = await self.get_battery_data()
+                
+                if myenergi_data and battery_data:
+                    for rule in active_rules:
+                        await self.execute_rule(rule, myenergi_data, battery_data)
+            elif target_mode == "manual_user":
+                logger.debug("👤 User override active - skipping rules")
+            elif target_mode == "anti_feed":
+                logger.debug("🔋 Anti-Feed mode - battery controls itself")
+                
+        except Exception as e:
+            logger.error(f"Rules engine error: {e}")
+    def __init__(self):
+        self.last_execution = {}
+        self.last_battery_commands = {}
+    
+    async def execute_active_rules(self):
+        """Execute all active rules."""
+        try:
+            rules_data = load_energy_rules()
+            
+            # Get current system data
+            myenergi_data = await self.get_myenergi_data()
+            battery_data = await self.get_battery_data()
+            
+            if not myenergi_data or not battery_data:
+                return
+            
+            # Execute each active rule
+            for rule in rules_data.get("rules", []):
+                if rule.get("active", False):
+                    await self.execute_rule(rule, myenergi_data, battery_data)
+                    
+        except Exception as e:
+            logger.error(f"Rules engine error: {e}")
+    
+    async def execute_rule(self, rule, myenergi_data, battery_data):
+        """Execute a specific rule."""
+        rule_id = rule.get("id")
+        
+        if rule_id == "eddi_priority":
+            await self.execute_eddi_priority_rule(rule, myenergi_data, battery_data)
+    
+    async def execute_eddi_priority_rule(self, rule, myenergi_data, battery_data):
+        """Execute the Eddi Priority rule."""
+        try:
+            # Extract data
+            export_w = myenergi_data.get("grid_export_w", 0)  # Positive = export
+            eddi_w = myenergi_data.get("eddi_power_w", 0)
+            
+            # Rule parameters
+            params = rule.get("parameters", {})
+            export_threshold = params.get("export_threshold_w", 100)
+            eddi_buffer = params.get("eddi_buffer_w", 200)
+            max_battery_w = params.get("max_battery_power_w", 1500)
+            
+            # Core logic: Export stoplicht
+            if export_w < export_threshold:
+                # No export = stop all batteries
+                target_power = 0
+                reason = f"No export ({export_w}W < {export_threshold}W)"
+            else:
+                # Calculate available power for batteries
+                available = export_w - eddi_w - eddi_buffer
+                target_power = max(0, min(available, max_battery_w))
+                reason = f"Export {export_w}W - Eddi {eddi_w}W - Buffer {eddi_buffer}W = {available}W"
+            
+            logger.info(f"🔥 EDDI PRIORITY: {reason} → Battery target: {target_power}W")
+            
+            # Apply to selected batteries
+            batteries = rule.get("batteries", {})
+            for battery_id, enabled in batteries.items():
+                if enabled:
+                    await self.set_battery_power(battery_id, target_power)
+                    
+        except Exception as e:
+            logger.error(f"Eddi priority rule error: {e}")
+    
+    async def get_myenergi_data(self):
+        """Get MyEnergi data."""
+        try:
+            async with myenergi_lock:
+                status = await myenergi.status_all()
+            
+            return {
+                "grid_export_w": extract_grid_export_w(status),
+                "eddi_power_w": extract_eddi_power_w(status),
+                "pv_generation_w": extract_pv_generation_w(status)
+            }
+        except Exception as e:
+            logger.error(f"Failed to get MyEnergi data: {e}")
+            return None
+    
+    async def get_battery_data(self):
+        """Get battery data."""
+        try:
+            soc = await asyncio.wait_for(marstek.get_soc(), timeout=2.0)
+            return {
+                "soc": soc.value if soc and hasattr(soc, "value") else 0
+            }
+        except Exception as e:
+            logger.error(f"Failed to get battery data: {e}")
+            return None
+    
+    async def set_battery_power(self, battery_id, power_w):
+        """Set battery charging power."""
+        try:
+            # Avoid sending same command repeatedly
+            if self.last_battery_commands.get(battery_id) == power_w:
+                return
+            
+            if power_w <= 0:
+                result = marstek.set_control("stop")
+            else:
+                result = marstek.set_control("charge", power_w)
+            
+            if result.get("ok", False):
+                self.last_battery_commands[battery_id] = power_w
+                logger.info(f"✅ Battery {battery_id}: {power_w}W")
+            else:
+                logger.error(f"❌ Battery {battery_id}: Failed to set {power_w}W")
+                
+        except Exception as e:
+            logger.error(f"Failed to set battery {battery_id} power: {e}")
+
+# Global rules engine
+rules_engine = SimpleRulesEngine()
 
 @app.get("/api/energy_rules")
 async def get_energy_rules():
-    """Get current energy management rules."""
+    """Get current energy rules configuration."""
     try:
-        rules = load_energy_rules()
-        active_rule = determine_active_rule(rules)
+        rules_data = load_energy_rules()
+        return {"success": True, "data": rules_data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/energy_rules")
+async def update_energy_rules(rules_data: dict):
+    """Update energy rules configuration."""
+    try:
+        if save_energy_rules(rules_data):
+            return {"success": True, "message": "Rules updated"}
+        else:
+            return {"success": False, "error": "Failed to save rules"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+
+# =========================
+# Mode Management & User Override Detection
+# =========================
+
+class ModeManager:
+    def __init__(self):
+        self.user_override_active = False
+        self.last_user_action = 0
+        self.current_mode = "unknown"
+        self.last_mode_switch = 0
+        
+    def detect_user_override(self):
+        """Detect if user has manually controlled battery."""
+        # This would be set by frontend when user presses buttons
+        # For now, we can detect by checking if manual commands were sent recently
+        current_time = time.time()
+        
+        # If user action within last 5 minutes, consider override active
+        if current_time - self.last_user_action < 300:  # 5 minutes
+            self.user_override_active = True
+        else:
+            self.user_override_active = False
+            
+        return self.user_override_active
+    
+    def set_user_action(self):
+        """Mark that user has taken manual action."""
+        self.last_user_action = time.time()
+        self.user_override_active = True
+        logger.info("👤 USER OVERRIDE: Manual control detected")
+    
+    async def determine_target_mode(self, rules_active=False):
+        """Determine what mode battery should be in with logging."""
+        logger.info(f"🔍 MODE DEBUG: Determining target mode - rules_active={rules_active}")
+        """Determine what mode battery should be in."""
+        if self.detect_user_override():
+            return "manual_user"  # User has control
+        elif rules_active:
+            return "manual_rules"  # Rules have control
+        else:
+            return "anti_feed"  # Battery controls itself
+    
+    async def ensure_correct_mode(self, target_mode):
+        """Ensure battery is in correct mode."""
+        current_time = time.time()
+        
+        # Avoid too frequent mode switches (1 minute hysteresis)
+        if current_time - self.last_mode_switch < 60:
+            return False
+            
+        mode_map = {
+            "manual_user": 1,    # Manual mode for user
+            "manual_rules": 1,   # Manual mode for rules  
+            "anti_feed": 0       # Anti-Feed mode
+        }
+        
+        target_mode_value = mode_map.get(target_mode, 0)
+        
+        if self.current_mode != target_mode:
+            logger.info(f"🔄 MODE SWITCH: {self.current_mode} → {target_mode}")
+            
+            # Use existing set_work_mode function
+            result = await set_work_mode("venus_e_78", target_mode_value)
+            
+            if result.get("success", False):
+                self.current_mode = target_mode
+                self.last_mode_switch = current_time
+                return True
+            else:
+                logger.error(f"❌ Failed to switch to {target_mode}")
+                return False
+        
+        return True  # Already in correct mode
+
+# Global mode manager
+mode_manager = ModeManager()
+
+# Update existing battery control functions to detect user actions
+original_set_battery_mode = globals().get("set_battery_mode")
+original_set_battery_power = globals().get("set_battery_power")
+
+async def set_battery_mode_with_override(*args, **kwargs):
+    """Wrapper to detect user override."""
+    mode_manager.set_user_action()
+    if original_set_battery_mode:
+        return await original_set_battery_mode(*args, **kwargs)
+
+async def set_battery_power_with_override(*args, **kwargs):
+    """Wrapper to detect user override.""" 
+    mode_manager.set_user_action()
+    if original_set_battery_power:
+        return await original_set_battery_power(*args, **kwargs)
+
+# Override the functions
+if original_set_battery_mode:
+    globals()["set_battery_mode"] = set_battery_mode_with_override
+if original_set_battery_power:
+    globals()["set_battery_power"] = set_battery_power_with_override
+
+
+
+# =========================
+# Startup: Start Rules Engine
+# =========================
+
+@app.on_event("shutdown") 
+async def stop_rules_engine():
+    """Stop the rules engine on app shutdown."""
+    try:
+        rules_engine.stop_rules_loop()
+        logger.info("✅ Rules Engine stopped successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to stop Rules Engine: {e}")
+
+# API endpoint to manually trigger user override reset
+@app.post("/api/rules/reset_override")
+async def reset_user_override():
+    """Reset user override to allow rules to take control again."""
+    try:
+        mode_manager.user_override_active = False
+        mode_manager.last_user_action = 0
+        return {"success": True, "message": "User override reset"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# API endpoint to get current mode status
+@app.get("/api/rules/status")
+async def get_rules_status():
+    """Get current rules and mode status."""
+    try:
+        rules_data = load_energy_rules()
+        active_rules = [r for r in rules_data.get("rules", []) if r.get("active", False)]
+        
         return {
             "success": True,
-            "active_rule": active_rule,
-            "rules": rules
+            "current_mode": mode_manager.current_mode,
+            "user_override": mode_manager.user_override_active,
+            "active_rules_count": len(active_rules),
+            "rules_engine_running": getattr(rules_engine, "running", False)
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def determine_active_rule(rules):
-    """Determine which energy rule should be active based on current conditions."""
+
+
+# =========================
+# Enhanced Rules Engine Debugging
+# =========================
+
+@app.get("/api/rules/debug")
+async def debug_rules_engine():
+    """Debug endpoint to see what the rules engine is doing."""
     try:
-        # This will be called from the control loop with real data
-        # For now, return a placeholder
-        if rules.get("emergency_charge", {}).get("enabled"):
-            return "Emergency Charge"
-        elif rules.get("boiler_priority", {}).get("enabled"):
-            return "Boiler Priority"
-        elif rules.get("surplus_charging", {}).get("enabled"):
-            return "Surplus Charging"
-        else:
-            return "Standby"
-    except Exception:
-        return "Unknown"
+        # Get current rules
+        rules_data = load_energy_rules()
+        active_rules = [r for r in rules_data.get("rules", []) if r.get("active", False)]
+        
+        # Get current system data
+        myenergi_data = await rules_engine.get_myenergi_data()
+        battery_data = await rules_engine.get_battery_data()
+        
+        # Determine what mode should be active
+        target_mode = await mode_manager.determine_target_mode(len(active_rules) > 0)
+        
+        debug_info = {
+            "timestamp": time.time(),
+            "rules_engine_running": getattr(rules_engine, "running", False),
+            "active_rules_count": len(active_rules),
+            "active_rules": [r.get("name", "Unknown") for r in active_rules],
+            "current_mode": mode_manager.current_mode,
+            "target_mode": target_mode,
+            "user_override": mode_manager.user_override_active,
+            "last_user_action": mode_manager.last_user_action,
+            "last_mode_switch": mode_manager.last_mode_switch,
+            "myenergi_data": myenergi_data,
+            "battery_data": battery_data,
+            "mode_switch_cooldown_remaining": max(0, 60 - (time.time() - mode_manager.last_mode_switch))
+        }
+        
+        return {"success": True, "debug": debug_info}
+        
+    except Exception as e:
+        return {"success": False, "error": str(e), "traceback": str(e.__traceback__)}
 
-
-
-# =========================
-# Smart Battery Control Logic
-# =========================
-
-class SmartBatteryController:
-    def __init__(self):
-        self.last_adjustment_time = 0
-        self.current_battery_power = 0
-        self.adjustment_history = []
-    
-    async def evaluate_and_adjust(self, pv_w, grid_export_w, eddi_w, zappi_w, battery_power_w, tank_temps, rules):
-        """Jip en Janneke batterij controle - Eddi krijgt voorrang!"""
+# Add more logging to the rules engine
+class EnhancedSimpleRulesEngine(SimpleRulesEngine):
+    async def execute_active_rules(self):
+        """Execute all active rules with enhanced logging."""
         try:
-            current_time = time.time()
+            logger.info("🔍 RULES DEBUG: Checking active rules...")
             
-            # Hysterese: Wacht tussen aanpassingen
-            if current_time - self.last_adjustment_time < rules.get("smart_control", {}).get("hysteresis_seconds", 120):
-                return None
+            rules_data = load_energy_rules()
+            active_rules = [r for r in rules_data.get("rules", []) if r.get("active", False)]
             
-            # Stap 1: Kijk of er een probleem is
-            sun_shining = pv_w > 500  # Er is zon
-            exporting_to_grid = grid_export_w > 50  # Er gaat nog energie naar net
-            eddi_underperforming = eddi_w < rules.get("smart_control", {}).get("min_eddi_power_for_scaling", 3000)
-            battery_is_charging = battery_power_w > 100
+            logger.info(f"🔍 RULES DEBUG: Found {len(active_rules)} active rules")
             
-            logger.info(f"Smart Control Check: sun={sun_shining}, export={exporting_to_grid}, eddi_low={eddi_underperforming}, battery_charging={battery_is_charging}")
+            # Determine target mode
+            target_mode = await mode_manager.determine_target_mode(len(active_rules) > 0)
+            logger.info(f"🔍 RULES DEBUG: Target mode: {target_mode}, Current mode: {mode_manager.current_mode}")
             
-            # Probleem detectie: Batterij "steelt" van Eddi
-            if sun_shining and exporting_to_grid and eddi_underperforming and battery_is_charging:
-                # Batterij moet minder laden zodat Eddi meer kan pakken
-                step_size = rules.get("smart_control", {}).get("step_size_w", 200)
-                new_power = max(0, battery_power_w - step_size)
+            # Ensure correct mode
+            mode_ok = await mode_manager.ensure_correct_mode(target_mode)
+            logger.info(f"🔍 RULES DEBUG: Mode switch OK: {mode_ok}")
+            
+            if not mode_ok:
+                logger.warning("🔍 RULES DEBUG: Mode switch failed, skipping rule execution")
+                return
+            
+            # Only execute rules if we are in rules mode
+            if target_mode == "manual_rules" and active_rules:
+                logger.info("🔍 RULES DEBUG: Executing rules in manual_rules mode")
                 
-                logger.info(f"🔥 EDDI PRIORITY: Reducing battery power from {battery_power_w}W to {new_power}W")
+                # Get current system data
+                myenergi_data = await self.get_myenergi_data()
+                battery_data = await self.get_battery_data()
                 
-                # Stuur commando naar batterij
-                result = await self.adjust_battery_power(new_power)
-                if result:
-                    self.last_adjustment_time = current_time
-                    self.adjustment_history.append({
-                        "time": current_time,
-                        "action": "reduce_for_eddi",
-                        "old_power": battery_power_w,
-                        "new_power": new_power,
-                        "reason": f"Eddi only {eddi_w}W, export {grid_export_w}W"
-                    })
-                return result
-            
-            # Opschaling: Eddi is tevreden, batterij mag meer
-            elif sun_shining and exporting_to_grid and (eddi_w >= 3400 or self.tank_is_warm(tank_temps, rules)):
-                step_size = rules.get("smart_control", {}).get("step_size_w", 200)
-                new_power = min(3000, battery_power_w + step_size)  # Max 3kW batterij laden
-                
-                if new_power > battery_power_w:
-                    logger.info(f"🌞 SURPLUS CHARGING: Increasing battery power from {battery_power_w}W to {new_power}W")
+                if myenergi_data and battery_data:
+                    logger.info(f"🔍 RULES DEBUG: MyEnergi data: {myenergi_data}")
+                    logger.info(f"🔍 RULES DEBUG: Battery data: {battery_data}")
                     
-                    result = await self.adjust_battery_power(new_power)
-                    if result:
-                        self.last_adjustment_time = current_time
-                        self.adjustment_history.append({
-                            "time": current_time,
-                            "action": "increase_surplus",
-                            "old_power": battery_power_w,
-                            "new_power": new_power,
-                            "reason": f"Eddi satisfied {eddi_w}W, export {grid_export_w}W"
-                        })
-                    return result
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Smart battery control error: {e}")
-            return None
-    
-    def tank_is_warm(self, tank_temps, rules):
-        """Check if selected tank is warm enough."""
-        try:
-            tank = rules.get("boiler_priority", {}).get("tank", "tank2")
-            min_temp = rules.get("boiler_priority", {}).get("min_temp", 36)
-            current_temp = tank_temps.get(tank)
-            
-            if current_temp is not None:
-                return current_temp >= min_temp
-            return False
-        except Exception:
-            return False
-    
-    async def adjust_battery_power(self, new_power_w):
-        """Adjust battery charging power."""
-        try:
-            global marstek
-            if new_power_w <= 0:
-                # Stop charging
-                result = marstek.set_control("stop")
+                    for rule in active_rules:
+                        logger.info(f"🔍 RULES DEBUG: Executing rule: {rule.get(name)}")
+                        await self.execute_rule(rule, myenergi_data, battery_data)
+                else:
+                    logger.warning("🔍 RULES DEBUG: No system data available")
+                    
+            elif target_mode == "manual_user":
+                logger.info("🔍 RULES DEBUG: User override active - skipping rules")
+            elif target_mode == "anti_feed":
+                logger.info("🔍 RULES DEBUG: Anti-Feed mode - battery controls itself")
             else:
-                # Set charging power
-                result = marstek.set_control("charge", new_power_w)
-            
-            return result.get("ok", False)
+                logger.info(f"🔍 RULES DEBUG: Unknown target mode: {target_mode}")
+                
         except Exception as e:
-            logger.error(f"Failed to adjust battery power: {e}")
-            return False
+            logger.error(f"🔍 RULES DEBUG: Error in execute_active_rules: {e}")
 
-# Global smart controller instance
-smart_controller = SmartBatteryController()
+# Replace the rules engine with enhanced version
+rules_engine = EnhancedSimpleRulesEngine()
+
+
+
+# =========================
+# Temperature Override Support
+# =========================
+
+async def get_tank_temperature_with_override(rule_params):
+    """Get tank temperature with optional override for testing."""
+    try:
+        # Check if override is enabled
+        temp_override = rule_params.get("tank_temp_override")
+        
+        if temp_override is not None:
+            logger.info(f"🌡️ TEMP OVERRIDE: Using manual temperature {temp_override}°C")
+            return float(temp_override)
+        
+        # Normal temperature reading from MyEnergi
+        myenergi_data = await myenergi.get_status()
+        if myenergi_data and "eddi" in myenergi_data:
+            eddi_data = myenergi_data["eddi"][0] if myenergi_data["eddi"] else {}
+            tank_temp = eddi_data.get("tp2", 0)  # Tank 2 temperature
+            logger.info(f"🌡️ REAL TEMP: Tank 2 temperature {tank_temp}°C")
+            return float(tank_temp)
+        
+        logger.warning("🌡️ TEMP WARNING: No temperature data available")
+        return 0.0
+        
+    except Exception as e:
+        logger.error(f"🌡️ TEMP ERROR: {e}")
+        return 0.0
+
+# Update the rule execution to use temperature override
+class EnhancedSimpleRulesEngine(SimpleRulesEngine):
+    async def execute_rule(self, rule, myenergi_data, battery_data):
+        """Execute a single rule with temperature override support."""
+        try:
+            rule_id = rule.get("id")
+            rule_name = rule.get("name", "Unknown")
+            rule_params = rule.get("parameters", {})
+            
+            logger.info(f"🎯 RULE EXEC: Executing {rule_name}")
+            
+            if rule_id == "eddi_priority":
+                await self.execute_eddi_priority_rule(rule, myenergi_data, battery_data, rule_params)
+            else:
+                logger.warning(f"🎯 RULE EXEC: Unknown rule type: {rule_id}")
+                
+        except Exception as e:
+            logger.error(f"🎯 RULE EXEC ERROR: {e}")
+    
+    async def execute_eddi_priority_rule(self, rule, myenergi_data, battery_data, rule_params):
+        """Execute Eddi Priority rule with temperature checking."""
+        try:
+            # Get current system values
+            grid_w = myenergi_data.get("grid_w", 0)
+            eddi_w = myenergi_data.get("eddi_w", 0)
+            
+            # Get tank temperature (with override support)
+            tank_temp = await get_tank_temperature_with_override(rule_params)
+            target_temp = rule_params.get("tank_temp_target", 60)
+            
+            logger.info(f"🔥 EDDI RULE: Grid={grid_w}W, Eddi={eddi_w}W, Tank={tank_temp}°C (target={target_temp}°C)")
+            
+            # Check if tank is warm enough
+            if tank_temp < target_temp:
+                logger.info(f"🔥 EDDI RULE: Tank too cold ({tank_temp}°C < {target_temp}°C) - Eddi has priority")
+                # Set battery to minimal power or stop charging
+                await self.set_battery_minimal_power(rule)
+                return
+            
+            # Tank is warm enough, apply normal Eddi priority logic
+            export_w = max(0, -grid_w)  # Negative grid = export
+            buffer_w = rule_params.get("eddi_buffer_w", 200)
+            threshold_w = rule_params.get("export_threshold_w", 100)
+            
+            available_for_battery = export_w - eddi_w - buffer_w
+            
+            logger.info(f"�� EDDI RULE: Export={export_w}W, Available for battery={available_for_battery}W")
+            
+            if available_for_battery > threshold_w:
+                max_battery_w = rule_params.get("max_battery_power_w", 1500)
+                target_power = min(available_for_battery, max_battery_w)
+                logger.info(f"🔥 EDDI RULE: Setting battery to {target_power}W")
+                await self.set_battery_power(rule, target_power)
+            else:
+                logger.info(f"🔥 EDDI RULE: Not enough surplus ({available_for_battery}W <= {threshold_w}W)")
+                await self.set_battery_minimal_power(rule)
+                
+        except Exception as e:
+            logger.error(f"🔥 EDDI RULE ERROR: {e}")
+    
+    async def set_battery_minimal_power(self, rule):
+        """Set battery to minimal power (stop charging)."""
+        try:
+            batteries = rule.get("batteries", {})
+            for battery_id, enabled in batteries.items():
+                if enabled and battery_id == "venus_e_78":
+                    logger.info(f"🔋 Setting {battery_id} to minimal power")
+                    # Set to very low power or stop
+                    result = await set_battery_power("venus_e_78", 0)
+                    logger.info(f"🔋 Battery power result: {result}")
+        except Exception as e:
+            logger.error(f"🔋 Battery minimal power error: {e}")
+    
+    async def set_battery_power(self, rule, power_w):
+        """Set battery to specific power."""
+        try:
+            batteries = rule.get("batteries", {})
+            for battery_id, enabled in batteries.items():
+                if enabled and battery_id == "venus_e_78":
+                    logger.info(f"🔋 Setting {battery_id} to {power_w}W")
+                    result = await set_battery_power("venus_e_78", power_w)
+                    logger.info(f"🔋 Battery power result: {result}")
+        except Exception as e:
+            logger.error(f"🔋 Battery power error: {e}")
+
+# Replace the rules engine
+rules_engine = EnhancedSimpleRulesEngine()
 

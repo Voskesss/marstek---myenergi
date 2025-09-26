@@ -197,133 +197,10 @@
         
         <!-- Energy Management Rules -->
         <div class="card" style="margin-bottom: 20px;">
-            <h3>⚡ Energie Regels</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
                 
-                <!-- Boiler Priority Rule -->
-                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <input type="checkbox" id="boilerPriorityToggle" onchange="updateRule('boiler_priority')" checked>
-                        <label style="font-weight: 600;">🔥 Boiler Prioriteit</label>
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                        Batterijen wachten tot tank warm genoeg is
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <label style="min-width: 60px;">Tank:</label>
-                        <select id="tankSelector" onchange="updateRule('boiler_priority')" style="flex: 1;">
-                            <option value="tank1">Tank 1</option>
-                            <option value="tank2" selected>Tank 2</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <label style="min-width: 60px;">Min temp:</label>
-                        <input id="minTempSlider" type="range" min="30" max="70" value="36" 
-                               oninput="document.getElementById('minTempValue').textContent=this.value+'°C'; updateRule('boiler_priority')" 
-                               style="flex: 1;" />
-                        <span id="minTempValue" style="min-width: 45px; font-weight: 600;">36°C</span>
-                    </div>
-                    <div style="border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Batterijen:</div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                <input type="checkbox" id="boilerBattery1" onchange="updateRule('boiler_priority')" checked>
-                                Batterij 1 (Venus E 78)
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: 0.6;">
-                                <input type="checkbox" id="boilerBattery2" onchange="updateRule('boiler_priority')" disabled>
-                                Batterij 2 (WiFi Converter)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Surplus Charging Rule -->
-                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <input type="checkbox" id="surplusChargingToggle" onchange="updateRule('surplus_charging')" checked>
-                        <label style="font-weight: 600;">🌞 Overschot Laden</label>
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                        Batterijen laden met overtollige PV energie (wat anders naar net zou gaan)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <label style="min-width: 80px;">Min export:</label>
-                        <input id="minExportSlider" type="range" min="50" max="500" value="100" 
-                               oninput="document.getElementById('minExportValue').textContent=this.value+'W'; updateRule('surplus_charging')" 
-                               style="flex: 1;" />
-                        <span id="minExportValue" style="min-width: 50px; font-weight: 600;">100W</span>
-                    </div>
-                    <div style="border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Batterijen:</div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                <input type="checkbox" id="surplusBattery1" onchange="updateRule('surplus_charging')" checked>
-                                Batterij 1 (Venus E 78)
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: 0.6;">
-                                <input type="checkbox" id="surplusBattery2" onchange="updateRule('surplus_charging')" disabled>
-                                Batterij 2 (WiFi Converter)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Emergency Charge Rule -->
-                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <input type="checkbox" id="emergencyChargeToggle" onchange="updateRule('emergency_charge')" checked>
-                        <label style="font-weight: 600;">🚨 Noodlading</label>
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                        Forceer laden bij lage batterij (overschrijdt andere regels)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <label style="min-width: 80px;">Nood power:</label>
-                        <input id="emergencyPowerSlider" type="range" min="500" max="3000" value="2000" step="100"
-                               oninput="document.getElementById('emergencyPowerValue').textContent=this.value+'W'; updateRule('emergency_charge')" 
-                               style="flex: 1;" />
-                        <span id="emergencyPowerValue" style="min-width: 60px; font-weight: 600;">2000W</span>
-                    </div>
-                    <div style="border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Batterijen:</div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-                                <input type="checkbox" id="emergencyBattery1" onchange="updateRule('emergency_charge')" checked>
-                                Batterij 1 (Venus E 78)
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: 0.6;">
-                                <input type="checkbox" id="emergencyBattery2" onchange="updateRule('emergency_charge')" disabled>
-                                Batterij 2 (WiFi Converter)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
             
-            <!-- Rules Status -->
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); text-align: center;">
-                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Huidige Actieve Regel:</div>
-                <div id="currentRule" style="font-weight: 600; color: var(--success-color); font-size: 16px;">Initialiseren...</div>
-            </div>
         </div>
         
-        <!-- System Status -->
-        <div class="card">
-            <h3>🎛️ Systeem Status</h3>
-            <div class="metric">
-                <span class="metric-label">Regellogica</span>
-                <span class="metric-value" id="controlLogic">-</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Batterij Actie</span>
-                <span class="metric-value" id="batteryAction">-</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Laatste Update</span>
-                <span class="metric-value" id="lastUpdate">-</span>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -420,29 +297,7 @@
             try {
                 const rules = {
                     boiler_priority: {
-                        enabled: document.getElementById('boilerPriorityToggle').checked,
-                        tank: document.getElementById('tankSelector').value,
-                        min_temp: parseInt(document.getElementById('minTempSlider').value),
-                        batteries: {
-                            battery1: document.getElementById('boilerBattery1').checked,
-                            battery2: document.getElementById('boilerBattery2').checked
-                        }
-                    },
-                    surplus_charging: {
-                        enabled: document.getElementById('surplusChargingToggle').checked,
-                        min_export_w: parseInt(document.getElementById('minExportSlider').value),
-                        batteries: {
-                            battery1: document.getElementById('surplusBattery1').checked,
-                            battery2: document.getElementById('surplusBattery2').checked
-                        }
-                    },
-                    emergency_charge: {
-                        enabled: document.getElementById('emergencyChargeToggle').checked,
-                        power_w: parseInt(document.getElementById('emergencyPowerSlider').value),
-                        batteries: {
-                            battery1: document.getElementById('emergencyBattery1').checked,
-                            battery2: document.getElementById('emergencyBattery2').checked
-                        }
+                        enabled: false
                     }
                 };
 
@@ -454,8 +309,8 @@
                 
                 const result = await res.json();
                 if (result.success) {
-                    document.getElementById('currentRule').textContent = result.active_rule || 'Standby';
-                    document.getElementById('currentRule').className = `status-${result.active_rule ? 'good' : 'info'}`;
+                    // Removed currentRule element
+                    // Removed currentRule element
                 } else {
                     console.error('Failed to update rules:', result.error);
                 }
@@ -650,7 +505,7 @@
                 updateSystemMetrics(statusData);
                 updateBattery78(batteryData);
 
-                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                // Removed lastUpdate element
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
@@ -769,3 +624,331 @@
     </script>
 </body>
 </html>
+                
+                <!-- Simple Rule Toggle -->
+                <div style="background: var(--bg-color); border-radius: 12px; padding: 30px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
+                        <span style="font-size: 18px; font-weight: 600;">🔥 Eddi krijgt altijd voorrang</span>
+                        
+                        <!-- Beautiful Toggle Switch -->
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="eddiPriorityToggle" onchange="toggleRule()" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        
+                        <span id="ruleStatus" style="font-size: 16px; font-weight: 600; color: var(--success-color);">AAN</span>
+                    </div>
+                    
+                    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 25px;">
+                        Batterijen laden alleen uit overschot dat Eddi niet nodig heeft
+                    </div>
+                    
+                    <!-- Battery Selection -->
+                    <div style="background: var(--card-bg); border-radius: 8px; padding: 20px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 15px; color: var(--text-primary);">
+                            🔋 Batterijen die meedoen:
+                        </div>
+                        
+                        <div style="display: flex; justify-content: center; gap: 30px;">
+                            <!-- Battery 1 -->
+                            <label class="battery-toggle">
+                                <input type="checkbox" id="battery1Toggle" onchange="updateBatteries()" checked>
+                                <div class="battery-card">
+                                    <div class="battery-icon">🔋</div>
+                                    <div class="battery-name">Venus E 78</div>
+                                    <div class="battery-status">Actief</div>
+                                </div>
+                            </label>
+                            
+                            <!-- Battery 2 -->
+                            <label class="battery-toggle">
+                                <input type="checkbox" id="battery2Toggle" onchange="updateBatteries()" disabled>
+                                <div class="battery-card disabled">
+                                    <div class="battery-icon">🔋</div>
+                                    <div class="battery-name">WiFi Converter</div>
+                                    <div class="battery-status">Niet aangesloten</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Temperature Override for Testing -->
+                    <div style="margin-top: 20px; padding: 15px; background: var(--warning-color); color: white; border-radius: 8px;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">🌡️ Tank Temperatuur (Testing):</div>
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                            <label style="min-width: 80px;">Override:</label>
+                            <input type="checkbox" id="tempOverrideToggle" onchange="updateTempOverride()" style="margin-right: 10px;">
+                            <input type="range" id="tempSlider" min="20" max="80" step="1" value="45" disabled
+                                   oninput="document.getElementById('tempValue').textContent=this.value+'°C'" style="flex: 1;">
+                            <span id="tempValue" style="min-width: 50px; font-weight: 600;">45°C</span>
+                        </div>
+                        <div style="font-size: 12px; opacity: 0.9;">Zet override aan om tank temperatuur handmatig in te stellen voor testing</div>
+                    </div>
+                    
+                    <!-- Rule Status -->
+                    <div style="margin-top: 20px; padding: 15px; background: var(--info-color); color: white; border-radius: 8px;">
+                        <div style="font-weight: 600; margin-bottom: 5px;">📊 Huidige Status:</div>
+                        <div id="currentRuleStatus">Regel wordt geladen...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        /* Beautiful Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: var(--success-color);
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        /* Battery Toggle Cards */
+        .battery-toggle {
+            cursor: pointer;
+        }
+        
+        .battery-toggle input {
+            display: none;
+        }
+        
+        .battery-card {
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            min-width: 120px;
+        }
+        
+        .battery-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+            border-color: var(--info-color);
+        }
+        
+        .battery-toggle input:checked + .battery-card {
+            border-color: var(--success-color);
+            background: var(--success-color);
+            color: white;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .battery-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .battery-card.disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .battery-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .battery-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .battery-status {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        </style>
+
+        <script>
+        // Simple Rules Management
+        async function toggleRule() {
+            const toggle = document.getElementById("eddiPriorityToggle");
+            const status = document.getElementById("ruleStatus");
+            
+            const isActive = toggle.checked;
+            status.textContent = isActive ? "AAN" : "UIT";
+            status.style.color = isActive ? "var(--success-color)" : "var(--text-secondary)";
+            
+            await updateRuleConfig();
+        }
+        
+        async function updateBatteries() {
+            await updateRuleConfig();
+        }
+        
+        // Temperature Override Management
+        async function updateTempOverride() {
+            const overrideEnabled = document.getElementById("tempOverrideToggle").checked;
+            const tempSlider = document.getElementById("tempSlider");
+            
+            tempSlider.disabled = !overrideEnabled;
+            
+            if (overrideEnabled) {
+                tempSlider.style.opacity = "1";
+            } else {
+                tempSlider.style.opacity = "0.5";
+            }
+            
+            await updateRuleConfig();
+        }
+        
+        async function updateRuleConfig() {
+            try {
+                const ruleActive = document.getElementById("eddiPriorityToggle").checked;
+                const tempOverride = document.getElementById("tempOverrideToggle").checked;
+                const tempValue = document.getElementById("tempSlider").value;
+                const battery1 = document.getElementById("battery1Toggle").checked;
+                const battery2 = document.getElementById("battery2Toggle").checked;
+                
+                const config = {
+                    "rules": [
+                        {
+                            "id": "eddi_priority",
+                            "name": "🔥 Eddi Prioriteit",
+                            "description": "Eddi krijgt altijd voorrang, batterijen laden alleen uit restant overschot",
+                            "active": ruleActive,
+                            "batteries": {
+                                "venus_e_78": battery1,
+                                "wifi_converter": battery2
+                            },
+                            "parameters": {
+                                "tank_temp_override": tempOverride ? parseFloat(tempValue) : null,
+                                "tank_temp_target": 60,
+                                "export_threshold_w": 100,
+                                "eddi_buffer_w": 200,
+                                "max_battery_power_w": 1500,
+                                "hysteresis_seconds": 5,
+                                "cooldown_seconds": 10
+                            }
+                        }
+                    ],
+                    "global_settings": {
+                        "check_interval_seconds": 2,
+                        "min_soc_failsafe": 15,
+                        "last_updated": null
+                    }
+                };
+                
+                const response = await fetch("/api/energy_rules", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(config)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    console.log("✅ Rules updated successfully");
+                    await updateRuleStatus();
+                } else {
+                    console.error("❌ Failed to update rules:", result.error);
+                }
+                
+            } catch (error) {
+                console.error("❌ Error updating rules:", error);
+            }
+        }
+        
+        async function updateRuleStatus() {
+            try {
+                const response = await fetch("/api/rules/status");
+                const result = await response.json();
+                
+                if (result.success) {
+                    const statusEl = document.getElementById("currentRuleStatus");
+                    const mode = result.current_mode;
+                    const override = result.user_override;
+                    const rulesCount = result.active_rules_count;
+                    
+                    let statusText = "";
+                    if (override) {
+                        statusText = "👤 Handmatige controle actief";
+                    } else if (rulesCount > 0) {
+                        statusText = `🤖 ${rulesCount} regel(s) actief - Mode: ${mode}`;
+                    } else {
+                        statusText = "🔋 Batterij controleert zichzelf (Anti-Feed)";
+                    }
+                    
+                    statusEl.textContent = statusText;
+                }
+            } catch (error) {
+                console.error("❌ Error getting rule status:", error);
+            }
+        }
+        
+        // Load current rules on page load
+        async function loadCurrentRules() {
+            try {
+                const response = await fetch("/api/energy_rules");
+                const result = await response.json();
+                
+                if (result.success && result.data.rules.length > 0) {
+                    const rule = result.data.rules[0];
+                    
+                    // Set toggle states
+                    document.getElementById("eddiPriorityToggle").checked = rule.active;
+                    document.getElementById("battery1Toggle").checked = rule.batteries.venus_e_78;
+                    document.getElementById("battery2Toggle").checked = rule.batteries.wifi_converter;
+                    
+                    // Update status
+                    const status = document.getElementById("ruleStatus");
+                    status.textContent = rule.active ? "AAN" : "UIT";
+                    status.style.color = rule.active ? "var(--success-color)" : "var(--text-secondary)";
+                }
+                
+                await updateRuleStatus();
+            } catch (error) {
+                console.error("❌ Error loading rules:", error);
+            }
+        }
+        
+        // Auto-refresh rule status
+        setInterval(updateRuleStatus, 5000);  // Every 5 seconds
+        
+        // Load rules when page loads
+        document.addEventListener("DOMContentLoaded", loadCurrentRules);
+        
+        </script>
+
+
+
