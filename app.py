@@ -1829,12 +1829,19 @@ class SimpleRuleState:
             "cooldown": False,
             "ts": None,
             "source": "zappi_ct",
+            "health": {
+                "myenergi_ok": False,
+                "myenergi_fail_count": 0,
+                "last_myenergi_ok_ts": None,
+                "simple_rule_ok": False,
+                "simple_rule_fail_count": 0,
+                "last_simple_rule_ok_ts": None,
+            },
         }
         self.prev_set_total: float = 0.0
         self.cooldown_until: float = 0.0
 
 simple_rule = SimpleRuleState()
-
 def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
     """Prefer Zappi CT ectp4..6 sum. Fallback to Eddi 'grd' or top-level 'grd'."""
     try:
@@ -1886,9 +1893,17 @@ async def _simple_rule_loop():
     while simple_rule.enabled:
         t0 = time.time()
         try:
-            # fetch myenergi raw and compute grid
-            data = await myenergi.status_all()
-            grid_w = _extract_grid_from_raw(data)
+            # fetch myenergi raw with small retry/backoff and compute grid
+            data = None
+            last_err = None
+            for attempt in range(3):
+                try:
+                    data = await myenergi.status_all()
+                    break
+                except Exception as e:
+                    last_err = str(e)
+                    await asyncio.sleep(0.2 * (attempt + 1))
+            grid_w = _extract_grid_from_raw(data) if data is not None else None
             if grid_w is None:
                 # no data -> safe stop
                 target_total = 0
@@ -1901,7 +1916,16 @@ async def _simple_rule_loop():
                     "per_battery": {},
                     "cooldown": False,
                     "ts": time.time(),
+                    "error": last_err or "no_grid_data",
                 })
+                # degrade health
+                try:
+                    h = simple_rule.last.get("health", {})
+                    h["myenergi_ok"] = False
+                    h["myenergi_fail_count"] = int(h.get("myenergi_fail_count", 0)) + 1
+                    simple_rule.last["health"] = h
+                except Exception:
+                    pass
                 # stop all
                 for it in (await list_batteries())['items']:  # type: ignore[index]
                     await _set_battery_power(it['id'], 0)
@@ -1970,6 +1994,13 @@ async def _simple_rule_loop():
                     set_total += sp
 
                 simple_rule.prev_set_total = set_total
+                # mark health ok
+                try:
+                    h = simple_rule.last.get("health", {})
+                    h.update({"myenergi_ok": True, "myenergi_fail_count": 0, "last_myenergi_ok_ts": time.time()})
+                    simple_rule.last["health"] = h
+                except Exception:
+                    pass
                 simple_rule.last.update({
                     "grid_w": grid_w,
                     "overschot_w": int(ema_overschot),
