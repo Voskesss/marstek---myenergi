@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energie Flow Visualisatie</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --grid: #f59e0b;   /* orange */
+      --pv: #22c55e;     /* green */
+      --eddi: #38bdf8;   /* sky */
+      --zappi: #60a5fa;  /* blue */
+      --batt_charge: #a78bfa; /* violet */
+      --batt_discharge: #fde047; /* yellow */
+      --house: #e879f9;  /* fuchsia */
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
+    header .title { font-weight:700; }
+    header .controls { display:flex; gap:8px; align-items:center; }
+    .btn { padding:8px 12px; background:var(--border); color:var(--text); border:none; border-radius:8px; cursor:pointer; }
+    .wrap { display:flex; flex-direction:column; align-items:center; padding:10px; }
+    .legend { margin-top:10px; color:var(--muted); font-size:12px; display:flex; gap:12px; flex-wrap:wrap; }
+    .legend span { display:flex; align-items:center; gap:6px; }
+    .badge { padding:2px 8px; border-radius:999px; background:var(--card); border:1px solid var(--border); }
+    svg { max-width: 920px; width: 95vw; height: auto; }
+    .node { fill: var(--card); stroke: var(--border); stroke-width: 2; }
+    .node-label { fill: var(--text); font-weight:600; font-size: 12px; text-anchor: middle; dominant-baseline: middle; }
+    .power-label { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
+    .arrow { fill: none; stroke-width: 3.5; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.4)); }
+    .flow-head { marker-end: url(#arrowhead); }
+    /* dash animation */
+    .dash { stroke-dasharray: 8 12; animation: flow 1.2s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -20; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">⚡ Energie Flow Visualisatie</div>
+    <div class="controls">
+      <span id="tsBadge" class="badge">—</span>
+      <button class="btn" onclick="window.location.href='/'">Terug naar dashboard</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <svg viewBox="0 0 900 600" id="flowSvg">
+      <defs>
+        <marker id="arrowhead" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+          <polygon points="0 0, 7 2.5, 0 5" fill="currentColor" />
+        </marker>
+      </defs>
+      <!-- Positions -->
+      <script>
+        // Positions are computed in JS for clarity
+      </script>
+    </svg>
+    <div class="legend">
+      <span><span style="width:10px;height:10px;background:var(--pv);display:inline-block;border-radius:2px;"></span> PV</span>
+      <span><span style="width:10px;height:10px;background:var(--grid);display:inline-block;border-radius:2px;"></span> Grid import</span>
+      <span><span style="width:10px;height:10px;background:var(--eddi);display:inline-block;border-radius:2px;"></span> Eddi</span>
+      <span><span style="width:10px;height:10px;background:var(--zappi);display:inline-block;border-radius:2px;"></span> Zappi</span>
+      <span><span style="width:10px;height:10px;background:var(--batt_charge);display:inline-block;border-radius:2px;"></span> Battery charge</span>
+      <span><span style="width:10px;height:10px;background:var(--batt_discharge);display:inline-block;border-radius:2px;"></span> Battery discharge</span>
+    </div>
+  </div>
+
+<script>
+// ----- Layout geometry -----
+const cx = 450, cy = 300; // center aggregator
+const R = 180; // radius to satellites
+const nodes = {
+  core:  { x: cx, y: cy, r: 44, color: 'var(--house)', label: 'Flow' },
+  house: { x: cx, y: cy - R, r: 34, color: 'var(--house)', label: 'Huis' },
+  grid:  { x: cx + R, y: cy - 20, r: 34, color: 'var(--grid)',  label: 'Grid' },
+  pv:    { x: cx - R, y: cy + 20, r: 34, color: 'var(--pv)',    label: 'PV' },
+  eddi:  { x: cx - 40, y: cy - R, r: 32, color: 'var(--eddi)',  label: 'Eddi' },
+  zappi: { x: cx + 40, y: cy + R, r: 32, color: 'var(--zappi)', label: 'Zappi' },
+  b1:    { x: cx - R + 30, y: cy - 80, r: 30, color: 'var(--batt_charge)', label: 'Batt 1' },
+  b2:    { x: cx + R - 30, y: cy + 80, r: 30, color: 'var(--batt_charge)', label: 'Batt 2' },
+};
+
+// ----- SVG helpers -----
+const svg = document.getElementById('flowSvg');
+function el(tag, attrs) {
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function node(id, n) {
+  const g = el('g', { id: id });
+  const c = el('circle', { cx: n.x, cy: n.y, r: n.r, class: 'node' });
+  const t = el('text', { x: n.x, y: n.y, class: 'node-label' });
+  t.textContent = n.label;
+  const p = el('text', { x: n.x, y: n.y + n.r + 16, class: 'power-label', id: id + '-pwr' });
+  p.textContent = '--';
+  g.appendChild(c); g.appendChild(t); g.appendChild(p); svg.appendChild(g);
+}
+function arrow(id, from, to, color) {
+  // Straight line with margin from/to node edges
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const L = Math.hypot(dx, dy);
+  const ux = dx / L, uy = dy / L;
+  const sx = from.x + ux * (from.r + 4);
+  const sy = from.y + uy * (from.r + 4);
+  const ex = to.x - ux * (to.r + 8);
+  const ey = to.y - uy * (to.r + 8);
+  const p = el('path', { id: id, d: `M ${sx} ${sy} L ${ex} ${ey}`, class: 'arrow flow-head' });
+  p.style.stroke = color;
+  p.style.color = color;
+  svg.appendChild(p);
+  // label at midpoint
+  const label = el('text', { id: id+"_lbl", class: 'power-label' });
+  const midx = (sx+ex)/2, midy = (sy+ey)/2;
+  label.setAttribute('x', midx);
+  label.setAttribute('y', midy - 10);
+  label.textContent = '';
+  svg.appendChild(label);
+}
+
+// Build static scene
+for (const k of Object.keys(nodes)) node(k, nodes[k]);
+// PV -> Core
+arrow('pv_to_core', nodes.pv, nodes.core, 'var(--pv)');
+// Grid <-> Core
+arrow('grid_to_core', nodes.grid, nodes.core, 'var(--grid)');
+arrow('core_to_grid', nodes.core, nodes.grid, 'var(--grid)');
+// Core -> Loads
+arrow('core_to_house', nodes.core, nodes.house, 'var(--house)');
+arrow('core_to_eddi', nodes.core, nodes.eddi, 'var(--eddi)');
+arrow('core_to_zappi', nodes.core, nodes.zappi, 'var(--zappi)');
+// Core <-> Batteries
+arrow('core_to_b1', nodes.core, nodes.b1, 'var(--batt_charge)');
+arrow('b1_to_core', nodes.b1, nodes.core, 'var(--batt_discharge)');
+arrow('core_to_b2', nodes.core, nodes.b2, 'var(--batt_charge)');
+arrow('b2_to_core', nodes.b2, nodes.core, 'var(--batt_discharge)');
+
+function setText(id, text){ const e = document.getElementById(id); if(e) e.textContent = text; }
+function showPath(id, show){ const p = document.getElementById(id); if(!p) return; p.style.opacity = show ? 1 : 0.08; }
+function setActive(id, watts){
+  const p = document.getElementById(id); if(!p) return;
+  // When no flow, remove dash animation
+  if (!watts || Math.abs(watts) < 50) {
+    p.classList.remove('dash');
+    return;
+  }
+  p.classList.add('dash');
+  // map 0..6000 W -> 0.6s..2.0s duration (faster for higher power)
+  const w = Math.max(0, Math.min(6000, watts||0));
+  const dur = 2.0 - (w/6000)*1.4; // 2.0 .. 0.6
+  p.style.animationDuration = `${dur.toFixed(2)}s`;
+}
+function setArrowLabel(id, watts){
+  const t = document.getElementById(id+"_lbl"); if(!t) return;
+  if (!watts || Math.abs(watts) < 50) { t.textContent=''; return; }
+  t.textContent = `${(Math.abs(watts)/1000).toFixed(1)} kW`;
+}
+
+// ----- Data mapping from /api/status -----
+async function fetchStatus(){
+  const r = await fetch('/api/status', { cache: 'no-store' });
+  const j = await r.json();
+  if(!j || j.error) throw new Error(j && j.error || 'status error');
+  return j;
+}
+
+function watts(n){ return (n==null) ? 0 : Number(n) || 0; }
+
+function updateScene(data){
+  const tsBadge = document.getElementById('tsBadge');
+  tsBadge.textContent = new Date().toLocaleTimeString();
+  const pv = watts(data.pv_generation_w || data.pv_w);
+  const grid = watts(data.grid_import_w != null ? data.grid_import_w : (data.grid_w)); // + import, - export
+  const eddi = watts(data.eddi_power_w || data.eddi_w);
+  const zappi = watts(data.zappi_power_w || data.zappi_w);
+  const b1 = watts((data.simple_rule?.last?.per_battery?.venus_ev2_92?.set));
+  const b2 = watts((data.simple_rule?.last?.per_battery?.venus_ev2_74?.set));
+  const house = watts(data.house_consumption_w || data.house_w);
+
+  // Node labels
+  setText('pv-pwr', pv ? `${(pv/1000).toFixed(1)} kW` : '--');
+  setText('grid-pwr', (grid>0) ? `${(grid/1000).toFixed(1)} kW import` : (grid<0) ? `${(-grid/1000).toFixed(1)} kW export` : '--');
+  setText('eddi-pwr', eddi ? `${(eddi/1000).toFixed(1)} kW` : '--');
+  setText('zappi-pwr', zappi ? `${(zappi/1000).toFixed(1)} kW` : '--');
+  setText('b1-pwr', b1 ? `${(b1/1000).toFixed(1)} kW set` : '--');
+  setText('b2-pwr', b2 ? `${(b2/1000).toFixed(1)} kW set` : '--');
+  setText('core-pwr', ''); // keep center clean like original app
+
+  // Flows
+  // PV -> Core
+  showPath('pv_to_core', pv>50); setActive('pv_to_core', pv); setArrowLabel('pv_to_core', pv);
+
+  // Grid <-> Core
+  const imp = grid>50; const exp = grid<-50;
+  showPath('grid_to_core', imp); setActive('grid_to_core', grid); setArrowLabel('grid_to_core', grid);
+  showPath('core_to_grid', exp); setActive('core_to_grid', -grid); setArrowLabel('core_to_grid', -grid);
+
+  // Core -> Loads
+  showPath('core_to_house', house>50); setActive('core_to_house', house); setArrowLabel('core_to_house', house);
+  showPath('core_to_eddi', eddi>50); setActive('core_to_eddi', eddi); setArrowLabel('core_to_eddi', eddi);
+  showPath('core_to_zappi', zappi>50); setActive('core_to_zappi', zappi); setArrowLabel('core_to_zappi', zappi);
+
+  // Core <-> Batteries (using setpoints as proxy)
+  const b1Charge = b1>50, b1Dis = b1< -50;
+  showPath('core_to_b1', b1Charge); setActive('core_to_b1', Math.abs(b1)); setArrowLabel('core_to_b1', b1Charge?b1:0);
+  showPath('b1_to_core', b1Dis); setActive('b1_to_core', Math.abs(b1)); setArrowLabel('b1_to_core', b1Dis?(-b1):0);
+
+  const b2Charge = b2>50, b2Dis = b2< -50;
+  showPath('core_to_b2', b2Charge); setActive('core_to_b2', Math.abs(b2)); setArrowLabel('core_to_b2', b2Charge?b2:0);
+  showPath('b2_to_core', b2Dis); setActive('b2_to_core', Math.abs(b2)); setArrowLabel('b2_to_core', b2Dis?(-b2):0);
+}
+
+async function tick(){
+  try{ const d = await fetchStatus(); updateScene(d); }
+  catch(e){ /* keep calm on errors */ }
+}
+setInterval(tick, 1200);
+window.addEventListener('DOMContentLoaded', tick);
+</script>
+</body>
+</html>

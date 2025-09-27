@@ -2126,6 +2126,16 @@ async def api_logs_tail(n: int = 200):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/flow.html")
+async def flow_visualization_page():
+    """Serve the energy flow visualization page."""
+    try:
+        with open("flow.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"Flow page not available: {e}", status_code=500)
+
 # ----------------------
 # Helpers for per-battery config/control
 # ----------------------
