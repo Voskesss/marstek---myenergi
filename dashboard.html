@@ -1378,5 +1378,69 @@
         
         </script>
 
+    <!-- Simple Battery Rule JS -->
+    <script>
+        // Update the Simple Battery Rule card from backend
+        async function updateSimpleRuleStatus() {
+            try {
+                const res = await fetch('/api/simple_rule/status', { cache: 'no-store' });
+                const j = await res.json();
+                const btn = document.getElementById('simple-rule-toggle');
+                const st = document.getElementById('simple-rule-state');
+                if (!j || !j.success) {
+                    if (st) { st.textContent = 'Fout'; st.className = 'status-danger'; }
+                    return;
+                }
+                const en = !!j.enabled;
+                if (btn) btn.textContent = en ? 'UIT' : 'AAN';
+                if (st) { st.textContent = en ? 'Aan' : 'Uit'; st.className = en ? 'status-good' : 'status-info'; }
+                const last = j.last || {};
+                const cfg  = j.cfg  || {};
+                const grid = document.getElementById('sr-grid');
+                const over = document.getElementById('sr-overschot');
+                const tex  = document.getElementById('sr-target-export');
+                const ttot = document.getElementById('sr-target-total');
+                const stot = document.getElementById('sr-set-total');
+                const cool = document.getElementById('sr-cooldown');
+                const per  = document.getElementById('sr-per-batt');
+                if (grid) grid.textContent = last.grid_w != null ? `${last.grid_w} W` : '--';
+                if (over) over.textContent = last.overschot_w != null ? `${last.overschot_w} W` : '--';
+                if (tex)  tex.textContent  = (cfg.buffer_w != null && cfg.export_margin_w != null) ? `${cfg.buffer_w + cfg.export_margin_w} W` : '--';
+                if (ttot) ttot.textContent = last.batt_target_total_w != null ? `${last.batt_target_total_w} W` : '--';
+                if (stot) stot.textContent = last.batt_set_total_w != null ? `${last.batt_set_total_w} W` : '--';
+                if (cool) cool.textContent = last.cooldown ? 'Actief' : 'Nee';
+                if (per)  {
+                    const p = last.per_battery || {};
+                    const lines = Object.keys(p).map(k => `${k}: ${p[k].set}W ${p[k].ok ? '✅' : '❌'}`);
+                    per.textContent = lines.length ? lines.join('  |  ') : '--';
+                }
+            } catch (e) {
+                const st = document.getElementById('simple-rule-state');
+                if (st) { st.textContent = 'Fout'; st.className = 'status-danger'; }
+            }
+        }
+
+        // Toggle enable/disable of the Simple Battery Rule
+        async function toggleSimpleRule() {
+            try {
+                const st = await fetch('/api/simple_rule/status');
+                const js = await st.json();
+                const enabled = !!js.enabled;
+                if (enabled) {
+                    await fetch('/api/simple_rule/disable', { method: 'POST' });
+                } else {
+                    await fetch('/api/simple_rule/enable', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+                }
+                setTimeout(updateSimpleRuleStatus, 300);
+            } catch (e) {
+                console.error('toggleSimpleRule error', e);
+            }
+        }
+
+        // Poll the status to keep the card updated
+        setInterval(updateSimpleRuleStatus, 2000);
+        document.addEventListener('DOMContentLoaded', updateSimpleRuleStatus);
+    </script>
+
 
 
