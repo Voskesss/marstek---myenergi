@@ -468,10 +468,13 @@ class VenusEModbusClient:
         
         return result
 
-# Global Modbus client
-venus_modbus = VenusEModbusClient()
-# Ensure only one Modbus read at a time
+# Global Modbus clients
+venus_modbus = VenusEModbusClient()  # Battery 1 (default host 192.168.68.92)
+# Battery 2 (WiFi converter), configurable via env VENUS_MODBUS_HOST2
+venus_modbus2 = VenusEModbusClient(host=os.getenv('VENUS_MODBUS_HOST2', '192.168.68.74'))
+# Ensure only one Modbus read at a time (per device)
 modbus_lock = asyncio.Lock()
+modbus_lock2 = asyncio.Lock()
 
 # Battery configuration management
 BATTERY_CONFIG_FILE = "battery_config.json"
@@ -1996,6 +1999,75 @@ async def get_battery_status():
                 "host": venus_modbus.host
             }
             
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "source": "modbus"
+        }
+
+@app.get("/api/battery2/status")
+async def get_battery2_status():
+    """Get real-time battery 2 status via Modbus (WiFi converter)."""
+    try:
+        async with modbus_lock2:
+            battery_data = venus_modbus2.read_battery_data()
+            try:
+                venus_modbus2.disconnect()
+            except Exception:
+                pass
+
+        if battery_data:
+            # Derived energy metrics
+            soc = None
+            try:
+                soc = float(battery_data.get("soc_percent", {}).get("value"))
+            except Exception:
+                soc = None
+            try:
+                v = float(battery_data.get("battery_voltage", {}).get("value", 0.0))
+            except Exception:
+                v = 0.0
+            try:
+                i = float(battery_data.get("battery_current", {}).get("value", 0.0))
+            except Exception:
+                i = 0.0
+            calc_power_w = v * i
+            raw_bp = battery_data.get("battery_power", {})
+            power_w = raw_bp.get("value") if isinstance(raw_bp, dict) else None
+            if not isinstance(power_w, (int, float)):
+                power_w = calc_power_w
+            work_mode_raw = battery_data.get("work_mode", {}).get("raw")
+            mode_map = {0: "Standby", 1: "Charging", 2: "Discharging", 3: "Backup", 4: "Fault", 5: "Idle", 6: "Self-Regulating"}
+            mode = mode_map.get(work_mode_raw)
+            if not mode:
+                mode = "Idle" if abs(calc_power_w) < 20 else ("Charging" if calc_power_w > 0 else "Discharging")
+            remaining_kwh = (BATTERY_FULL_KWH * (soc/100.0)) if (soc is not None) else None
+
+            return {
+                "success": True,
+                "data": battery_data,
+                "derived": {
+                    "full_kwh": BATTERY_FULL_KWH,
+                    "remaining_kwh": remaining_kwh,
+                    "soc_percent": soc,
+                    "power_w": power_w,
+                    "calc_power_w": calc_power_w,
+                    "mode": mode,
+                    "min_soc_reserve": MIN_SOC_RESERVE,
+                },
+                "source": "modbus",
+                "host": venus_modbus2.host,
+                "port": venus_modbus2.port,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No battery data available",
+                "source": "modbus",
+                "host": venus_modbus2.host
+            }
     except Exception as e:
         return {
             "success": False,

@@ -183,14 +183,20 @@
                 </div>
             </div>
 
-            <!-- Column 3: Battery 2 (Future) -->
-            <div class="card" style="opacity: 0.5; border: 2px dashed var(--border-color);">
+            <!-- Column 3: Battery 2 (WiFi Converter) -->
+            <div class="card battery-card connecting" id="battery2-card">
                 <div class="battery-header">
                     <h3>🔋 Batterij 2 (WiFi Converter)</h3>
-                    <span class="battery-status-badge" style="background: var(--text-secondary);">Nog niet aangesloten</span>
+                    <span class="battery-status-badge connecting" id="battery2-badge">Connecting</span>
                 </div>
-                <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
-                    <p>Wordt toegevoegd als de WiFi converter er is</p>
+                <div class="metric"><span class="metric-label">State of Charge</span><span class="metric-value status-info" id="battery2-soc">--</span></div>
+                <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="battery2-energy">--</span></div>
+                <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="battery2-power">--</span></div>
+                <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="battery2-action">--</span></div>
+                <div class="metric"><span class="metric-label">IP</span><span class="metric-value" id="battery2-ip">--</span></div>
+                <div class="metric"><span class="metric-label">Port</span><span class="metric-value" id="battery2-port">--</span></div>
+                <div class="modbus-info">
+                    <strong>Last Update:</strong> <span id="battery2-timestamp">--</span>
                 </div>
             </div>
         </div>

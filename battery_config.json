@@ -12,7 +12,7 @@
     "original_work_mode": null,
     "emergency_charge_active": false,
     "last_updated": null,
-    "ip_address": "192.168.68.98",
+    "ip_address": "192.168.68.74",
     "modbus_port": 502,
     "modbus_unit_id": 1
   }
