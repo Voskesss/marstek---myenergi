@@ -1,10 +1,11 @@
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 
 # Logging configuration (must run after importing os/logging)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_FILE = os.getenv("LOG_FILE", "")
+LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 
 if not logging.getLogger().handlers:
     handlers = []
@@ -15,10 +16,17 @@ if not logging.getLogger().handlers:
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     handlers.append(stream_handler)
-    if LOG_FILE:
-        file_handler = logging.FileHandler(LOG_FILE)
-        file_handler.setFormatter(formatter)
-        handlers.append(file_handler)
+    # Ensure directory
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    except Exception:
+        pass
+    try:
+        rot = RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=5)
+        rot.setFormatter(formatter)
+        handlers.append(rot)
+    except Exception:
+        pass
     logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO), handlers=handlers)
 
 logger = logging.getLogger("myenergi-marstek")
@@ -2017,6 +2025,40 @@ async def simple_rule_disable():
 @app.get("/api/simple_rule/status")
 async def simple_rule_status():
     return {"success": True, "enabled": simple_rule.enabled, "last": simple_rule.last, "cfg": simple_rule.cfg}
+
+# =========================
+# Health and Logs endpoints
+# =========================
+@app.get("/api/health")
+async def api_health():
+    try:
+        sr = {"enabled": simple_rule.enabled, "last": simple_rule.last}
+        return {"success": True, "simple_rule": sr}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/logs/tail")
+async def api_logs_tail(n: int = 200):
+    try:
+        path = LOG_FILE
+        if not path or not os.path.exists(path):
+            return {"success": False, "error": "log file not found", "path": path}
+        # Tail last n lines efficiently
+        lines = []
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            block = -1024
+            data = b""
+            while len(lines) <= n and -block < size:
+                f.seek(block, os.SEEK_END)
+                data = f.read(-block) + data
+                lines = data.splitlines()
+                block *= 2
+        text_lines = [ln.decode("utf-8", errors="ignore") for ln in lines[-n:]]
+        return {"success": True, "lines": text_lines, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # ----------------------
 # Helpers for per-battery config/control
