@@ -71,6 +71,10 @@ class BatteryManager:
         if not mode:
             mode = "Idle" if abs(calc_power_w) < 20 else ("Charging" if calc_power_w > 0 else "Discharging")
 
+        # Estimate remaining energy if soc is known
+        FULL_KWH = 5.12  # align with app.py BATTERY_FULL_KWH
+        remaining_kwh = (FULL_KWH * (soc/100.0)) if soc is not None else None
+
         return {
             "success": True,
             "data": data,
@@ -79,6 +83,7 @@ class BatteryManager:
                 "power_w": power_w,
                 "calc_power_w": calc_power_w,
                 "mode": mode,
+                "remaining_kwh": remaining_kwh,
             },
             "timestamp": datetime.now().isoformat(),
         }

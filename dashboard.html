@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>myenergi ↔ Marstek Live Dashboard</title>
+    <link rel="icon" href="data:,">
     <style>
         :root {
             --bg-color: #0f172a; /* slate-900 */
@@ -84,36 +85,34 @@
             <button class="btn btn-secondary" onclick="clearLogs()">🗑️ Clear Logs</button>
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <!-- Column 1: System Overview -->
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div class="card">
-                    <h3>☀️ PV Generatie</h3>
-                    <div class="metric"><span class="metric-label">Opwekking</span><span class="metric-value" id="pvGeneration">-</span></div>
-                    <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="pvStatus">-</span></div>
-                </div>
-                <div class="card">
-                    <h3>⚡ Grid</h3>
-                    <div class="metric"><span class="metric-label">Import/Export</span><span class="metric-value" id="gridExport">-</span></div>
-                    <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="gridStatus">-</span></div>
-                </div>
-                <div class="card">
-                    <h3>🏠 Huis Verbruik</h3>
-                    <div class="metric"><span class="metric-label">Verbruik</span><span class="metric-value" id="houseConsumption">-</span></div>
-                    <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="houseStatus">-</span></div>
-                </div>
-                <div class="card">
-                    <h3>🔥 Eddi (Warmwater)</h3>
-                    <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="eddiPower">-</span></div>
-                    <div class="metric"><span class="metric-label">Tank 1 Temp</span><span class="metric-value" id="tank1Temp">-</span></div>
-                    <div class="metric"><span class="metric-label">Tank 2 Temp</span><span class="metric-value" id="tank2Temp">-</span></div>
-                </div>
-                <div class="card">
-                    <h3>🚗 Zappi (Auto)</h3>
-                    <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="zappiPower">-</span></div>
-                </div>
+        <div class="status-grid" style="margin-bottom: 20px;">
+            <div class="card">
+                <h3>☀️ PV Generatie</h3>
+                <div class="metric"><span class="metric-label">Opwekking</span><span class="metric-value" id="pvGeneration">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="pvStatus">-</span></div>
+            </div>
+            <div class="card">
+                <h3>⚡ Grid</h3>
+                <div class="metric"><span class="metric-label">Import/Export</span><span class="metric-value" id="gridExport">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="gridStatus">-</span></div>
+            </div>
+            <div class="card">
+                <h3>🏠 Huis Verbruik</h3>
+                <div class="metric"><span class="metric-label">Verbruik</span><span class="metric-value" id="houseConsumption">-</span></div>
+                <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="houseStatus">-</span></div>
+            </div>
+            <div class="card">
+                <h3>🔥 Eddi (Warmwater)</h3>
+                <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="eddiPower">-</span></div>
+                <div class="metric"><span class="metric-label">Tank 1 Temp</span><span class="metric-value" id="tank1Temp">-</span></div>
+                <div class="metric"><span class="metric-label">Tank 2 Temp</span><span class="metric-value" id="tank2Temp">-</span></div>
+            </div>
+            <div class="card">
+                <h3>🚗 Zappi (Auto)</h3>
+                <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="zappiPower">-</span></div>
             </div>
 
+            <!-- Legacy cards kept but hidden by startAutoRefresh; leave them here for safety/testing -->
             <!-- Column 2: Battery 1 -->
             <div class="card battery-card connecting" id="battery78-card">
                 <div class="battery-header">
@@ -139,9 +138,9 @@
                             <span id="powerValue" style="min-width:60px; text-align:right; font-weight:600;">500 W</span>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            <button class="btn btn-success" onclick="batteryControl('charge')">Force Charge</button>
-                            <button class="btn btn-danger" onclick="batteryControl('discharge')">Force Discharge</button>
-                            <button class="btn btn-secondary" onclick="batteryControl('stop')">Stop Force</button>
+                            <button class="btn btn-success" onclick="batteryControlFor('venus_ev2_92','charge')">Force Charge</button>
+                            <button class="btn btn-danger" onclick="batteryControlFor('venus_ev2_92','discharge')">Force Discharge</button>
+                            <button class="btn btn-secondary" onclick="batteryControlFor('venus_ev2_92','stop')">Stop Force</button>
                         </div>
                     </div>
                     <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -150,9 +149,9 @@
                             Huidig: <span id="current-work-mode" style="font-weight: bold; color: var(--success-color);">-</span>
                          </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            <button id="work-mode-0" class="btn btn-primary" onclick="setWorkMode(0)">Manual</button>
-                            <button id="work-mode-1" class="btn btn-primary" onclick="setWorkMode(1)">Anti-Feed</button>
-                            <button id="work-mode-2" class="btn btn-primary" onclick="setWorkMode(2)">Trade</button>
+                            <button id="work-mode-0" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_92',0)">Manual</button>
+                            <button id="work-mode-1" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_92',1)">Anti-Feed</button>
+                            <button id="work-mode-2" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_92',2)">Trade</button>
                         </div>
                     </div>
                     <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -195,7 +194,32 @@
                 <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="battery2-action">--</span></div>
                 <div class="metric"><span class="metric-label">IP</span><span class="metric-value" id="battery2-ip">--</span></div>
                 <div class="metric"><span class="metric-label">Port</span><span class="metric-value" id="battery2-port">--</span></div>
+                <!-- CONTROLS (Battery 2) -->
+                <div class="metric" style="flex-direction: column; align-items: flex-start; gap:12px; padding-top:15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
+                    <span class="metric-label" style="margin-bottom: 8px;">Handmatige Controle</span>
+                    <div style="width:100%;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px;">
+                            <label style="color:var(--text-secondary);">Power</label>
+                            <input id="powerSlider2" type="range" min="0" max="2000" step="50" value="500" oninput="document.getElementById('powerValue2').textContent=this.value+' W'" />
+                            <span id="powerValue2" style="min-width:60px; text-align:right; font-weight:600;">500 W</span>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button id="b2-charge" class="btn btn-success" onclick="batteryControlFor('venus_ev2_74','charge')">Force Charge</button>
+                            <button id="b2-discharge" class="btn btn-danger" onclick="batteryControlFor('venus_ev2_74','discharge')">Force Discharge</button>
+                            <button id="b2-stop" class="btn btn-secondary" onclick="batteryControlFor('venus_ev2_74','stop')">Stop Force</button>
+                        </div>
+                    </div>
+                    <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                        <label style="color:var(--text-secondary); margin-bottom: 5px;">Hoofd Werkmodus</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <button id="work-mode2-0" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_74',0)">Manual</button>
+                            <button id="work-mode2-1" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_74',1)">Anti-Feed</button>
+                            <button id="work-mode2-2" class="btn btn-primary" onclick="setWorkModeFor('venus_ev2_74',2)">Trade</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="modbus-info">
+                    <span id="battery2-control-msg" style="font-size: 12px;"></span><br>
                     <strong>Last Update:</strong> <span id="battery2-timestamp">--</span>
                 </div>
             </div>
@@ -304,46 +328,31 @@
             }
         }
 
-        async function batteryControl(action) {
-            const el = document.getElementById('battery78-control-msg');
-            const buttons = document.querySelectorAll('.btn');
-            
+        async function batteryControlFor(bid, action) {
+            const el = bid === 'venus_ev2_92' ? document.getElementById('battery78-control-msg') : document.getElementById('battery2-control-msg');
+            const cardId = bid === 'venus_ev2_92' ? 'battery78-card' : 'battery2-card';
+            const card = document.getElementById(cardId);
+            const buttons = card ? card.querySelectorAll('.btn') : document.querySelectorAll('.btn');
             try {
-                // Disable all buttons and show loading
-                buttons.forEach(btn => {
-                    btn.disabled = true;
-                    btn.style.opacity = '0.6';
-                });
-                el.textContent = `⏳ ${action} wordt uitgevoerd...`;
-                el.className = 'status-info';
-                
-                const power_w = parseInt(document.getElementById('powerSlider').value, 10);
-                const payload = { action, power_w };
-                const res = await fetch('/api/battery/control', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                buttons.forEach(btn => { btn.disabled = true; btn.style.opacity = '0.6'; });
+                if (el) { el.textContent = `⏳ ${action} wordt uitgevoerd...`; el.className = 'status-info'; }
+                const sliderId = bid === 'venus_ev2_92' ? 'powerSlider' : 'powerSlider2';
+                const powerEl = document.getElementById(sliderId);
+                const power_w = powerEl ? parseInt(powerEl.value, 10) : undefined;
+                const payload = power_w != null ? { action, power_w } : { action };
+                const res = await fetch(`/api/batteries/${bid}/control`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 });
                 const j = await res.json();
-                if (j.success) {
-                    el.textContent = `✅ ${j.action} succesvol uitgevoerd`;
-                    el.className = 'status-good';
-                } else {
-                    el.textContent = `❌ Fout: ${j.error || 'onbekend'}`;
-                    el.className = 'status-danger';
+                if (el) {
+                    if (j.success) { el.textContent = `✅ ${action} ok`; el.className = 'status-good'; }
+                    else { el.textContent = `❌ Fout: ${j.error || 'onbekend'}`; el.className = 'status-danger'; }
                 }
                 setTimeout(refreshData, 1200);
             } catch (e) {
-                el.textContent = `❌ Fout bij ${action}: ${e}`;
-                el.className = 'status-danger';
+                if (el) { el.textContent = `❌ Fout bij ${action}: ${e}`; el.className = 'status-danger'; }
             } finally {
-                // Re-enable buttons after 2 seconds
-                setTimeout(() => {
-                    buttons.forEach(btn => {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                    });
-                }, 2000);
+                setTimeout(() => { buttons.forEach(btn => { btn.disabled = false; btn.style.opacity = '1'; }); }, 2000);
             }
         }
 
@@ -539,30 +548,45 @@
         }
 
         // --- Main Refresh Logic ---
-        function startAutoRefresh() {
-            refreshData();
-            autoRefreshInterval = setInterval(refreshData, 5000);
+        async function startAutoRefresh() {
+            try {
+                // Hide legacy static cards to avoid interference
+                const old1 = document.getElementById('battery78-card');
+                const old2 = document.getElementById('battery2-card');
+                if (old1) old1.style.display = 'none';
+                if (old2) old2.style.display = 'none';
+
+                await renderBatteryCards();
+                await refreshAllBatteries();
+                autoRefreshInterval = setInterval(refreshAllBatteries, 5000);
+            } catch (e) {
+                console.error('Init error:', e);
+            }
         }
 
         function stopAutoRefresh() {
             if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         }
 
-        async function refreshData() {
+        async function refreshAllBatteries() {
             try {
                 const ts = Date.now();
-                const [statusRes, b1Res, b2Res] = await Promise.all([
-                    fetch(`/api/status?ts=${ts}`, { cache: 'no-store' }),
-                    fetch(`/api/battery/status?ts=${ts}`, { cache: 'no-store' }),
-                    fetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`, { cache: 'no-store' })
-                ]);
+                const statusRes = await fetch(`/api/status?ts=${ts}`, { cache: 'no-store' });
                 const statusData = await statusRes.json();
-                const b1Data = await b1Res.json();
-                const b2Data = await b2Res.json();
-
                 updateSystemMetrics(statusData);
-                updateBattery78(b1Data);
-                updateBattery2(b2Data);
+
+                // Loop all rendered cards
+                const cards = document.querySelectorAll('[data-bid]');
+                for (const card of cards) {
+                    const bid = card.getAttribute('data-bid');
+                    try {
+                        const res = await fetch(`/api/batteries/${bid}/status?ts=${ts}`, { cache: 'no-store' });
+                        const data = await res.json();
+                        updateBatteryCard(bid, data);
+                    } catch (e) {
+                        console.warn('Status error for', bid, e);
+                    }
+                }
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
@@ -645,6 +669,225 @@
             card.classList.add(status);
             badge.classList.add(status);
             badge.textContent = status;
+        }
+
+        // Dynamic battery cards renderer
+        async function renderBatteryCards() {
+            const containerId = 'batteries-container';
+            let container = document.getElementById(containerId);
+            if (!container) {
+                container = document.createElement('div');
+                container.id = containerId;
+                container.style.display = 'grid';
+                container.style.gridTemplateColumns = '1fr 1fr';
+                container.style.gap = '20px';
+                container.style.marginTop = '20px';
+                document.querySelector('.container').appendChild(container);
+            }
+            container.innerHTML = '';
+
+            const resp = await fetch('/api/batteries');
+            const list = await resp.json();
+            if (!list.success || !Array.isArray(list.items)) return;
+
+            for (const it of list.items) {
+                const bid = it.id;
+                const title = it.name || (bid === 'venus_ev2_92' ? 'Venus EV2 (92)' : bid === 'venus_ev2_74' ? 'Venus EV2 (74)' : bid);
+                const idPrefix = `battery-${bid}`;
+                const card = document.createElement('div');
+                card.className = 'card battery-card connecting';
+                card.setAttribute('data-bid', bid);
+                card.innerHTML = `
+                    <div class="battery-header">
+                        <h3>🔋 ${title}</h3>
+                        <span class="battery-status-badge connecting" id="${idPrefix}-badge">Connecting</span>
+                    </div>
+                    <div class="metric"><span class="metric-label">State of Charge</span><span class="metric-value status-info" id="${idPrefix}-soc">--</span></div>
+                    <div class="metric"><span class="metric-label">Energy Remaining</span><span class="metric-value" id="${idPrefix}-energy">--</span></div>
+                    <div class="metric"><span class="metric-label">Battery Power</span><span class="metric-value" id="${idPrefix}-power">--</span></div>
+                    <div class="metric"><span class="metric-label">Huidige Actie</span><span class="metric-value" id="${idPrefix}-action">--</span></div>
+                    <div class="metric"><span class="metric-label">RS485 Control</span><span class="metric-value" id="${idPrefix}-rs485">--</span></div>
+                    <div class="metric"><span class="metric-label">Mode Cmd</span><span class="metric-value" id="${idPrefix}-cmd">--</span></div>
+                    <div class="metric"><span class="metric-label">Setpoint Charge</span><span class="metric-value" id="${idPrefix}-sp-charge">--</span></div>
+                    <div class="metric"><span class="metric-label">Setpoint Discharge</span><span class="metric-value" id="${idPrefix}-sp-discharge">--</span></div>
+                    <div class="metric" style="flex-direction: column; align-items: flex-start; gap:12px; padding-top:15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
+                        <span class="metric-label" style="margin-bottom: 8px;">Handmatige Controle</span>
+                        <div style="width:100%;">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px;">
+                                <label style="color:var(--text-secondary);">Power</label>
+                                <input id="${idPrefix}-powerSlider" type="range" min="0" max="2000" step="50" value="500" oninput="document.getElementById('${idPrefix}-powerValue').textContent=this.value+' W'" />
+                                <span id="${idPrefix}-powerValue" style="min-width:60px; text-align:right; font-weight:600;">500 W</span>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <button class="btn btn-success" onclick="batteryControlFor('${bid}','charge')">Force Charge</button>
+                                <button class="btn btn-danger" onclick="batteryControlFor('${bid}','discharge')">Force Discharge</button>
+                                <button class="btn btn-secondary" onclick="batteryControlFor('${bid}','stop')">Stop Force</button>
+                            </div>
+                        </div>
+                        <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <label style="color:var(--text-secondary); margin-bottom: 5px;">Hoofd Werkmodus</label>
+                            <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                                Huidig: <span id="${idPrefix}-current-work-mode" style="font-weight: bold; color: var(--success-color);">-</span>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <button id="${idPrefix}-wm-0" data-mode="0" class="btn btn-primary work-mode-btn" onclick="setWorkModeFor('${bid}',0)">Manual</button>
+                                <button id="${idPrefix}-wm-1" data-mode="1" class="btn btn-primary work-mode-btn" onclick="setWorkModeFor('${bid}',1)">Anti-Feed</button>
+                                <button id="${idPrefix}-wm-2" data-mode="2" class="btn btn-primary work-mode-btn" onclick="setWorkModeFor('${bid}',2)">Trade</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modbus-info">
+                        <span id="${idPrefix}-control-msg" style="font-size: 12px;"></span><br>
+                        <strong>Last Update:</strong> <span id="${idPrefix}-timestamp">--</span>
+                    </div>
+                `;
+                document.getElementById('batteries-container') ?
+                    container.appendChild(card) : document.querySelector('.container').appendChild(card);
+            }
+        }
+
+        function updateBatteryCard(bid, batteryData) {
+            const idPrefix = `battery-${bid}`;
+            const badge = document.getElementById(`${idPrefix}-badge`);
+            const card = document.querySelector(`[data-bid="${bid}"]`);
+            if (!card) return;
+            const setStatus = (status) => {
+                if (badge) {
+                    ['connected','error','connecting'].forEach(c=>badge.classList.remove(c));
+                    badge.classList.add(status);
+                    badge.textContent = status.toUpperCase();
+                }
+                card.classList.remove('connected','error','connecting');
+                card.classList.add(status);
+            };
+            if (batteryData && batteryData.success && batteryData.data) {
+                setStatus('connected');
+                const d = batteryData.derived || {};
+                const raw = batteryData.data || {};
+                const socEl = document.getElementById(`${idPrefix}-soc`);
+                if (socEl) {
+                    const soc = d.soc_percent;
+                    socEl.textContent = soc != null ? `${soc.toFixed(1)} %` : '--';
+                    socEl.className = soc > 80 ? 'metric-value status-good' : soc > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
+                }
+                const energyEl = document.getElementById(`${idPrefix}-energy`);
+                if (energyEl) energyEl.textContent = d.remaining_kwh != null ? `${d.remaining_kwh.toFixed(2)} kWh` : '--';
+                const powerEl = document.getElementById(`${idPrefix}-power`);
+                if (powerEl) {
+                    const pw = d.power_w;
+                    if (pw != null) {
+                        powerEl.textContent = `${pw.toFixed(0)} W`;
+                        powerEl.className = pw > 20 ? 'metric-value status-good' : pw < -20 ? 'metric-value status-danger' : 'metric-value';
+                    } else { powerEl.textContent = '--'; }
+                }
+                const actionEl = document.getElementById(`${idPrefix}-action`);
+                if (actionEl) {
+                    const modeText = (raw.work_mode && (raw.work_mode.formatted || raw.work_mode.value)) || (d.mode || 'Onbekend');
+                    actionEl.textContent = String(modeText);
+                    if (modeText === 'Charging') actionEl.className = 'metric-value status-good';
+                    else if (modeText === 'Discharging') actionEl.className = 'metric-value status-danger';
+                    else actionEl.className = 'metric-value';
+                }
+                // Current user-set work mode (if available)
+                const currentModeEl = document.getElementById(`${idPrefix}-current-work-mode`);
+                let cur = null;
+                if (raw && raw.user_work_mode && raw.user_work_mode.value !== null && raw.user_work_mode.value !== undefined) {
+                    cur = raw.user_work_mode.value;
+                }
+                if (currentModeEl && cur !== null) {
+                    const mm = {0: 'Manual', 1: 'Anti-Feed', 2: 'Trade'};
+                    currentModeEl.textContent = mm[cur] || `Mode ${cur}`;
+                }
+                // Highlight active work-mode button per card
+                const cardEl = document.querySelector(`[data-bid="${bid}"]`);
+                if (cardEl) {
+                    const buttons = cardEl.querySelectorAll('.work-mode-btn');
+                    buttons.forEach(btn => {
+                        const m = parseInt(btn.getAttribute('data-mode'), 10);
+                        if (cur !== null && m === cur) {
+                            btn.className = 'btn btn-success work-mode-btn';
+                            btn.disabled = true;
+                            btn.style.opacity = '0.9';
+                            btn.style.transform = 'scale(0.98)';
+                        } else {
+                            btn.className = 'btn btn-primary work-mode-btn';
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.transform = 'scale(1)';
+                        }
+                    });
+                }
+                // RS485/Mode Cmd/Setpoints values (formatted if present)
+                const rs = raw && raw.rs485_control_enable;
+                const cmd = raw && raw.control_mode_command;
+                const spc = raw && raw.charge_setpoint_power;
+                const spd = raw && raw.discharge_setpoint_power;
+                const rsEl = document.getElementById(`${idPrefix}-rs485`);
+                if (rsEl) rsEl.textContent = rs ? (rs.formatted || rs.value || '--') : '--';
+                const cmdEl = document.getElementById(`${idPrefix}-cmd`);
+                if (cmdEl) cmdEl.textContent = cmd ? (cmd.formatted || cmd.value || '--') : '--';
+                const spcEl = document.getElementById(`${idPrefix}-sp-charge`);
+                if (spcEl) spcEl.textContent = spc ? (spc.formatted || `${spc.value} W`) : '--';
+                const spdEl = document.getElementById(`${idPrefix}-sp-discharge`);
+                if (spdEl) spdEl.textContent = spd ? (spd.formatted || `${spd.value} W`) : '--';
+                const tsEl = document.getElementById(`${idPrefix}-timestamp`);
+                if (tsEl) tsEl.textContent = new Date().toLocaleTimeString();
+            } else {
+                setStatus('error');
+            }
+        }
+
+        // Per-card control with confirmations
+        async function batteryControlFor(bid, action) {
+            const idPrefix = `battery-${bid}`;
+            const el = document.getElementById(`${idPrefix}-control-msg`);
+            const card = document.querySelector(`[data-bid="${bid}"]`);
+            const buttons = card ? card.querySelectorAll('.btn') : document.querySelectorAll('.btn');
+            try {
+                buttons.forEach(btn => { btn.disabled = true; btn.style.opacity = '0.6'; });
+                if (el) { el.textContent = `⏳ ${action} wordt uitgevoerd...`; el.className = 'status-info'; }
+                // Read slider strictly from this card to prevent cross-talk
+                const powerEl = card ? card.querySelector(`#${idPrefix}-powerSlider`) : document.getElementById(`${idPrefix}-powerSlider`);
+                const power_w = powerEl ? parseInt(powerEl.value, 10) : undefined;
+                const payload = power_w != null ? { action, power_w } : { action };
+                const res = await fetch(`/api/batteries/${bid}/control`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                if (el) {
+                    if (j.success) { el.textContent = `✅ ${action} succesvol`; el.className = 'status-good'; }
+                    else { el.textContent = `❌ Fout: ${j.error || 'onbekend'}`; el.className = 'status-danger'; }
+                }
+                setTimeout(() => refreshAllBatteries && refreshAllBatteries(), 1200);
+            } catch (e) {
+                if (el) { el.textContent = `❌ Fout bij ${action}: ${e}`; el.className = 'status-danger'; }
+            } finally {
+                setTimeout(() => { buttons.forEach(btn => { btn.disabled = false; btn.style.opacity = '1'; }); }, 2000);
+            }
+        }
+
+        async function setWorkModeFor(bid, mode) {
+            const idPrefix = `battery-${bid}`;
+            const el = document.getElementById(`${idPrefix}-control-msg`);
+            const card = document.querySelector(`[data-bid="${bid}"]`);
+            const buttons = card ? card.querySelectorAll('.btn') : document.querySelectorAll('.btn');
+            try {
+                buttons.forEach(btn => { btn.disabled = true; btn.style.opacity = '0.6'; });
+                if (el) { el.textContent = `⏳ Werkmodus wordt ingesteld...`; el.className = 'status-info'; }
+                const res = await fetch(`/api/batteries/${bid}/mode`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode })
+                });
+                const j = await res.json();
+                if (el) {
+                    if (j.success) { el.textContent = `✅ Werkmodus gezet`; el.className = 'status-good'; }
+                    else { el.textContent = `❌ Fout: ${j.error || 'onbekend'}`; el.className = 'status-danger'; }
+                }
+                setTimeout(() => refreshAllBatteries && refreshAllBatteries(), 1200);
+            } catch (e) {
+                if (el) { el.textContent = `❌ Fout bij werkmodus: ${e}`; el.className = 'status-danger'; }
+            } finally {
+                setTimeout(() => { buttons.forEach(btn => { btn.disabled = false; btn.style.opacity = '1'; }); }, 2000);
+            }
         }
 
         function updateSystemMetrics(data) {
