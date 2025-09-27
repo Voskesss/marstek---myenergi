@@ -735,10 +735,32 @@
                                 <button id="${idPrefix}-wm-2" data-mode="2" class="btn btn-primary work-mode-btn" onclick="setWorkModeFor('${bid}',2)">Trade</button>
                             </div>
                         </div>
+                        <div style="width:100%; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <label style="color:var(--text-secondary); margin-bottom: 5px;">Minimum SoC Bescherming</label>
+                            <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                                Huidig SoC: <span id="${idPrefix}-current-soc-display" style="font-weight: bold; color: var(--success-color);">-</span> |
+                                Actieve Min: <span id="${idPrefix}-active-min-soc" style="font-weight: bold; color: var(--warning-color);">-</span>
+                            </div>
+                            <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
+                                Status: <span id="${idPrefix}-soc-protection-status" style="font-weight: bold;">-</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                <label style="min-width:80px; font-size:14px;">Min SoC:</label>
+                                <input id="${idPrefix}-minSocSlider" type="range" min="15" max="100" step="1" value="20"
+                                       oninput="document.getElementById('${idPrefix}-minSocValue').textContent=this.value+'%'" style="flex:1;" />
+                                <span id="${idPrefix}-minSocValue" style="min-width:50px; text-align:right; font-weight:600;">20%</span>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <button class="btn btn-primary" onclick="setMinimumSocFor('${bid}')">Instellen</button>
+                                <button class="btn btn-warning" onclick="resetToFactoryFor('${bid}')">Reset naar Fabrikant</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="modbus-info">
                         <span id="${idPrefix}-control-msg" style="font-size: 12px;"></span><br>
                         <strong>Last Update:</strong> <span id="${idPrefix}-timestamp">--</span>
+                        <div id="${idPrefix}-dbg1" style="margin-top:6px; font-size: 11px; opacity: 0.8;">&nbsp;</div>
+                        <div id="${idPrefix}-dbg2" style="font-size: 11px; opacity: 0.8;">&nbsp;</div>
                     </div>
                 `;
                 document.getElementById('batteries-container') ?
@@ -832,6 +854,23 @@
                 if (spdEl) spdEl.textContent = spd ? (spd.formatted || `${spd.value} W`) : '--';
                 const tsEl = document.getElementById(`${idPrefix}-timestamp`);
                 if (tsEl) tsEl.textContent = new Date().toLocaleTimeString();
+
+                // Debug lines
+                const dbg1 = document.getElementById(`${idPrefix}-dbg1`);
+                const dbg2 = document.getElementById(`${idPrefix}-dbg2`);
+                if (dbg1) {
+                    const pw = d.power_w != null ? d.power_w.toFixed(0) : '--';
+                    const pc = d.calc_power_w != null ? d.calc_power_w.toFixed(0) : '--';
+                    dbg1.textContent = `P=${pw}W (calc=${pc}W) | SoC=${d.soc_percent != null ? d.soc_percent.toFixed(1) : '--'}%`;
+                }
+                if (dbg2) {
+                    const uwm = raw && raw.user_work_mode && (raw.user_work_mode.formatted ?? raw.user_work_mode.value);
+                    const wmr = raw && raw.work_mode && (raw.work_mode.formatted ?? raw.work_mode.value);
+                    dbg2.textContent = `user_mode=${uwm ?? '-'} | device_mode=${wmr ?? '-'}`;
+                }
+
+                // Update SoC protection section with config
+                updateSocProtectionDisplayFor(bid, d);
             } else {
                 setStatus('error');
             }

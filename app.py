@@ -1793,6 +1793,29 @@ async def ble_connect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# ----------------------
+# Helpers for per-battery config/control
+# ----------------------
+def _get_modbus_for(bid: str):
+    try:
+        if bid == "venus_ev2_92":
+            return venus_modbus
+        if bid == "venus_ev2_74":
+            return venus_modbus2
+    except Exception:
+        pass
+    return venus_modbus
+
+def _get_or_init_battery_config(cfg: Dict[str, Any], bid: str) -> Dict[str, Any]:
+    if bid not in cfg:
+        cfg[bid] = {
+            "minimum_soc_percent": 20.0,
+            "auto_charge_enabled": True,
+            "original_work_mode": None,
+            "emergency_charge_active": False,
+        }
+    return cfg[bid]
+
 @app.post("/api/batteries/{bid}/control")
 async def battery_control_by_id(bid: str, payload: Dict[str, Any] = Body(...)):
     """Generic control endpoint: action in {'charge','discharge','stop'}, optional power_w."""
@@ -2159,6 +2182,18 @@ async def get_battery_config():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/api/batteries/{bid}/config")
+async def get_battery_config_by_id(bid: str):
+    """Get per-battery configuration (min SoC etc.)."""
+    try:
+        cfg = load_battery_config()
+        bc = _get_or_init_battery_config(cfg, bid)
+        # persist defaults if missing
+        save_battery_config(cfg)
+        return {"success": True, "config": bc, "id": bid}
+    except Exception as e:
+        return {"success": False, "error": str(e), "id": bid}
+
 @app.post("/api/battery/minimum_soc")
 async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
     """Check and enforce minimum SoC limit.
@@ -2198,6 +2233,46 @@ async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
         
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.post("/api/batteries/{bid}/minimum_soc")
+async def api_minimum_soc_per_battery(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Set/check minimum SoC limit per battery.
+    Payload: { min_soc_percent: float, auto_charge?: bool }
+    """
+    try:
+        min_soc = float(payload.get("min_soc_percent", 20.0))
+        auto_charge = bool(payload.get("auto_charge", True))
+        if not (15.0 <= min_soc <= 100.0):
+            return {"success": False, "error": "min_soc_percent must be between 15 and 100"}
+
+        cfg = load_battery_config()
+        bc = _get_or_init_battery_config(cfg, bid)
+        bc["minimum_soc_percent"] = min_soc
+        bc["auto_charge_enabled"] = auto_charge
+        save_battery_config(cfg)
+
+        vm = _get_modbus_for(bid)
+        if auto_charge:
+            # enforce and/or start emergency charge if needed
+            result = vm.check_minimum_soc(min_soc)
+            ok = bool(result.get("ok", False))
+            return {"success": ok, **result, "id": bid}
+        else:
+            # passive check
+            bd = vm.read_battery_data()
+            if not bd or "soc_percent" not in bd:
+                return {"success": False, "error": "Could not read SoC data", "id": bid}
+            current_soc = float(bd["soc_percent"]["value"]) if isinstance(bd["soc_percent"], dict) else float(bd["soc_percent"]) 
+            return {
+                "success": True,
+                "current_soc": current_soc,
+                "min_soc_limit": min_soc,
+                "below_limit": current_soc <= min_soc,
+                "action_taken": None,
+                "id": bid,
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e), "id": bid}
 
 @app.post("/api/battery/control")
 async def set_battery_control(payload: Dict[str, Any] = Body(...)):
