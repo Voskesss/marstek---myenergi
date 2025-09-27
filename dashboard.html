@@ -929,6 +929,85 @@
             }
         }
 
+        // --- Minimum SoC per battery ---
+        async function updateSocProtectionDisplayFor(bid, derived) {
+            try {
+                const idPrefix = `battery-${bid}`;
+                const cfgRes = await fetch(`/api/batteries/${bid}/config`, { cache: 'no-store' });
+                const cfg = await cfgRes.json();
+                if (!cfg.success) return;
+                const c = cfg.config || {};
+                const curSocEl = document.getElementById(`${idPrefix}-current-soc-display`);
+                const activeMinEl = document.getElementById(`${idPrefix}-active-min-soc`);
+                const statusEl = document.getElementById(`${idPrefix}-soc-protection-status`);
+                const slider = document.getElementById(`${idPrefix}-minSocSlider`);
+                const sliderVal = document.getElementById(`${idPrefix}-minSocValue`);
+                if (slider && (c.minimum_soc_percent != null)) slider.value = c.minimum_soc_percent;
+                if (sliderVal) sliderVal.textContent = `${(c.minimum_soc_percent ?? slider?.value) ?? '-'}%`;
+                if (activeMinEl) activeMinEl.textContent = `${(c.minimum_soc_percent ?? '-')}%`;
+                if (curSocEl && derived && derived.soc_percent != null) curSocEl.textContent = `${derived.soc_percent.toFixed(1)}%`;
+                if (statusEl && derived && derived.soc_percent != null && (c.minimum_soc_percent != null)) {
+                    const soc = derived.soc_percent;
+                    const min = c.minimum_soc_percent;
+                    if (soc <= min) { statusEl.textContent = '⚠️ Te laag - Emergency charge'; statusEl.style.color = 'var(--status-yellow)'; }
+                    else if (soc <= min + 2) { statusEl.textContent = '⚡ Hysteresis zone'; statusEl.style.color = 'var(--status-yellow)'; }
+                    else { statusEl.textContent = '✅ Veilig'; statusEl.style.color = 'var(--status-green)'; }
+                }
+            } catch (e) {
+                console.warn('SoC display update failed for', bid, e);
+            }
+        }
+
+        async function setMinimumSocFor(bid) {
+            const idPrefix = `battery-${bid}`;
+            const card = document.querySelector(`[data-bid="${bid}"]`);
+            const el = document.getElementById(`${idPrefix}-control-msg`);
+            const buttons = card ? card.querySelectorAll('.btn') : document.querySelectorAll('.btn');
+            try {
+                buttons.forEach(b=>{b.disabled=true;b.style.opacity='0.6'});
+                if (el) { el.textContent = '⏳ Minimum SoC wordt ingesteld...'; el.className='status-info'; }
+                const slider = document.getElementById(`${idPrefix}-minSocSlider`);
+                const minSoc = slider ? parseFloat(slider.value) : 20;
+                const res = await fetch(`/api/batteries/${bid}/minimum_soc`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ min_soc_percent: minSoc, auto_charge: true })});
+                const j = await res.json();
+                if (el) {
+                    if (j.success) {
+                        if (j.action_taken === 'emergency_charge') { el.textContent = `⚠️ SoC te laag (${j.current_soc}%) - Noodlading gestart!`; el.className='status-warning'; }
+                        else { el.textContent = `✅ Min SoC: ${minSoc}% ingesteld`; el.className='status-good'; }
+                    } else { el.textContent = `❌ Fout: ${j.error || 'onbekend'}`; el.className='status-danger'; }
+                }
+                setTimeout(()=>refreshAllBatteries && refreshAllBatteries(), 1200);
+            } catch (e) {
+                if (el) { el.textContent = `❌ Fout bij min SoC: ${e}`; el.className='status-danger'; }
+            } finally {
+                setTimeout(()=>{buttons.forEach(b=>{b.disabled=false;b.style.opacity='1'})},2000);
+            }
+        }
+
+        async function resetToFactoryFor(bid) {
+            const idPrefix = `battery-${bid}`;
+            const card = document.querySelector(`[data-bid="${bid}"]`);
+            const el = document.getElementById(`${idPrefix}-control-msg`);
+            const buttons = card ? card.querySelectorAll('.btn') : document.querySelectorAll('.btn');
+            try {
+                buttons.forEach(b=>{b.disabled=true;b.style.opacity='0.6'});
+                if (el) { el.textContent = '⏳ Reset naar fabrikant...'; el.className='status-info'; }
+                // Stop any active force first (best effort)
+                await fetch(`/api/batteries/${bid}/control`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'stop' })});
+                const res = await fetch(`/api/batteries/${bid}/minimum_soc`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ min_soc_percent: 15.0, auto_charge: false })});
+                const j = await res.json();
+                if (el) {
+                    if (j.success) { el.textContent = '🔄 Reset naar fabrikant - Batterij bepaalt zelf wanneer te stoppen'; el.className='status-good'; }
+                    else { el.textContent = `❌ Fout bij reset: ${j.error || 'onbekend'}`; el.className='status-danger'; }
+                }
+                setTimeout(()=>refreshAllBatteries && refreshAllBatteries(), 1200);
+            } catch (e) {
+                if (el) { el.textContent = `❌ Fout bij reset: ${e}`; el.className='status-danger'; }
+            } finally {
+                setTimeout(()=>{buttons.forEach(b=>{b.disabled=false;b.style.opacity='1'})},2000);
+            }
+        }
+
         function updateSystemMetrics(data) {
             // PV Generation
             const pv_w = data.pv_generation_w || 0;
