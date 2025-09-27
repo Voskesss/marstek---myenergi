@@ -1083,25 +1083,38 @@
 
     <!-- Backend Health & Logs -->
     <script>
+        // Debounced health state to prevent flicker
+        const __healthClient = { lastOkTs: 0, consecutiveFails: 0 };
+        function renderHealthBadge(state){
+            const b = document.getElementById('backendHealthBadge');
+            if(!b) return;
+            const now = Date.now()/1000;
+            const sinceOk = now - (state.lastOkTs || 0);
+            // Rules: OK if success in last 20s; Degraded if >=3 fails in a row or >60s since last OK; else Unknown
+            let label = 'Backend: Unknown';
+            let cls = 'badge degraded';
+            if (sinceOk <= 20) { label = 'Backend: OK'; cls = 'badge ok'; }
+            else if (state.consecutiveFails >= 3 || sinceOk > 60) { label = 'Backend: Degraded'; cls = 'badge degraded'; }
+            else { label = 'Backend: Unknown'; cls = 'badge degraded'; }
+            b.textContent = label;
+            b.className = cls;
+        }
         async function updateBackendHealthBadge(){
             try{
                 const r = await fetch('/api/health', {cache:'no-store'});
                 const j = await r.json();
-                const b = document.getElementById('backendHealthBadge');
-                if(!b) return;
                 if(j.success && j.simple_rule){
                     const health = (j.simple_rule.last && j.simple_rule.last.health) || {};
                     const ok = health && health.myenergi_ok === true;
-                    b.textContent = ok ? 'Backend: OK' : 'Backend: Degraded';
-                    b.className = ok ? 'badge ok' : 'badge degraded';
+                    if (ok) { __healthClient.lastOkTs = Date.now()/1000; __healthClient.consecutiveFails = 0; }
+                    else { __healthClient.consecutiveFails = (__healthClient.consecutiveFails||0) + 1; }
                 } else {
-                    b.textContent = 'Backend: Degraded';
-                    b.className = 'badge degraded';
+                    __healthClient.consecutiveFails = (__healthClient.consecutiveFails||0) + 1;
                 }
             }catch(e){
-                const b = document.getElementById('backendHealthBadge');
-                if(b){ b.textContent = 'Backend: Degraded'; b.className = 'badge degraded'; }
+                __healthClient.consecutiveFails = (__healthClient.consecutiveFails||0) + 1;
             }
+            renderHealthBadge(__healthClient);
         }
         setInterval(updateBackendHealthBadge, 5000);
         document.addEventListener('DOMContentLoaded', updateBackendHealthBadge);
@@ -1188,56 +1201,21 @@
                         <span id="ruleStatus" style="font-size: 16px; font-weight: 600; color: var(--success-color);">AAN</span>
                     </div>
                     
-                    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 25px;">
+                    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">
                         Batterijen laden alleen uit overschot dat Eddi niet nodig heeft
                     </div>
-                    
-                    <!-- Battery Selection -->
-                    <div style="background: var(--card-bg); border-radius: 8px; padding: 20px; border: 1px solid var(--border-color);">
-                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 15px; color: var(--text-primary);">
-                            🔋 Batterijen die meedoen:
-                        </div>
-                        
-                        <div style="display: flex; justify-content: center; gap: 30px;">
-                            <!-- Battery 1 -->
-                            <label class="battery-toggle">
-                                <input type="checkbox" id="battery1Toggle" onchange="updateBatteries()" checked>
-                                <div class="battery-card">
-                                    <div class="battery-icon">🔋</div>
-                                    <div class="battery-name">Venus E 78</div>
-                                    <div class="battery-status">Actief</div>
-                                </div>
-                            </label>
-                            
-                            <!-- Battery 2 -->
-                            <label class="battery-toggle">
-                                <input type="checkbox" id="battery2Toggle" onchange="updateBatteries()" disabled>
-                                <div class="battery-card disabled">
-                                    <div class="battery-icon">🔋</div>
-                                    <div class="battery-name">WiFi Converter</div>
-                                    <div class="battery-status">Niet aangesloten</div>
-                                </div>
-                            </label>
-                        </div>
+                    <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 25px;">
+                        Let op: deze regels-UI is (nog) niet actief in de backend. De Simple Rule bestuurt nu de batterijen.
                     </div>
                     
-                    <!-- Temperature Override for Testing -->
-                    <div style="margin-top: 20px; padding: 15px; background: var(--warning-color); color: white; border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 10px;">🌡️ Tank Temperatuur (Testing):</div>
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
-                            <label style="min-width: 80px;">Override:</label>
-                            <input type="checkbox" id="tempOverrideToggle" onchange="updateTempOverride()" style="margin-right: 10px;">
-                            <input type="range" id="tempSlider" min="20" max="80" step="1" value="45" disabled
-                                   oninput="document.getElementById('tempValue').textContent=this.value+'°C'" style="flex: 1;">
-                            <span id="tempValue" style="min-width: 50px; font-weight: 600;">45°C</span>
-                        </div>
-                        <div style="font-size: 12px; opacity: 0.9;">Zet override aan om tank temperatuur handmatig in te stellen voor testing</div>
-                    </div>
+                    <!-- Battery selection UI removed -->
+                    
+                    <!-- Temperature override testing UI removed -->
                     
                     <!-- Rule Status -->
                     <div style="margin-top: 20px; padding: 15px; background: var(--info-color); color: white; border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 5px;">📊 Huidige Status:</div>
-                        <div id="currentRuleStatus">Regel wordt geladen...</div>
+                        <div style="font-weight: 600; margin-bottom: 5px;">📊 Huidige Status (Rules UI):</div>
+                        <div id="currentRuleStatus">Deze status is informatief; backend rules-engine staat uit. Simple Rule is actief.</div>
                     </div>
                 </div>
             </div>
@@ -1362,33 +1340,16 @@
             await updateRuleConfig();
         }
         
-        async function updateBatteries() {
-            await updateRuleConfig();
-        }
+        // Battery selection removed
         
-        // Temperature Override Management
-        async function updateTempOverride() {
-            const overrideEnabled = document.getElementById("tempOverrideToggle").checked;
-            const tempSlider = document.getElementById("tempSlider");
-            
-            tempSlider.disabled = !overrideEnabled;
-            
-            if (overrideEnabled) {
-                tempSlider.style.opacity = "1";
-            } else {
-                tempSlider.style.opacity = "0.5";
-            }
-            
-            await updateRuleConfig();
-        }
+        // Temperature override removed
         
         async function updateRuleConfig() {
             try {
                 const ruleActive = document.getElementById("eddiPriorityToggle").checked;
-                const tempOverride = document.getElementById("tempOverrideToggle").checked;
-                const tempValue = document.getElementById("tempSlider").value;
-                const battery1 = document.getElementById("battery1Toggle").checked;
-                const battery2 = document.getElementById("battery2Toggle").checked;
+                // Hardcode which batteries participate
+                const battery1 = true; // venus_e_78 actief
+                const battery2 = false; // wifi_converter uit
                 
                 const config = {
                     "rules": [
@@ -1402,8 +1363,6 @@
                                 "wifi_converter": battery2
                             },
                             "parameters": {
-                                "tank_temp_override": tempOverride ? parseFloat(tempValue) : null,
-                                "tank_temp_target": 60,
                                 "export_threshold_w": 100,
                                 "eddi_buffer_w": 200,
                                 "max_battery_power_w": 1500,
@@ -1473,11 +1432,8 @@
                 
                 if (result.success && result.data.rules.length > 0) {
                     const rule = result.data.rules[0];
-                    
-                    // Set toggle states
+                    // Set toggle state for eddi priority only
                     document.getElementById("eddiPriorityToggle").checked = rule.active;
-                    document.getElementById("battery1Toggle").checked = rule.batteries.venus_e_78;
-                    document.getElementById("battery2Toggle").checked = rule.batteries.wifi_converter;
                     
                     // Update status
                     const status = document.getElementById("ruleStatus");

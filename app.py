@@ -3252,9 +3252,12 @@ class SimpleRulesEngine:
             
             # Apply to selected batteries
             batteries = rule.get("batteries", {})
+            allow = {"venus_e_78"}
             for battery_id, enabled in batteries.items():
-                if enabled:
+                if enabled and battery_id in allow:
                     await self.set_battery_power(battery_id, target_power)
+                elif enabled and battery_id not in allow:
+                    logger.info(f"🎯 RULE EXEC: Skipping non-allowed battery '{battery_id}'")
                     
         except Exception as e:
             logger.error(f"Eddi priority rule error: {e}")
