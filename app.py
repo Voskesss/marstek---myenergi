@@ -2057,6 +2057,41 @@ async def simple_rule_disable():
 async def simple_rule_status():
     return {"success": True, "enabled": simple_rule.enabled, "last": simple_rule.last, "cfg": simple_rule.cfg}
 
+# ---------------------------------
+# Startup/shutdown: auto-start simple rule
+# ---------------------------------
+@app.on_event("startup")
+async def _startup_simple_rule():
+    """Auto-start the simple export-driven rule on app boot.
+    Keeps behavior resilient after crashes/restarts.
+    """
+    try:
+        # If already running, do nothing
+        if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
+            return
+        # Start with default cfg; can be overridden later via API
+        simple_rule.enabled = True
+        simple_rule.prev_set_total = 0
+        simple_rule.cooldown_until = 0
+        simple_rule.task = asyncio.create_task(_simple_rule_loop())
+        logger.info("🚀 Simple Rule auto-started on startup")
+    except Exception as e:
+        logger.error(f"❌ Failed to auto-start Simple Rule: {e}")
+
+@app.on_event("shutdown")
+async def _shutdown_simple_rule():
+    """Ensure the simple rule loop stops cleanly on shutdown."""
+    try:
+        if simple_rule.task and not simple_rule.task.done():
+            try:
+                simple_rule.task.cancel()
+            except Exception:
+                pass
+        simple_rule.enabled = False
+        logger.info("🛑 Simple Rule stopped on shutdown")
+    except Exception as e:
+        logger.error(f"❌ Failed to stop Simple Rule on shutdown: {e}")
+
 # =========================
 # Health and Logs endpoints
 # =========================
