@@ -60,6 +60,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pymodbus.client import ModbusTcpClient
 from venus_e_register_map import format_value, get_all_sensors
+from battery_manager import BatteryManager
 from dotenv import load_dotenv
 
 # BLE integration
@@ -475,6 +476,22 @@ venus_modbus2 = VenusEModbusClient(host=os.getenv('VENUS_MODBUS_HOST2', '192.168
 # Ensure only one Modbus read at a time (per device)
 modbus_lock = asyncio.Lock()
 modbus_lock2 = asyncio.Lock()
+
+# Multi-battery manager (ids aligned to user naming)
+#  - venus_ev2_92 → 192.168.68.92 (Battery 1)
+#  - venus_ev2_74 → 192.168.68.74 (Battery 2)
+manager = BatteryManager({
+    'venus_ev2_92': {'client': venus_modbus,  'lock': modbus_lock},
+    'venus_ev2_74': {'client': venus_modbus2, 'lock': modbus_lock2},
+})
+
+def _get_entry_for(bid: str):
+    entry = None
+    try:
+        entry = {'client': manager.registry[bid]['client'], 'lock': manager.registry[bid]['lock']}
+    except Exception:
+        entry = None
+    return entry
 
 # Battery configuration management
 BATTERY_CONFIG_FILE = "battery_config.json"
@@ -1776,6 +1793,44 @@ async def ble_connect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/batteries/{bid}/control")
+async def battery_control_by_id(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Generic control endpoint: action in {'charge','discharge','stop'}, optional power_w."""
+    entry = _get_entry_for(bid)
+    if not entry:
+        return {"success": False, "error": f"unknown battery id: {bid}"}
+    action = str(payload.get("action") or "").strip().lower()
+    power_w = payload.get("power_w")
+    if action not in {"charge", "discharge", "stop"}:
+        return {"success": False, "error": "invalid action"}
+    client = entry['client']
+    lock = entry['lock']
+    async with lock:
+        try:
+            result = client.set_control(action, power_w)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    return {"success": bool(result.get("ok")), **result, "id": bid}
+
+@app.post("/api/batteries/{bid}/mode")
+async def battery_mode_by_id(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Generic work mode endpoint. Payload: { mode: 0|1|2|3 }"""
+    entry = _get_entry_for(bid)
+    if not entry:
+        return {"success": False, "error": f"unknown battery id: {bid}"}
+    try:
+        mode = int(payload.get("mode"))
+    except Exception:
+        return {"success": False, "error": "invalid mode"}
+    client = entry['client']
+    lock = entry['lock']
+    async with lock:
+        try:
+            result = client.set_work_mode(mode)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    return {"success": bool(result.get("ok")), **result, "id": bid}
+
 @app.post("/api/battery/diagnostics/work_mode")
 async def diagnostics_work_mode(payload: Dict[str, Any] = Body(default={})):  
     """Diagnose setting user work mode by trying multiple unit IDs and tokens.
@@ -2005,6 +2060,26 @@ async def get_battery_status():
             "error": str(e),
             "source": "modbus"
         }
+
+@app.get("/api/batteries")
+async def list_batteries():
+    """List available batteries (ids and hosts)."""
+    return {
+        "success": True,
+        "items": [
+            {"id": "venus_ev2_92", "host": venus_modbus.host,  "port": venus_modbus.port},
+            {"id": "venus_ev2_74", "host": venus_modbus2.host, "port": venus_modbus2.port},
+        ]
+    }
+
+@app.get("/api/batteries/{bid}/status")
+async def battery_status_by_id(bid: str):
+    """Generic status endpoint using BatteryManager by id."""
+    try:
+        result = await manager.read_status(bid)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/api/battery2/status")
 async def get_battery2_status():

@@ -255,6 +255,55 @@
             }
         }
 
+        function updateBattery2(batteryData) {
+            const prefix = 'battery2';
+            if (batteryData && batteryData.success && batteryData.data) {
+                setBatteryStatus(prefix, 'connected');
+                const d = batteryData.derived || {};
+                const raw = batteryData.data || {};
+
+                // SoC
+                const socEl = document.getElementById(`${prefix}-soc`);
+                if (socEl) {
+                    const soc = d.soc_percent;
+                    socEl.textContent = soc != null ? `${soc.toFixed(1)} %` : '--';
+                    socEl.className = soc > 80 ? 'metric-value status-good' : soc > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
+                }
+
+                // Energy Remaining
+                const energyEl = document.getElementById(`${prefix}-energy`);
+                if (energyEl && d.remaining_kwh != null) energyEl.textContent = `${d.remaining_kwh.toFixed(2)} kWh`;
+
+                // Power
+                const powerEl = document.getElementById(`${prefix}-power`);
+                if (powerEl) {
+                    const pw = d.power_w;
+                    if (pw != null) {
+                        powerEl.textContent = `${pw.toFixed(0)} W`;
+                        powerEl.className = pw > 20 ? 'metric-value status-good' : pw < -20 ? 'metric-value status-danger' : 'metric-value';
+                    } else {
+                        powerEl.textContent = '--';
+                    }
+                }
+
+                // Mode/Action
+                const actionEl = document.getElementById(`${prefix}-action`);
+                if (actionEl) {
+                    const modeText = (raw.work_mode && (raw.work_mode.formatted || raw.work_mode.value)) || (d.mode || 'Onbekend');
+                    actionEl.textContent = String(modeText);
+                    if (modeText === 'Charging') actionEl.className = 'metric-value status-good';
+                    else if (modeText === 'Discharging') actionEl.className = 'metric-value status-danger';
+                    else actionEl.className = 'metric-value';
+                }
+
+                // Timestamp
+                const tsEl = document.getElementById(`${prefix}-timestamp`);
+                if (tsEl) tsEl.textContent = new Date().toLocaleTimeString();
+            } else {
+                setBatteryStatus(prefix, 'error');
+            }
+        }
+
         async function batteryControl(action) {
             const el = document.getElementById('battery78-control-msg');
             const buttons = document.querySelectorAll('.btn');
@@ -501,17 +550,19 @@
 
         async function refreshData() {
             try {
-                const [statusRes, batteryRes] = await Promise.all([
-                    fetch(`/api/status?ts=${Date.now()}`, { cache: 'no-store' }),
-                    fetch(`/api/battery/status?ts=${Date.now()}`, { cache: 'no-store' })
+                const ts = Date.now();
+                const [statusRes, b1Res, b2Res] = await Promise.all([
+                    fetch(`/api/status?ts=${ts}`, { cache: 'no-store' }),
+                    fetch(`/api/battery/status?ts=${ts}`, { cache: 'no-store' }),
+                    fetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`, { cache: 'no-store' })
                 ]);
                 const statusData = await statusRes.json();
-                const batteryData = await batteryRes.json();
+                const b1Data = await b1Res.json();
+                const b2Data = await b2Res.json();
 
                 updateSystemMetrics(statusData);
-                updateBattery78(batteryData);
-
-                // Removed lastUpdate element
+                updateBattery78(b1Data);
+                updateBattery2(b2Data);
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
