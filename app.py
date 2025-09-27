@@ -48,13 +48,12 @@ import time
 import asyncio
 import json
 import logging
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import FastAPI, BackgroundTasks, Request, Query, Body, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -1793,6 +1792,208 @@ async def ble_connect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# =========================
+# Simple Battery Rule Engine (export-driven, manual setpoints)
+# =========================
+class SimpleRuleState:
+    def __init__(self):
+        self.enabled: bool = False
+        self.task: Optional[asyncio.Task] = None
+        # defaults (can be overridden via enable payload)
+        self.cfg: Dict[str, Any] = {
+            "buffer_w": 200,
+            "export_margin_w": 100,
+            "threshold_start_w": 150,
+            "threshold_stop_w": 100,
+            "ramp_step_w": 150,        # per tick
+            "loop_interval_s": 0.5,    # 500ms
+            "cooldown_s": 8,
+            "max_batt_total_w": 1500,
+        }
+        self.last: Dict[str, Any] = {
+            "grid_w": None,
+            "overschot_w": 0,
+            "target_export_w": 0,
+            "batt_target_total_w": 0,
+            "batt_set_total_w": 0,
+            "per_battery": {},
+            "cooldown": False,
+            "ts": None,
+            "source": "zappi_ct",
+        }
+        self.prev_set_total: float = 0.0
+        self.cooldown_until: float = 0.0
+
+simple_rule = SimpleRuleState()
+
+def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
+    """Prefer Zappi CT ectp4..6 sum. Fallback to Eddi 'grd' or top-level 'grd'."""
+    try:
+        blocks = raw.get("raw") or []
+        z_sum = None
+        for b in blocks:
+            if "zappi" in b and isinstance(b["zappi"], list):
+                for z in b["zappi"]:
+                    try:
+                        e4 = int(z.get("ectp4") or 0)
+                        e5 = int(z.get("ectp5") or 0)
+                        e6 = int(z.get("ectp6") or 0)
+                        z_sum = (z_sum or 0) + (e4 + e5 + e6)
+                    except Exception:
+                        continue
+        if z_sum is not None:
+            return z_sum
+        # fallback: see if eddi.grd exists
+        for b in blocks:
+            if "eddi" in b and isinstance(b["eddi"], list):
+                for e in b["eddi"]:
+                    if e.get("grd") is not None:
+                        return int(e.get("grd"))
+        # last chance: top-level
+        if isinstance(raw, dict) and raw.get("grd") is not None:
+            return int(raw.get("grd"))
+    except Exception:
+        return None
+    return None
+
+async def _set_battery_power(bid: str, power_w: int) -> Dict[str, Any]:
+    """Helper to send manual charge setpoint to a battery id; power_w=0 -> stop."""
+    try:
+        if power_w and power_w > 0:
+            payload = {"action": "charge", "power_w": int(power_w)}
+        else:
+            payload = {"action": "stop"}
+        # reuse endpoint logic directly
+        result = await battery_control_by_id(bid, payload)  # type: ignore[arg-type]
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+async def _simple_rule_loop():
+    global simple_rule
+    cfg = simple_rule.cfg
+    alpha = 0.3  # light smoothing for overschot
+    ema_overschot = 0.0
+    while simple_rule.enabled:
+        t0 = time.time()
+        try:
+            # fetch myenergi raw and compute grid
+            data = await myenergi.status_all()
+            grid_w = _extract_grid_from_raw(data)
+            if grid_w is None:
+                # no data -> safe stop
+                target_total = 0
+                simple_rule.last.update({
+                    "grid_w": None,
+                    "overschot_w": 0,
+                    "target_export_w": cfg["buffer_w"] + cfg["export_margin_w"],
+                    "batt_target_total_w": target_total,
+                    "batt_set_total_w": 0,
+                    "per_battery": {},
+                    "cooldown": False,
+                    "ts": time.time(),
+                })
+                # stop all
+                for it in (await list_batteries())['items']:  # type: ignore[index]
+                    await _set_battery_power(it['id'], 0)
+            else:
+                overschot_raw = max(0, -int(grid_w))
+                ema_overschot = alpha * overschot_raw + (1 - alpha) * ema_overschot
+                target_export = cfg["buffer_w"] + cfg["export_margin_w"]
+                error = ema_overschot - target_export
+
+                # cooldown logic
+                now = time.time()
+                in_cooldown = now < simple_rule.cooldown_until
+
+                target_total = simple_rule.prev_set_total
+                if grid_w >= 0:
+                    # importing -> immediate stop + cooldown
+                    target_total = 0
+                    simple_rule.cooldown_until = now + cfg["cooldown_s"]
+                else:
+                    if error > cfg["threshold_start_w"] and not in_cooldown:
+                        # ramp up proportionally but bounded
+                        step = min(cfg["ramp_step_w"], int(error))
+                        target_total = min(cfg["max_batt_total_w"], simple_rule.prev_set_total + step)
+                    elif error < -cfg["threshold_stop_w"]:
+                        # ramp down quickly
+                        step = cfg["ramp_step_w"]
+                        target_total = max(0, simple_rule.prev_set_total - step)
+                        if target_total == 0:
+                            simple_rule.cooldown_until = now + cfg["cooldown_s"]
+                    # else hold
+
+                # distribute across batteries equally
+                per = {}
+                items = (await list_batteries())['items']  # type: ignore[index]
+                n = max(1, len(items))
+                per_val = int(target_total / n)
+                set_total = 0
+                for it in items:
+                    bid = it['id']
+                    # respect per-battery min SoC on discharge; we only charge here
+                    res = await _set_battery_power(bid, per_val)
+                    per[bid] = {"set": per_val, "ok": bool(res.get("success"))}
+                    set_total += per_val
+
+                simple_rule.prev_set_total = set_total
+                simple_rule.last.update({
+                    "grid_w": grid_w,
+                    "overschot_w": int(ema_overschot),
+                    "target_export_w": target_export,
+                    "batt_target_total_w": int(target_total),
+                    "batt_set_total_w": int(set_total),
+                    "per_battery": per,
+                    "cooldown": in_cooldown,
+                    "ts": time.time(),
+                })
+        except Exception as e:
+            simple_rule.last.update({"error": str(e), "ts": time.time()})
+        # sleep remaining interval
+        dt = time.time() - t0
+        await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+
+@app.post("/api/simple_rule/enable")
+async def simple_rule_enable(payload: Dict[str, Any] = Body(default={})):  # type: ignore[assignment]
+    """Enable the simple export-driven battery rule engine.
+    Optional payload overrides defaults: buffer_w, export_margin_w, threshold_start_w, threshold_stop_w, ramp_step_w, loop_interval_s, cooldown_s, max_batt_total_w
+    """
+    if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
+        return {"success": True, "status": "already_enabled", "cfg": simple_rule.cfg}
+    # merge cfg
+    for k, v in (payload or {}).items():
+        if k in simple_rule.cfg:
+            simple_rule.cfg[k] = v
+    simple_rule.enabled = True
+    simple_rule.prev_set_total = 0
+    simple_rule.cooldown_until = 0
+    simple_rule.task = asyncio.create_task(_simple_rule_loop())
+    return {"success": True, "status": "enabled", "cfg": simple_rule.cfg}
+
+@app.post("/api/simple_rule/disable")
+async def simple_rule_disable():
+    if not simple_rule.enabled:
+        return {"success": True, "status": "already_disabled"}
+    simple_rule.enabled = False
+    if simple_rule.task:
+        try:
+            simple_rule.task.cancel()
+        except Exception:
+            pass
+    # stop batteries safely
+    try:
+        items = (await list_batteries())['items']  # type: ignore[index]
+        for it in items:
+            await _set_battery_power(it['id'], 0)
+    except Exception:
+        pass
+    return {"success": True, "status": "disabled"}
+
+@app.get("/api/simple_rule/status")
+async def simple_rule_status():
+    return {"success": True, "enabled": simple_rule.enabled, "last": simple_rule.last, "cfg": simple_rule.cfg}
+
 # ----------------------
 # Helpers for per-battery config/control
 # ----------------------
@@ -2358,6 +2559,90 @@ async def battery_ping():
         return {"success": ok, "host": venus_modbus.host, "port": venus_modbus.port, "sample": {"address": addr, "value": val}}
     except Exception as e:
         return {"success": False, "error": str(e), "host": venus_modbus.host, "port": venus_modbus.port}
+
+# =========================
+# MyEnergi raw helpers (to inspect Harvi/CT data)
+# =========================
+@app.get("/api/myenergi/raw")
+async def myenergi_raw():
+    """Return the unmodified MyEnergi status payload for debugging CT/Harvi fields."""
+    try:
+        data = await myenergi.status_all()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/myenergi/summary")
+async def myenergi_summary():
+    """Summarize grid/export, eddi power, zappi power and any Harvi ectp* readings we can find."""
+    try:
+        data = await myenergi.status_all()
+        grid_w = None
+        eddi_w = 0
+        zappi_w = 0
+        harvi = []
+
+        # Top-level grid if present
+        try:
+            grid_w = int(data.get("grd")) if isinstance(data.get("grd"), (int, float, str)) else None
+        except Exception:
+            grid_w = None
+
+        # Walk devices
+        for key in ("eddi", "zappi", "harvi", "as", "devices"):
+            devs = data.get(key)
+            if not isinstance(devs, list):
+                continue
+            for d in devs:
+                typ = d.get("typ") or d.get("type") or key
+                # Eddi
+                if str(typ).lower().startswith("eddi") or key == "eddi":
+                    try:
+                        # 'div' diverter power (W) commonly used
+                        eddi_w += int(d.get("div", 0) or 0)
+                    except Exception:
+                        pass
+                    # Some payloads expose grid under device as 'grd'
+                    if grid_w is None and d.get("grd") is not None:
+                        try:
+                            grid_w = int(d.get("grd"))
+                        except Exception:
+                            pass
+                # Zappi
+                if str(typ).lower().startswith("zappi") or key == "zappi":
+                    try:
+                        zappi_w += int(d.get("ectp1", 0) or 0)
+                    except Exception:
+                        pass
+                    if grid_w is None and d.get("grd") is not None:
+                        try:
+                            grid_w = int(d.get("grd"))
+                        except Exception:
+                            pass
+                # Harvi (wireless CT): ectp1..3 values
+                if str(typ).lower().startswith("harvi") or key == "harvi":
+                    rec = {
+                        "sn": d.get("sno") or d.get("serial") or d.get("sn"),
+                        "ectp1": d.get("ectp1"),
+                        "ectp2": d.get("ectp2"),
+                        "ectp3": d.get("ectp3"),
+                        "ct1": d.get("ct1"),
+                        "ct2": d.get("ct2"),
+                        "ct3": d.get("ct3"),
+                        "grd": d.get("grd"),
+                    }
+                    harvi.append(rec)
+
+        return {
+            "success": True,
+            "grid_w": grid_w,
+            "eddi_w": eddi_w,
+            "zappi_w": zappi_w,
+            "harvi": harvi,
+            "raw_keys": list(data.keys()) if isinstance(data, dict) else None,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/api/battery/read_many")
 async def modbus_read_many(addrs: str, fn: str = Query("holding"), unit: int = Query(1), delay_ms: int = Query(0)):

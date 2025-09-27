@@ -225,10 +225,20 @@
             </div>
         </div>
         
-        <!-- Energy Management Rules -->
-        <div class="card" style="margin-bottom: 20px;">
-                
-            
+        <!-- Simple Battery Rule (export-driven) -->
+        <div class="card" id="simple-rule-card" style="margin-bottom: 20px;">
+            <h3>⚡ Simple Battery Rule (export)</h3>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom: 12px;">
+                <button id="simple-rule-toggle" class="btn btn-primary" onclick="toggleSimpleRule()">AAN</button>
+                <span id="simple-rule-state" class="status-info">Uit</span>
+            </div>
+            <div class="metric"><span class="metric-label">Grid</span><span class="metric-value" id="sr-grid">--</span></div>
+            <div class="metric"><span class="metric-label">Overschot (EMA)</span><span class="metric-value" id="sr-overschot">--</span></div>
+            <div class="metric"><span class="metric-label">Doel Export</span><span class="metric-value" id="sr-target-export">--</span></div>
+            <div class="metric"><span class="metric-label">Batterij Target Totaal</span><span class="metric-value" id="sr-target-total">--</span></div>
+            <div class="metric"><span class="metric-label">Batterij Set Totaal</span><span class="metric-value" id="sr-set-total">--</span></div>
+            <div class="metric"><span class="metric-label">Cooldown</span><span class="metric-value" id="sr-cooldown">--</span></div>
+            <div class="metric"><span class="metric-label">Per Batterij</span><span class="metric-value" id="sr-per-batt" style="font-size:14px;">--</span></div>
         </div>
         
     </div>
