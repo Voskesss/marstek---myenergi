@@ -4,7 +4,7 @@
     "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false,
-    "last_updated": "2025-09-27T11:42:09.248311"
+    "last_updated": "2025-09-27T11:46:23.937262"
   },
   "wifi_converter": {
     "minimum_soc_percent": 20,
