@@ -1808,7 +1808,8 @@ class SimpleRuleState:
             "ramp_step_w": 150,        # per tick
             "loop_interval_s": 0.5,    # 500ms
             "cooldown_s": 8,
-            "max_batt_total_w": 1500,
+            "max_batt_total_w": 5000,  # total across all batteries
+            "per_battery_max_w": 2500, # hard cap per battery
         }
         self.last: Dict[str, Any] = {
             "grid_w": None,
@@ -1924,18 +1925,41 @@ async def _simple_rule_loop():
                             simple_rule.cooldown_until = now + cfg["cooldown_s"]
                     # else hold
 
-                # distribute across batteries equally
-                per = {}
+                # distribute across batteries with per-battery cap and leftover redistribution
+                per: Dict[str, Any] = {}
                 items = (await list_batteries())['items']  # type: ignore[index]
                 n = max(1, len(items))
-                per_val = int(target_total / n)
+                setpoints: Dict[str, int] = {}
+                remaining = int(target_total)
+                base_share = int(target_total / n) if n > 0 else 0
+                base_share = min(base_share, int(simple_rule.cfg.get("per_battery_max_w", 2500)))
+                # first pass: assign base share
+                for it in items:
+                    bid = it['id']
+                    sp = max(0, min(base_share, remaining))
+                    setpoints[bid] = sp
+                    remaining -= sp
+                # second pass: distribute leftover up to per-battery max
+                if remaining > 0 and items:
+                    cap = int(simple_rule.cfg.get("per_battery_max_w", 2500))
+                    idx = 0
+                    L = len(items)
+                    while remaining > 0 and idx < L * 2:  # limited cycles
+                        bid = items[idx % L]['id']
+                        space = max(0, cap - setpoints.get(bid, 0))
+                        if space > 0:
+                            give = min(space, remaining)
+                            setpoints[bid] = setpoints.get(bid, 0) + give
+                            remaining -= give
+                        idx += 1
+                # apply setpoints
                 set_total = 0
                 for it in items:
                     bid = it['id']
-                    # respect per-battery min SoC on discharge; we only charge here
-                    res = await _set_battery_power(bid, per_val)
-                    per[bid] = {"set": per_val, "ok": bool(res.get("success"))}
-                    set_total += per_val
+                    sp = int(setpoints.get(bid, 0))
+                    res = await _set_battery_power(bid, sp)
+                    per[bid] = {"set": sp, "ok": bool(res.get("success"))}
+                    set_total += sp
 
                 simple_rule.prev_set_total = set_total
                 simple_rule.last.update({
