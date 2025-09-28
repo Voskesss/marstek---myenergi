@@ -276,6 +276,47 @@
 
     <script>
         let autoRefreshInterval;
+        // Anti-flicker cache with zero-confirmation
+        const __stable = {
+            cache: {},
+            streak: {},
+            // Basic stabilizer (kept for compatibility)
+            num(key, newVal, {ttlMs=6000, treatZeroAsInvalid=true}={}){
+                const now = Date.now();
+                const prev = this.cache[key];
+                const isNullish = (newVal === null || newVal === undefined || Number.isNaN(newVal));
+                const isZero = Number(newVal) === 0;
+                const zeroIsGlitch = treatZeroAsInvalid && isZero && prev && prev.val !== 0 && (now - prev.ts) < ttlMs;
+                const valid = !isNullish && !(zeroIsGlitch);
+                if (valid){ this.cache[key] = {val: Number(newVal), ts: now}; return Number(newVal); }
+                if (prev && (now - prev.ts) < ttlMs){ return prev.val; }
+                if (!isNullish) return Number(newVal);
+                return prev ? prev.val : 0;
+            },
+            // Zero-aware stabilizer: require N consecutive zeros or TTL expiry to accept zero
+            numZeroAware(key, newVal, {ttlMs=6000, confirmZeros=2}={}){
+                const now = Date.now();
+                const prev = this.cache[key];
+                const isNullish = (newVal === null || newVal === undefined || Number.isNaN(newVal));
+                const v = Number(newVal || 0);
+                if (!isNullish && v !== 0){
+                    this.cache[key] = {val: v, ts: now};
+                    this.streak[key] = 0;
+                    return v;
+                }
+                if (!isNullish && v === 0){
+                    const s = (this.streak[key] || 0) + 1;
+                    this.streak[key] = s;
+                    if (s >= confirmZeros) {
+                        this.cache[key] = {val: 0, ts: now};
+                        return 0;
+                    }
+                }
+                if (prev && (now - prev.ts) < ttlMs){ return prev.val; }
+                // If no prev or expired, return current (0 or 0-ish)
+                return v;
+            }
+        };
 
         // --- API Wrappers ---
         async function setWorkMode(mode) {
@@ -1050,31 +1091,37 @@
         }
 
         function updateSystemMetrics(data) {
-            // PV Generation
-            const pv_w = data.pv_generation_w || 0;
+            // PV Generation (zero-aware)
+            const pv_raw = Number(data.pv_generation_w || 0);
+            const pv_w = __stable.numZeroAware('pv_w', pv_raw, { ttlMs: 6000, confirmZeros: 2 });
             document.getElementById('pvGeneration').textContent = `${pv_w}W`;
             document.getElementById('pvStatus').textContent = pv_w > 100 ? 'Actief' : 'Laag';
 
-            // Grid Import/Export (positive = import from grid, negative = export to grid)
-            const grid_w = data.grid_export_w || 0;
+            // Grid Import/Export (signed), zero-aware
+            const grid_signed = (data.grid_import_w != null ? Number(data.grid_import_w)
+                                : (data.grid_export_w != null ? Number(data.grid_export_w)
+                                : Number(data.grid_w || 0)));
+            const grid_w = __stable.numZeroAware('grid_w', grid_signed, { ttlMs: 6000, confirmZeros: 2 });
             const gridEl = document.getElementById('gridExport');
             gridEl.textContent = grid_w > 0 ? `${grid_w}W (Import)` : grid_w < 0 ? `${Math.abs(grid_w)}W (Export)` : '0W';
             gridEl.className = `metric-value ${grid_w > 10 ? 'status-warning' : grid_w < -10 ? 'status-good' : ''}`;
             document.getElementById('gridStatus').textContent = grid_w > 100 ? 'Importeren' : grid_w < -100 ? 'Exporteren' : 'Neutraal';
 
-            // House Consumption
-            const house_w = data.house_consumption_w || 0;
+            // House Consumption (zero-aware)
+            const house_w = __stable.numZeroAware('house_w', Number(data.house_consumption_w || 0), { ttlMs: 6000, confirmZeros: 2 });
             document.getElementById('houseConsumption').textContent = `${house_w}W`;
             document.getElementById('houseStatus').textContent = house_w > 1000 ? 'Hoog' : 'Normaal';
 
             // Eddi Status
-            document.getElementById('eddiPower').textContent = `${data.eddi_power_w || 0}W`;
+            const eddi_w = __stable.numZeroAware('eddi_w', Number(data.eddi_power_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+            document.getElementById('eddiPower').textContent = `${eddi_w}W`;
             const temps = data.eddi_temperatures || {};
             document.getElementById('tank1Temp').textContent = temps.tank1 != null ? `${temps.tank1}°C` : 'N/A';
             document.getElementById('tank2Temp').textContent = temps.tank2 != null ? `${temps.tank2}°C` : 'N/A';
 
             // Zappi Status
-            document.getElementById('zappiPower').textContent = `${data.zappi_power_w || 0}W`;
+            const zappi_w = __stable.numZeroAware('zappi_w', Number(data.zappi_power_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+            document.getElementById('zappiPower').textContent = `${zappi_w}W`;
         }
 
         // --- Initializer ---
@@ -1481,15 +1528,24 @@
                 const stot = document.getElementById('sr-set-total');
                 const cool = document.getElementById('sr-cooldown');
                 const per  = document.getElementById('sr-per-batt');
-                if (grid) grid.textContent = last.grid_w != null ? `${last.grid_w} W` : '--';
-                if (over) over.textContent = last.overschot_w != null ? `${last.overschot_w} W` : '--';
-                if (tex)  tex.textContent  = (cfg.buffer_w != null && cfg.export_margin_w != null) ? `${cfg.buffer_w + cfg.export_margin_w} W` : '--';
-                if (ttot) ttot.textContent = last.batt_target_total_w != null ? `${last.batt_target_total_w} W` : '--';
-                if (stot) stot.textContent = last.batt_set_total_w != null ? `${last.batt_set_total_w} W` : '--';
+                const sr_grid_w = __stable.numZeroAware('sr_grid_w', Number(last.grid_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+                const sr_over_w = __stable.numZeroAware('sr_over_w', Number(last.overschot_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+                const sr_tex_w  = (cfg.buffer_w != null && cfg.export_margin_w != null) ? (Number(cfg.buffer_w) + Number(cfg.export_margin_w)) : null;
+                const sr_ttot_w = __stable.numZeroAware('sr_ttot_w', Number(last.batt_target_total_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+                const sr_stot_w = __stable.numZeroAware('sr_stot_w', Number(last.batt_set_total_w || 0), { ttlMs: 6000, confirmZeros: 2 });
+                if (grid) grid.textContent = (last.grid_w != null) ? `${sr_grid_w} W` : '--';
+                if (over) over.textContent = (last.overschot_w != null) ? `${sr_over_w} W` : '--';
+                if (tex)  tex.textContent  = (sr_tex_w != null) ? `${sr_tex_w} W` : '--';
+                if (ttot) ttot.textContent = (last.batt_target_total_w != null) ? `${sr_ttot_w} W` : '--';
+                if (stot) stot.textContent = (last.batt_set_total_w != null) ? `${sr_stot_w} W` : '--';
                 if (cool) cool.textContent = last.cooldown ? 'Actief' : 'Nee';
                 if (per)  {
                     const p = last.per_battery || {};
-                    const lines = Object.keys(p).map(k => `${k}: ${p[k].set}W ${p[k].ok ? '✅' : '❌'}`);
+                    const lines = Object.keys(p).map(k => {
+                        const key = `sr_pb_${k}_set`;
+                        const setVal = __stable.numZeroAware(key, Number(p[k].set || 0), { ttlMs: 6000, confirmZeros: 2 });
+                        return `${k}: ${setVal}W ${p[k].ok ? '✅' : '❌'}`;
+                    });
                     per.textContent = lines.length ? lines.join('  |  ') : '--';
                 }
             } catch (e) {
