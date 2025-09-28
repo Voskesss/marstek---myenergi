@@ -71,17 +71,18 @@
 
 <script>
 // ----- Layout geometry -----
-const cx = 450, cy = 300; // center aggregator
-const R = 180; // radius to satellites
+const THRESH = 100; // minimum watts to animate/label/highlight
+const cx = 460, cy = 310; // center aggregator
+const R = 230; // more spacing between nodes
 const nodes = {
   core:  { x: cx, y: cy, r: 44, color: 'var(--house)', label: 'Flow' },
-  house: { x: cx, y: cy - R, r: 34, color: 'var(--house)', label: 'Huis' },
-  grid:  { x: cx + R, y: cy - 20, r: 34, color: 'var(--grid)',  label: 'Grid' },
-  pv:    { x: cx - R, y: cy + 20, r: 34, color: 'var(--pv)',    label: 'PV' },
-  eddi:  { x: cx - 40, y: cy - R, r: 32, color: 'var(--eddi)',  label: 'Eddi' },
-  zappi: { x: cx + 40, y: cy + R, r: 32, color: 'var(--zappi)', label: 'Zappi' },
-  b1:    { x: cx - R + 30, y: cy - 80, r: 30, color: 'var(--batt_charge)', label: 'Batt 1' },
-  b2:    { x: cx + R - 30, y: cy + 80, r: 30, color: 'var(--batt_charge)', label: 'Batt 2' },
+  house: { x: cx, y: cy - R, r: 36, color: 'var(--house)', label: 'Huis' },
+  grid:  { x: cx + R, y: cy - 10, r: 36, color: 'var(--grid)',  label: 'Grid' },
+  pv:    { x: cx - R, y: cy + 10, r: 36, color: 'var(--pv)',    label: 'PV' },
+  eddi:  { x: cx - 60, y: cy - R, r: 32, color: 'var(--eddi)',  label: 'Eddi' },
+  zappi: { x: cx + 60, y: cy + R, r: 32, color: 'var(--zappi)', label: 'Zappi' },
+  b1:    { x: cx - R + 30, y: cy - 90, r: 30, color: 'var(--batt_charge)', label: 'Batt 1' },
+  b2:    { x: cx + R - 30, y: cy + 90, r: 30, color: 'var(--batt_charge)', label: 'Batt 2' },
 };
 
 // ----- SVG helpers -----
@@ -144,7 +145,7 @@ function showPath(id, show){ const p = document.getElementById(id); if(!p) retur
 function setActive(id, watts){
   const p = document.getElementById(id); if(!p) return;
   // When no flow, remove dash animation
-  if (!watts || Math.abs(watts) < 50) {
+  if (!watts || Math.abs(watts) < THRESH) {
     p.classList.remove('dash');
     return;
   }
@@ -156,8 +157,21 @@ function setActive(id, watts){
 }
 function setArrowLabel(id, watts){
   const t = document.getElementById(id+"_lbl"); if(!t) return;
-  if (!watts || Math.abs(watts) < 50) { t.textContent=''; return; }
+  if (!watts || Math.abs(watts) < THRESH) { t.textContent=''; return; }
   t.textContent = `${(Math.abs(watts)/1000).toFixed(1)} kW`;
+}
+// Color node when active (fill changes to node color, else neutral)
+function setNodeActive(nodeId, watts){
+  const g = document.getElementById(nodeId); if(!g) return;
+  const circle = g.querySelector('circle'); if(!circle) return;
+  const active = watts && Math.abs(watts) >= THRESH;
+  if (active) {
+    circle.setAttribute('fill', nodes[nodeId]?.color || 'var(--card)');
+    circle.setAttribute('stroke-width', '2.5');
+  } else {
+    circle.setAttribute('fill', 'var(--card)');
+    circle.setAttribute('stroke-width', '2');
+  }
 }
 
 // ----- Data mapping from /api/status -----
@@ -174,7 +188,12 @@ function updateScene(data){
   const tsBadge = document.getElementById('tsBadge');
   tsBadge.textContent = new Date().toLocaleTimeString();
   const pv = watts(data.pv_generation_w || data.pv_w);
-  const grid = watts(data.grid_import_w != null ? data.grid_import_w : (data.grid_w)); // + import, - export
+  // Robust grid: prefer signed import(+) export(-) value
+  const grid = watts(
+    (data.grid_import_w != null ? data.grid_import_w : undefined) ??
+    (data.grid_export_w != null ? data.grid_export_w : undefined) ??
+    (data.grid_w != null ? data.grid_w : 0)
+  );
   const eddi = watts(data.eddi_power_w || data.eddi_w);
   const zappi = watts(data.zappi_power_w || data.zappi_w);
   const b1 = watts((data.simple_rule?.last?.per_battery?.venus_ev2_92?.set));
@@ -192,26 +211,35 @@ function updateScene(data){
 
   // Flows
   // PV -> Core
-  showPath('pv_to_core', pv>50); setActive('pv_to_core', pv); setArrowLabel('pv_to_core', pv);
+  showPath('pv_to_core', pv>THRESH); setActive('pv_to_core', pv); setArrowLabel('pv_to_core', pv);
 
   // Grid <-> Core
-  const imp = grid>50; const exp = grid<-50;
+  const imp = grid>THRESH; const exp = grid<-THRESH;
   showPath('grid_to_core', imp); setActive('grid_to_core', grid); setArrowLabel('grid_to_core', grid);
   showPath('core_to_grid', exp); setActive('core_to_grid', -grid); setArrowLabel('core_to_grid', -grid);
 
   // Core -> Loads
-  showPath('core_to_house', house>50); setActive('core_to_house', house); setArrowLabel('core_to_house', house);
-  showPath('core_to_eddi', eddi>50); setActive('core_to_eddi', eddi); setArrowLabel('core_to_eddi', eddi);
-  showPath('core_to_zappi', zappi>50); setActive('core_to_zappi', zappi); setArrowLabel('core_to_zappi', zappi);
+  showPath('core_to_house', house>THRESH); setActive('core_to_house', house); setArrowLabel('core_to_house', house);
+  showPath('core_to_eddi', eddi>THRESH); setActive('core_to_eddi', eddi); setArrowLabel('core_to_eddi', eddi);
+  showPath('core_to_zappi', zappi>THRESH); setActive('core_to_zappi', zappi); setArrowLabel('core_to_zappi', zappi);
 
   // Core <-> Batteries (using setpoints as proxy)
-  const b1Charge = b1>50, b1Dis = b1< -50;
+  const b1Charge = b1>THRESH, b1Dis = b1< -THRESH;
   showPath('core_to_b1', b1Charge); setActive('core_to_b1', Math.abs(b1)); setArrowLabel('core_to_b1', b1Charge?b1:0);
   showPath('b1_to_core', b1Dis); setActive('b1_to_core', Math.abs(b1)); setArrowLabel('b1_to_core', b1Dis?(-b1):0);
 
-  const b2Charge = b2>50, b2Dis = b2< -50;
+  const b2Charge = b2>THRESH, b2Dis = b2< -THRESH;
   showPath('core_to_b2', b2Charge); setActive('core_to_b2', Math.abs(b2)); setArrowLabel('core_to_b2', b2Charge?b2:0);
   showPath('b2_to_core', b2Dis); setActive('b2_to_core', Math.abs(b2)); setArrowLabel('b2_to_core', b2Dis?(-b2):0);
+
+  // Node color highlights
+  setNodeActive('pv', pv);
+  setNodeActive('grid', grid);
+  setNodeActive('eddi', eddi);
+  setNodeActive('zappi', zappi);
+  setNodeActive('b1', b1);
+  setNodeActive('b2', b2);
+  setNodeActive('house', house);
 }
 
 async function tick(){
