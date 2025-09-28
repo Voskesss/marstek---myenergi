@@ -870,9 +870,22 @@
                 const raw = batteryData.data || {};
                 const socEl = document.getElementById(`${idPrefix}-soc`);
                 if (socEl) {
-                    const soc = d.soc_percent;
-                    socEl.textContent = soc != null ? `${soc.toFixed(1)} %` : '--';
-                    socEl.className = soc > 80 ? 'metric-value status-good' : soc > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
+                    let soc = (typeof d.soc_percent === 'number') ? d.soc_percent : (d.soc_percent != null ? Number(d.soc_percent) : null);
+                    const key = `${idPrefix}_soc_percent`;
+                    const prev = __stable.cache[key];
+                    const now = Date.now();
+                    // Ignore improbable jump >20%-pt within 15s (transient read glitch)
+                    if (prev && soc != null && Math.abs(soc - prev.val) > 20 && (now - prev.ts) < 15000) {
+                        soc = prev.val;
+                    }
+                    if (soc != null) {
+                        __stable.cache[key] = { val: soc, ts: now };
+                        socEl.textContent = `${soc.toFixed(1)} %`;
+                        socEl.className = soc > 80 ? 'metric-value status-good' : soc > 20 ? 'metric-value status-warning' : 'metric-value status-danger';
+                    } else {
+                        socEl.textContent = '--';
+                        socEl.className = 'metric-value';
+                    }
                 }
                 const energyEl = document.getElementById(`${idPrefix}-energy`);
                 if (energyEl) energyEl.textContent = d.remaining_kwh != null ? `${d.remaining_kwh.toFixed(2)} kWh` : '--';

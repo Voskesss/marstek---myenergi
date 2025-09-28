@@ -1279,8 +1279,10 @@ async def get_status():
             power = await asyncio.wait_for(marstek.get_power(), timeout=2.0)
             
             # Extract battery power for house consumption calculation
-            if power and hasattr(power, 'value'):
-                battery_power_w = int(power.value)  # Positive = charging (consuming), Negative = discharging (providing)
+            # get_power() returns an int (W) or None. Convention:
+            #  +ve = charging (consuming), -ve = discharging (providing)
+            if isinstance(power, (int, float)):
+                battery_power_w = int(power)
         except asyncio.TimeoutError:
             marstek_error = "Battery connection timeout"
         except Exception as e:
@@ -1289,10 +1291,15 @@ async def get_status():
         # Calculate house consumption with battery power included
         house_w = extract_house_consumption_w(m, battery_power_w)
         
+        # Grid import-positief waarde (compat voor flow.html)
+        grid_import_w = None if export_w is None else (-export_w)
+        
         return {
             "timestamp": time.time(),
             "myenergi_raw": m,
             "grid_export_w": export_w,
+            "grid_import_w": grid_import_w,
+            "grid_w": grid_import_w,  # alias used by some UIs (import = +)
             "eddi_power_w": eddi_w,
             "zappi_power_w": zappi_w,
             "house_consumption_w": house_w,
@@ -1301,10 +1308,19 @@ async def get_status():
             "should_block": should_block,
             "block_reason": block_reason,
             "marstek_soc": soc,
-            "marstek_power_w": power,
+            "marstek_power_w": battery_power_w,
             "marstek_error": marstek_error,
             "battery_blocked": state.battery_blocked,
             "last_switch": state.last_switch,
+            # Minimal derived block for legacy UI on "/" route
+            "derived": {
+                "grid_export_w": export_w,
+                "eddi_power_w": eddi_w,
+                "zappi_power_w": zappi_w,
+                "house_consumption_w": house_w,
+                "pv_generation_w": pv_w,
+                "battery_power_w": battery_power_w,
+            },
             "config": {
                 "priority_mode": EDDI_PRIORITY_MODE,
                 "target_temp_1": EDDI_TARGET_TEMP_1,
