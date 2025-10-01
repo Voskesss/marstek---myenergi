@@ -161,9 +161,14 @@ class VenusEModbusClient:
 
     def read_battery_data(self):
         """Read all battery data from Venus E via Modbus"""
-        if not self.connected:
-            if not self.connect():
-                return None
+        try:
+            if not self.connected:
+                if not self.connect():
+                    logging.warning(f"Modbus connection to {self.host}:{self.port} failed, returning None")
+                    return None
+        except Exception as e:
+            logging.error(f"Modbus connect exception on {self.host}:{self.port}: {e}")
+            return None
 
         battery_data = {}
 
@@ -209,7 +214,8 @@ class VenusEModbusClient:
                     }
                     
             except Exception as e:
-                logging.error(f"Error reading register {reg_addr}: {e}")
+                logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
+                # Continue to next register instead of failing completely
         
         # Calculate actual power from voltage × current if we have both
         if "battery_voltage" in battery_data and "battery_current" in battery_data:
@@ -230,6 +236,11 @@ class VenusEModbusClient:
                 "timestamp": datetime.now().isoformat()
             }
             logging.info(f"Calculated power: {voltage}V × {current}A = {calculated_power}W, scaled = {scaled_power}W")
+        
+        # If we got no data at all, return None to signal complete failure
+        if not battery_data:
+            logging.error(f"No battery data retrieved from {self.host}:{self.port}")
+            return None
         
         return battery_data
 

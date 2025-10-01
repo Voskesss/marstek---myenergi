@@ -175,11 +175,31 @@ function setNodeActive(nodeId, watts){
 }
 
 // ----- Data mapping from /api/status -----
+let failureCount = 0;
+let pollInterval = 1200;
+const maxPollInterval = 10000;
+
 async function fetchStatus(){
-  const r = await fetch('/api/status', { cache: 'no-store' });
-  const j = await r.json();
-  if(!j || j.error) throw new Error(j && j.error || 'status error');
-  return j;
+  try {
+    const r = await fetch('/api/status', { cache: 'no-store' });
+    if (!r.ok) {
+      throw new Error(`HTTP ${r.status}`);
+    }
+    const j = await r.json();
+    if(!j || j.error) throw new Error(j && j.error || 'status error');
+    
+    // Success: reset failure tracking
+    failureCount = 0;
+    pollInterval = 1200;
+    
+    return j;
+  } catch (e) {
+    failureCount++;
+    // Exponential backoff on failures
+    pollInterval = Math.min(pollInterval * 1.5, maxPollInterval);
+    console.warn(`API fetch failed (${failureCount}x): ${e.message}. Retrying in ${pollInterval}ms`);
+    throw e;
+  }
 }
 
 function watts(n){ return (n==null) ? 0 : Number(n) || 0; }
@@ -243,10 +263,22 @@ function updateScene(data){
 }
 
 async function tick(){
-  try{ const d = await fetchStatus(); updateScene(d); }
-  catch(e){ /* keep calm on errors */ }
+  try{ 
+    const d = await fetchStatus(); 
+    updateScene(d); 
+  }
+  catch(e){ 
+    console.error('Fetch error:', e);
+    // Show reconnecting indicator after 3 failures
+    if (failureCount >= 3) {
+      // Could add visual reconnecting indicator here
+      document.title = '⚠️ Reconnecting...';
+    }
+  }
+  // Schedule next tick with adaptive interval
+  setTimeout(tick, pollInterval);
 }
-setInterval(tick, 1200);
+// Start first tick on load
 window.addEventListener('DOMContentLoaded', tick);
 </script>
 </body>
