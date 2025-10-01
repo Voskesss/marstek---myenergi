@@ -640,7 +640,14 @@
 
                 await renderBatteryCards();
                 await refreshAllBatteries();
-                autoRefreshInterval = setInterval(refreshAllBatteries, 5000);
+                // Use adaptive interval based on failure count
+                function scheduleNextRefresh() {
+                    setTimeout(async () => {
+                        await refreshAllBatteries();
+                        scheduleNextRefresh();
+                    }, dashPollInterval);
+                }
+                scheduleNextRefresh();
             } catch (e) {
                 console.error('Init error:', e);
             }
@@ -650,10 +657,19 @@
             if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         }
 
+        let dashFailureCount = 0;
+        let dashPollInterval = 5000;
+        const dashMaxPollInterval = 30000;
+
         async function refreshAllBatteries() {
             try {
                 const ts = Date.now();
                 const statusRes = await fetch(`/api/status?ts=${ts}`, { cache: 'no-store' });
+                
+                if (!statusRes.ok) {
+                    throw new Error(`HTTP ${statusRes.status}`);
+                }
+                
                 const statusData = await statusRes.json();
                 updateSystemMetrics(statusData);
 
@@ -669,8 +685,21 @@
                         console.warn('Status error for', bid, e);
                     }
                 }
+                
+                // Success: reset failure tracking
+                dashFailureCount = 0;
+                dashPollInterval = 5000;
+                document.title = 'Dashboard - myenergi-marstek';
+                
             } catch (error) {
-                console.error('Error refreshing data:', error);
+                dashFailureCount++;
+                dashPollInterval = Math.min(dashPollInterval * 1.5, dashMaxPollInterval);
+                console.error(`Dashboard refresh failed (${dashFailureCount}x): ${error.message}. Retrying in ${dashPollInterval}ms`);
+                
+                // Show reconnecting indicator after 3 failures
+                if (dashFailureCount >= 3) {
+                    document.title = '⚠️ Reconnecting...';
+                }
             }
         }
 
