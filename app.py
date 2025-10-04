@@ -1867,6 +1867,7 @@ class SimpleRuleState:
         }
         self.prev_set_total: float = 0.0
         self.cooldown_until: float = 0.0
+        self.battery_modes: Dict[str, str] = {}  # Track battery modes: bid -> "manual"|"anti-feed"|"unknown"
 
 simple_rule = SimpleRuleState()
 def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
@@ -1895,6 +1896,27 @@ def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
         # last chance: top-level
         if isinstance(raw, dict) and raw.get("grd") is not None:
             return int(raw.get("grd"))
+    except Exception:
+        return None
+    return None
+
+def _extract_pv_from_raw(raw: Dict[str, Any]) -> Optional[int]:
+    """Extract PV generation from raw data. Prefer 'gen' field."""
+    try:
+        blocks = raw.get("raw") or []
+        # Try to get from eddi or zappi 'gen' field
+        for b in blocks:
+            if "eddi" in b and isinstance(b["eddi"], list):
+                for e in b["eddi"]:
+                    if e.get("gen") is not None:
+                        return int(e.get("gen"))
+            if "zappi" in b and isinstance(b["zappi"], list):
+                for z in b["zappi"]:
+                    if z.get("gen") is not None:
+                        return int(z.get("gen"))
+        # Fallback to top-level
+        if isinstance(raw, dict) and raw.get("gen") is not None:
+            return int(raw.get("gen"))
     except Exception:
         return None
     return None
@@ -1931,6 +1953,7 @@ async def _simple_rule_loop():
                     last_err = str(e)
                     await asyncio.sleep(0.2 * (attempt + 1))
             grid_w = _extract_grid_from_raw(data) if data is not None else None
+            pv_w = _extract_pv_from_raw(data) if data is not None else None
             if grid_w is None:
                 # no data -> safe stop
                 target_total = 0
@@ -1967,8 +1990,65 @@ async def _simple_rule_loop():
                 in_cooldown = now < simple_rule.cooldown_until
 
                 target_total = simple_rule.prev_set_total
+                
+                # Anti-feed mode parameters
+                pv_threshold = cfg.get("pv_threshold_w", 50)
+                import_threshold = cfg.get("import_threshold_w", 100)
+                
+                # Check for anti-feed condition: no PV + importing from grid
+                if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
+                    # No PV and importing -> activate anti-feed mode
+                    logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
+                    items = (await list_batteries())['items']  # type: ignore[index]
+                    per: Dict[str, Any] = {}
+                    for it in items:
+                        bid = it['id']
+                        try:
+                            # Get the existing battery client from registry
+                            entry = _get_entry_for(bid)
+                            if not entry:
+                                logger.warning(f"⚡ Battery {bid} not found in registry")
+                                per[bid] = {"mode": "anti-feed", "ok": False, "error": "not_in_registry"}
+                                continue
+                            
+                            client = entry['client']
+                            lock = entry['lock']
+                            
+                            # Set work mode to Anti-Feed (1) - only if not already in anti-feed
+                            current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                            if current_mode != "anti-feed":
+                                async with lock:
+                                    result = client.set_work_mode(1)
+                                if result.get("ok"):
+                                    simple_rule.battery_modes[bid] = "anti-feed"
+                                per[bid] = {"mode": "anti-feed", "ok": result.get("ok", False)}
+                                logger.info(f"⚡ Battery {bid} switched to anti-feed: {result}")
+                            else:
+                                per[bid] = {"mode": "anti-feed", "ok": True, "already_set": True}
+                                logger.debug(f"⚡ Battery {bid} already in anti-feed mode")
+                        except Exception as e:
+                            logger.error(f"⚡ Battery {bid} anti-feed error: {e}")
+                            per[bid] = {"mode": "anti-feed", "ok": False, "error": str(e)}
+                    
+                    simple_rule.last.update({
+                        "grid_w": grid_w,
+                        "pv_w": pv_w,
+                        "overschot_w": 0,
+                        "mode": "anti-feed",
+                        "target_export_w": target_export,
+                        "batt_target_total_w": 0,
+                        "batt_set_total_w": 0,
+                        "per_battery": per,
+                        "cooldown": False,
+                        "ts": time.time(),
+                    })
+                    # Continue to next iteration
+                    dt = time.time() - t0
+                    await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+                    continue
+                    
                 if grid_w >= 0:
-                    # importing -> immediate stop + cooldown
+                    # importing but PV is available -> stop charging
                     target_total = 0
                     simple_rule.cooldown_until = now + cfg["cooldown_s"]
                 else:
@@ -2011,13 +2091,38 @@ async def _simple_rule_loop():
                             setpoints[bid] = setpoints.get(bid, 0) + give
                             remaining -= give
                         idx += 1
-                # apply setpoints
+                # apply setpoints (with mode switching back to Manual if charging)
                 set_total = 0
                 for it in items:
                     bid = it['id']
                     sp = int(setpoints.get(bid, 0))
+                    
+                    # If we're going to charge (sp > 0), ensure battery is in Manual mode
+                    # Only switch if not already in manual mode to prevent flipping
+                    if sp > 0:
+                        current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                        if current_mode != "manual":
+                            try:
+                                logger.info(f"🔋 SIMPLE RULE: Setting {bid} to Manual mode for charging {sp}W")
+                                # Get the existing battery client from registry
+                                entry = _get_entry_for(bid)
+                                if entry:
+                                    client = entry['client']
+                                    lock = entry['lock']
+                                    async with lock:
+                                        mode_result = client.set_work_mode(0)  # 0 = Manual mode
+                                    if mode_result.get("ok"):
+                                        simple_rule.battery_modes[bid] = "manual"
+                                    logger.info(f"🔋 Mode switch result: {mode_result}")
+                                else:
+                                    logger.warning(f"🔋 Battery {bid} not found in registry for mode switch")
+                            except Exception as e:
+                                logger.error(f"🔋 Mode switch error for {bid}: {e}")
+                        else:
+                            logger.debug(f"🔋 Battery {bid} already in manual mode, skipping switch")
+                    
                     res = await _set_battery_power(bid, sp)
-                    per[bid] = {"set": sp, "ok": bool(res.get("success"))}
+                    per[bid] = {"set": sp, "ok": bool(res.get("success")), "mode": "charging" if sp > 0 else "idle"}
                     set_total += sp
 
                 simple_rule.prev_set_total = set_total
@@ -3696,17 +3801,22 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
             logger.error(f"🎯 RULE EXEC ERROR: {e}")
     
     async def execute_eddi_priority_rule(self, rule, myenergi_data, battery_data, rule_params):
-        """Execute Eddi Priority rule with temperature checking."""
+        """Execute Eddi Priority rule with temperature checking and anti-feed mode."""
         try:
             # Get current system values
             grid_w = myenergi_data.get("grid_w", 0)
             eddi_w = myenergi_data.get("eddi_w", 0)
+            pv_w = myenergi_data.get("pv_generation_w", 0)
             
             # Get tank temperature (with override support)
             tank_temp = await get_tank_temperature_with_override(rule_params)
             target_temp = rule_params.get("tank_temp_target", 60)
             
-            logger.info(f"🔥 EDDI RULE: Grid={grid_w}W, Eddi={eddi_w}W, Tank={tank_temp}°C (target={target_temp}°C)")
+            # Anti-feed mode parameters
+            pv_threshold = rule_params.get("pv_threshold_w", 50)  # Min PV to consider "sun is shining"
+            import_threshold = rule_params.get("import_threshold_w", 100)  # Min grid import to trigger anti-feed
+            
+            logger.info(f"🔥 EDDI RULE: Grid={grid_w}W, Eddi={eddi_w}W, PV={pv_w}W, Tank={tank_temp}°C (target={target_temp}°C)")
             
             # Check if tank is warm enough
             if tank_temp < target_temp:
@@ -3715,19 +3825,25 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
                 await self.set_battery_minimal_power(rule)
                 return
             
-            # Tank is warm enough, apply normal Eddi priority logic
+            # Check for anti-feed mode condition: no PV + importing from grid
+            if pv_w < pv_threshold and grid_w > import_threshold:
+                logger.info(f"☀️ EDDI RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Activating ANTI-FEED mode")
+                await self.set_battery_anti_feed(rule)
+                return
+            
+            # Tank is warm enough and PV available, apply normal Eddi priority logic
             export_w = max(0, -grid_w)  # Negative grid = export
             buffer_w = rule_params.get("eddi_buffer_w", 200)
             threshold_w = rule_params.get("export_threshold_w", 100)
             
             available_for_battery = export_w - eddi_w - buffer_w
             
-            logger.info(f"�� EDDI RULE: Export={export_w}W, Available for battery={available_for_battery}W")
+            logger.info(f"🔥 EDDI RULE: Export={export_w}W, Available for battery={available_for_battery}W")
             
             if available_for_battery > threshold_w:
                 max_battery_w = rule_params.get("max_battery_power_w", 1500)
                 target_power = min(available_for_battery, max_battery_w)
-                logger.info(f"🔥 EDDI RULE: Setting battery to {target_power}W")
+                logger.info(f"🔥 EDDI RULE: Setting battery to {target_power}W (CHARGING)")
                 await self.set_battery_power(rule, target_power)
             else:
                 logger.info(f"🔥 EDDI RULE: Not enough surplus ({available_for_battery}W <= {threshold_w}W)")
@@ -3749,12 +3865,40 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
         except Exception as e:
             logger.error(f"🔋 Battery minimal power error: {e}")
     
-    async def set_battery_power(self, rule, power_w):
-        """Set battery to specific power."""
+    async def set_battery_anti_feed(self, rule):
+        """Set battery to anti-feed mode (discharge to supply house)."""
         try:
             batteries = rule.get("batteries", {})
             for battery_id, enabled in batteries.items():
                 if enabled and battery_id == "venus_e_78":
+                    logger.info(f"⚡ Setting {battery_id} to ANTI-FEED mode")
+                    # Get the VenusE client and set work mode to Anti-Feed (mode=1)
+                    venus_e_client = VenusEModbusClient(
+                        host=os.getenv("MARSTEK_MODBUS_HOST", "192.168.0.198"),
+                        port=int(os.getenv("MARSTEK_MODBUS_PORT", "502"))
+                    )
+                    result = venus_e_client.set_work_mode(1)  # 1 = Anti-Feed mode
+                    logger.info(f"⚡ Battery anti-feed result: {result}")
+        except Exception as e:
+            logger.error(f"⚡ Battery anti-feed error: {e}")
+    
+    async def set_battery_power(self, rule, power_w):
+        """Set battery to specific power (charge mode with Eddi priority)."""
+        try:
+            batteries = rule.get("batteries", {})
+            for battery_id, enabled in batteries.items():
+                if enabled and battery_id == "venus_e_78":
+                    # First, ensure we're back in Manual mode (mode=0) from Anti-Feed
+                    # This allows us to control charge/discharge manually
+                    logger.info(f"🔋 Setting {battery_id} to Manual mode for charging")
+                    venus_e_client = VenusEModbusClient(
+                        host=os.getenv("MARSTEK_MODBUS_HOST", "192.168.0.198"),
+                        port=int(os.getenv("MARSTEK_MODBUS_PORT", "502"))
+                    )
+                    mode_result = venus_e_client.set_work_mode(0)  # 0 = Manual mode
+                    logger.info(f"🔋 Mode switch result: {mode_result}")
+                    
+                    # Now set the charging power
                     logger.info(f"🔋 Setting {battery_id} to {power_w}W")
                     result = await set_battery_power("venus_e_78", power_w)
                     logger.info(f"🔋 Battery power result: {result}")
