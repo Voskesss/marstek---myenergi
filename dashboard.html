@@ -123,8 +123,8 @@
                 <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="pvStatus">-</span></div>
             </div>
             <div class="card">
-                <h3>⚡ Grid</h3>
-                <div class="metric"><span class="metric-label">Import/Export</span><span class="metric-value" id="gridExport">-</span></div>
+                <h3>⚡ Grid (Netwerk)</h3>
+                <div class="metric"><span class="metric-label">Van/Naar Net</span><span class="metric-value" id="gridExport">-</span></div>
                 <div class="metric"><span class="metric-label">Status</span><span class="metric-value" id="gridStatus">-</span></div>
             </div>
             <div class="card">
@@ -1145,9 +1145,9 @@
                                 : Number(data.grid_w || 0)));
             const grid_w = __stable.numZeroAware('grid_w', grid_signed, { ttlMs: 6000, confirmZeros: 2 });
             const gridEl = document.getElementById('gridExport');
-            gridEl.textContent = grid_w > 0 ? `${grid_w}W (Import)` : grid_w < 0 ? `${Math.abs(grid_w)}W (Export)` : '0W';
-            gridEl.className = `metric-value ${grid_w > 10 ? 'status-warning' : grid_w < -10 ? 'status-good' : ''}`;
-            document.getElementById('gridStatus').textContent = grid_w > 100 ? 'Importeren' : grid_w < -100 ? 'Exporteren' : 'Neutraal';
+            gridEl.textContent = grid_w < 0 ? `${Math.abs(grid_w)}W ← Van Net` : grid_w > 0 ? `${grid_w}W → Naar Net` : '0W';
+            gridEl.className = `metric-value ${grid_w < -10 ? 'status-warning' : grid_w > 10 ? 'status-good' : ''}`;
+            document.getElementById('gridStatus').textContent = grid_w < -100 ? 'Importeren ←' : grid_w > 100 ? 'Exporteren →' : 'Neutraal';
 
             // House Consumption (zero-aware)
             const house_w = __stable.numZeroAware('house_w', Number(data.house_consumption_w || 0), { ttlMs: 6000, confirmZeros: 2 });
