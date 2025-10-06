@@ -1841,7 +1841,7 @@ class SimpleRuleState:
             "threshold_start_w": 150,
             "threshold_stop_w": 100,
             "ramp_step_w": 150,        # per tick
-            "loop_interval_s": 0.5,    # 500ms
+            "loop_interval_s": 5.0,    # 5 seconds (was 0.5s)
             "cooldown_s": 8,
             "max_batt_total_w": 5000,  # total across all batteries
             "per_battery_max_w": 2500, # hard cap per battery
@@ -1999,23 +1999,33 @@ async def _simple_rule_loop():
                 if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
                     # No PV and importing -> activate anti-feed mode
                     logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
-                    items = (await list_batteries())['items']  # type: ignore[index]
+                    try:
+                        items = (await list_batteries())['items']  # type: ignore[index]
+                        logger.info(f"🔋 Found {len(items)} batteries: {[it['id'] for it in items]}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to list batteries: {e}")
+                        continue
                     per: Dict[str, Any] = {}
+                    logger.info(f"🔄 Starting battery loop for {len(items)} batteries")
                     for it in items:
                         bid = it['id']
+                        logger.info(f"🔄 Processing battery {bid}")
                         try:
                             # Get the existing battery client from registry
+                            logger.info(f"🔍 Getting entry for {bid}")
                             entry = _get_entry_for(bid)
                             if not entry:
                                 logger.warning(f"⚡ Battery {bid} not found in registry")
                                 per[bid] = {"mode": "anti-feed", "ok": False, "error": "not_in_registry"}
                                 continue
                             
+                            logger.info(f"🔍 Got client and lock for {bid}")
                             client = entry['client']
                             lock = entry['lock']
                             
                             # Set work mode to Anti-Feed (1) - only if not already in anti-feed
                             current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                            logger.info(f"🔍 Current mode for {bid}: {current_mode}")
                             if current_mode != "anti-feed":
                                 async with lock:
                                     result = client.set_work_mode(1)
@@ -2025,7 +2035,7 @@ async def _simple_rule_loop():
                                 logger.info(f"⚡ Battery {bid} switched to anti-feed: {result}")
                             else:
                                 per[bid] = {"mode": "anti-feed", "ok": True, "already_set": True}
-                                logger.debug(f"⚡ Battery {bid} already in anti-feed mode")
+                                logger.info(f"✅ Battery {bid} already in anti-feed mode (skipping)")
                         except Exception as e:
                             logger.error(f"⚡ Battery {bid} anti-feed error: {e}")
                             per[bid] = {"mode": "anti-feed", "ok": False, "error": str(e)}
@@ -2119,7 +2129,7 @@ async def _simple_rule_loop():
                             except Exception as e:
                                 logger.error(f"🔋 Mode switch error for {bid}: {e}")
                         else:
-                            logger.debug(f"🔋 Battery {bid} already in manual mode, skipping switch")
+                            logger.info(f"✅ Battery {bid} already in manual mode (skipping)")
                     
                     res = await _set_battery_power(bid, sp)
                     per[bid] = {"set": sp, "ok": bool(res.get("success")), "mode": "charging" if sp > 0 else "idle"}
@@ -2223,6 +2233,38 @@ async def _shutdown_simple_rule():
         logger.info("🛑 Simple Rule stopped on shutdown")
     except Exception as e:
         logger.error(f"❌ Failed to stop Simple Rule on shutdown: {e}")
+
+# =========================
+# Weather API
+# =========================
+from weather import weather_service
+
+@app.get("/api/weather/current")
+async def get_current_weather():
+    """Get current weather conditions"""
+    try:
+        data = await weather_service.get_current_weather()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/weather/forecast")
+async def get_weather_forecast():
+    """Get weather forecast for next 24 hours"""
+    try:
+        data = await weather_service.get_forecast(hours=24)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/weather/solar")
+async def get_solar_forecast():
+    """Get solar-relevant weather forecast"""
+    try:
+        data = await weather_service.get_solar_forecast()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # =========================
 # Health and Logs endpoints

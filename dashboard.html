@@ -142,6 +142,13 @@
                 <h3>🚗 Zappi (Auto)</h3>
                 <div class="metric"><span class="metric-label">Vermogen</span><span class="metric-value" id="zappiPower">-</span></div>
             </div>
+            <div class="card">
+                <h3>🌤️ Weer Verwachting</h3>
+                <div class="metric"><span class="metric-label">Nu</span><span class="metric-value" id="weatherNow">-</span></div>
+                <div class="metric"><span class="metric-label">Komende 6u</span><span class="metric-value" id="weather6h">-</span></div>
+                <div class="metric"><span class="metric-label">Morgen</span><span class="metric-value" id="weatherTomorrow">-</span></div>
+                <div class="metric"><span class="metric-label">PV Potentieel 24u</span><span class="metric-value" id="weatherSolarPotential">-</span></div>
+            </div>
 
             <!-- Legacy cards kept but hidden by startAutoRefresh; leave them here for safety/testing -->
             <!-- Column 2: Battery 1 -->
@@ -1208,6 +1215,65 @@
         }
         setInterval(updateBackendHealthBadge, 5000);
         document.addEventListener('DOMContentLoaded', updateBackendHealthBadge);
+
+        // Weather update function
+        async function updateWeather() {
+            try {
+                const res = await fetch('/api/weather/solar', { cache: 'no-store' });
+                const j = await res.json();
+                if (j.success && j.data && j.data.current) {
+                    const current = j.data.current;
+                    const forecasts = j.data.forecast_24h?.forecasts || [];
+                    
+                    // Nu: temperatuur en bewolking
+                    const nowText = `${current.temperature}°C, ${current.clouds}% ☁️`;
+                    document.getElementById('weatherNow').textContent = nowText;
+                    
+                    // Komende 6 uur: gemiddelde bewolking
+                    if (forecasts.length >= 6) {
+                        const next6h = forecasts.slice(0, 6);
+                        const avgClouds = Math.round(next6h.reduce((sum, f) => sum + f.clouds, 0) / 6);
+                        const sunnyHours = next6h.filter(f => f.clouds < 30).length;
+                        let text6h = avgClouds < 30 ? '☀️ Zonnig' : avgClouds < 70 ? '⛅ Mix' : '☁️ Bewolkt';
+                        if (sunnyHours > 0) text6h += ` (${sunnyHours}u zon)`;
+                        document.getElementById('weather6h').textContent = text6h;
+                    } else {
+                        document.getElementById('weather6h').textContent = 'N/A';
+                    }
+                    
+                    // Morgen (12-24u vooruit): gemiddelde bewolking met detail
+                    if (forecasts.length >= 24) {
+                        const tomorrow = forecasts.slice(12, 24);
+                        const avgClouds = Math.round(tomorrow.reduce((sum, f) => sum + f.clouds, 0) / 12);
+                        const sunnyHours = tomorrow.filter(f => f.clouds < 30).length;
+                        const partlyHours = tomorrow.filter(f => f.clouds >= 30 && f.clouds < 70).length;
+                        const cloudyHours = tomorrow.filter(f => f.clouds >= 70).length;
+                        
+                        let emoji = avgClouds < 30 ? '☀️' : avgClouds < 70 ? '⛅' : '☁️';
+                        let textTmr = `${emoji} ${avgClouds}% bewolkt`;
+                        if (sunnyHours > 0 || partlyHours > 0) {
+                            textTmr += ` (${sunnyHours}u ☀️, ${partlyHours}u ⛅, ${cloudyHours}u ☁️)`;
+                        }
+                        document.getElementById('weatherTomorrow').textContent = textTmr;
+                    } else {
+                        document.getElementById('weatherTomorrow').textContent = 'N/A';
+                    }
+                    
+                    // PV potentieel
+                    document.getElementById('weatherSolarPotential').textContent = `${j.data.solar_potential}%`;
+                } else {
+                    document.getElementById('weatherNow').textContent = 'N/A';
+                    document.getElementById('weather6h').textContent = 'N/A';
+                    document.getElementById('weatherTomorrow').textContent = 'N/A';
+                    document.getElementById('weatherSolarPotential').textContent = 'N/A';
+                }
+            } catch (e) {
+                console.error('Weather fetch error:', e);
+            }
+        }
+        // Update weather every 10 minutes (600000ms) to stay within API limits
+        setInterval(updateWeather, 600000);
+        document.addEventListener('DOMContentLoaded', updateWeather);
 
         let __lastLogsLines = [];
         function filterImportantLogs(lines){
