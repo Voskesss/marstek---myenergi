@@ -1845,6 +1845,10 @@ class SimpleRuleState:
             "cooldown_s": 8,
             "max_batt_total_w": 5000,  # total across all batteries
             "per_battery_max_w": 2500, # hard cap per battery
+            "battery_config": {
+                "venus_ev2_92": {"minimum_soc_percent": 35},  # Winter: allow discharge to 35%
+                "venus_ev2_74": {"minimum_soc_percent": 35},  # Winter: allow discharge to 35%
+            }
         }
         self.last: Dict[str, Any] = {
             "grid_w": None,
@@ -2023,6 +2027,56 @@ async def _simple_rule_loop():
                             client = entry['client']
                             lock = entry['lock']
                             
+                            # Check SOC before allowing discharge (anti-feed) - ALWAYS check, even if already active
+                            # Use async timeout to prevent blocking
+                            try:
+                                battery_data = await asyncio.wait_for(
+                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                    timeout=5.0
+                                )
+                                current_soc = battery_data.get("soc_percent", {}).get("value", 100) if battery_data else 100
+                                min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
+                                
+                                if current_soc <= min_soc:
+                                    logger.warning(f"🔋 Battery {bid} SOC too low ({current_soc}% <= {min_soc}%) - BLOCKING anti-feed!")
+                                    # Check ACTUAL mode from battery (work_mode register 42000)
+                                    # Work mode: 0=Manual, 1=Anti-Feed, 2=Trade
+                                    actual_mode = battery_data.get("work_mode", {}).get("value", -1) if battery_data else -1
+                                    logger.info(f"🔍 Actual battery mode from Modbus: {actual_mode} (0=Manual, 1=Anti-Feed, 2=Trade)")
+                                    
+                                    # If in anti-feed or discharging (power < 0), STOP it immediately
+                                    battery_power = battery_data.get("battery_power", {}).get("value", 0) if battery_data else 0
+                                    if actual_mode == 1 or battery_power < -50:  # Anti-feed or actively discharging
+                                        logger.warning(f"⚠️ Battery {bid} is discharging ({battery_power}W) - Switching to Manual mode to STOP!")
+                                        async with lock:
+                                            stop_result = client.set_work_mode(0)  # Manual mode
+                                        simple_rule.battery_modes[bid] = "manual"
+                                        logger.info(f"✅ Mode switch result: {stop_result}")
+                                    else:
+                                        logger.info(f"ℹ️ Battery {bid} not actively discharging (mode={actual_mode}, power={battery_power}W)")
+                                    
+                                    per[bid] = {"mode": "blocked", "ok": False, "error": f"soc_too_low_{current_soc}%", "soc": current_soc}
+                                    continue
+                            except Exception as e:
+                                error_type = "timeout" if "timeout" in str(e).lower() else "connection" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor"]) else "unknown"
+                                logger.warning(f"⚠️ Modbus {error_type} for {bid} - BLOCKING anti-feed for safety (app continues)")
+                                # If battery is currently in anti-feed, STOP it immediately (safety first!)
+                                current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                                if current_mode == "anti-feed":
+                                    logger.warning(f"⚠️ Battery {bid} in anti-feed but SOC unknown - Attempting emergency stop...")
+                                    try:
+                                        async with lock:
+                                            stop_result = client.set_work_mode(0)  # Manual mode
+                                        if stop_result.get("ok"):
+                                            simple_rule.battery_modes[bid] = "manual"
+                                            logger.info(f"✅ Emergency stop successful for {bid}")
+                                        else:
+                                            logger.warning(f"⚠️ Emergency stop failed for {bid}, will retry next cycle")
+                                    except Exception as stop_error:
+                                        logger.warning(f"⚠️ Could not emergency stop {bid} (Modbus issue), will retry: {stop_error}")
+                                per[bid] = {"mode": "blocked", "ok": False, "error": f"modbus_{error_type}", "will_retry": True}
+                                continue
+                            
                             # Set work mode to Anti-Feed (1) - only if not already in anti-feed
                             current_mode = simple_rule.battery_modes.get(bid, "unknown")
                             logger.info(f"🔍 Current mode for {bid}: {current_mode}")
@@ -2037,8 +2091,9 @@ async def _simple_rule_loop():
                                 per[bid] = {"mode": "anti-feed", "ok": True, "already_set": True}
                                 logger.info(f"✅ Battery {bid} already in anti-feed mode (skipping)")
                         except Exception as e:
-                            logger.error(f"⚡ Battery {bid} anti-feed error: {e}")
-                            per[bid] = {"mode": "anti-feed", "ok": False, "error": str(e)}
+                            error_type = "modbus_error" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor", "timeout"]) else "logic_error"
+                            logger.warning(f"⚠️ Battery {bid} temporary error ({error_type}), will retry next cycle: {e}")
+                            per[bid] = {"mode": "error", "ok": False, "error": error_type, "will_retry": True}
                     
                     simple_rule.last.update({
                         "grid_w": grid_w,

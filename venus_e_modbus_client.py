@@ -49,9 +49,10 @@ class VenusEModbusClient:
             return result.registers
         except Exception as e:
             # Handle broken pipe and connection errors
-            if "Broken pipe" in str(e) or "Connection" in str(e):
+            if "Broken pipe" in str(e) or "Connection" in str(e) or "Bad file descriptor" in str(e) or "timed out" in str(e):
                 print(f"⚠️ Connection lost to {self.host}:{self.port} - attempting reconnect")
                 self.disconnect()
+                time.sleep(0.5)  # Brief pause before reconnect
                 # Try to reconnect once
                 if self.connect():
                     try:
@@ -65,14 +66,36 @@ class VenusEModbusClient:
             return None
     
     def write_register(self, address, value, unit=1):
-        """Write single holding register"""
+        """Write single holding register with connection recovery"""
         if not self.connected:
-            return False
+            if not self.connect():
+                return False
         
         try:
             result = self.client.write_register(address, value, unit=unit)
-            return not result.isError()
+            if not result.isError():
+                return True
+            # If error, try reconnect
+            print(f"⚠️ Write error at {address}, attempting reconnect")
+            self.disconnect()
+            if self.connect():
+                result = self.client.write_register(address, value, unit=unit)
+                return not result.isError()
+            return False
         except Exception as e:
+            # Handle broken pipe and connection errors
+            if "Broken pipe" in str(e) or "Connection" in str(e) or "Bad file descriptor" in str(e):
+                print(f"⚠️ Connection lost during write to {self.host}:{self.port} - attempting reconnect")
+                self.disconnect()
+                # Try to reconnect once
+                if self.connect():
+                    try:
+                        result = self.client.write_register(address, value, unit=unit)
+                        if not result.isError():
+                            return True
+                    except:
+                        pass
+            
             print(f"❌ Write error at {address}: {e}")
             return False
     

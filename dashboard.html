@@ -56,6 +56,8 @@
         .btn-secondary { background: var(--border-color); color: var(--text-primary); }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .auto-refresh { text-align: center; margin-bottom: 20px; padding: 10px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); }
+        .loading-indicator { position: fixed; top: 20px; right: 20px; padding: 8px 16px; background: var(--accent-blue); color: white; border-radius: 8px; font-size: 14px; font-weight: 600; display: none; z-index: 999; animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         .battery-card { border: 2px solid var(--border-color); transition: border-color 0.3s; }
         .battery-card.connected { border-color: var(--status-green); }
         .battery-card.error { border-color: var(--status-red); }
@@ -74,6 +76,7 @@
     </style>
 </head>
 <body>
+    <div class="loading-indicator" id="loadingIndicator">⏳ Laden...</div>
     <div class="container">
         <div class="header">
             <div>
@@ -668,10 +671,25 @@
         let dashPollInterval = 5000;
         const dashMaxPollInterval = 30000;
 
-        async function refreshAllBatteries() {
+        // Manual refresh (with loader)
+        async function refreshData() {
+            await refreshAllBatteries(true);
+        }
+
+        async function refreshAllBatteries(showLoader = false) {
+            const loader = document.getElementById('loadingIndicator');
+            let loaderTimeout;
+            
             try {
+                // Only show loader if requested OR if request takes >1s
+                if (showLoader && loader) {
+                    loaderTimeout = setTimeout(() => {
+                        loader.style.display = 'block';
+                    }, 1000);
+                }
+                
                 const ts = Date.now();
-                const statusRes = await fetch(`/api/status?ts=${ts}`, { cache: 'no-store' });
+                const statusRes = await fetchWithTimeout(`/api/status?ts=${ts}`, { cache: 'no-store' }, 5000);
                 
                 if (!statusRes.ok) {
                     throw new Error(`HTTP ${statusRes.status}`);
@@ -685,7 +703,7 @@
                 for (const card of cards) {
                     const bid = card.getAttribute('data-bid');
                     try {
-                        const res = await fetch(`/api/batteries/${bid}/status?ts=${ts}`, { cache: 'no-store' });
+                        const res = await fetchWithTimeout(`/api/batteries/${bid}/status?ts=${ts}`, { cache: 'no-store' }, 5000);
                         const data = await res.json();
                         updateBatteryCard(bid, data);
                     } catch (e) {
@@ -699,6 +717,7 @@
                 document.title = 'Dashboard - myenergi-marstek';
                 
             } catch (error) {
+                // Error handling
                 dashFailureCount++;
                 dashPollInterval = Math.min(dashPollInterval * 1.5, dashMaxPollInterval);
                 console.error(`Dashboard refresh failed (${dashFailureCount}x): ${error.message}. Retrying in ${dashPollInterval}ms`);
@@ -707,6 +726,10 @@
                 if (dashFailureCount >= 3) {
                     document.title = '⚠️ Reconnecting...';
                 }
+            } finally {
+                // Always cleanup loader
+                if (loaderTimeout) clearTimeout(loaderTimeout);
+                if (loader) loader.style.display = 'none';
             }
         }
 
@@ -1196,9 +1219,29 @@
             b.textContent = label;
             b.className = cls;
         }
+        // Fetch with timeout helper
+        async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
+            }
+        }
+
         async function updateBackendHealthBadge(){
             try{
-                const r = await fetch('/api/health', {cache:'no-store'});
+                const r = await fetchWithTimeout('/api/health', {cache:'no-store'}, 3000);
                 const j = await r.json();
                 if(j.success && j.simple_rule){
                     const health = (j.simple_rule.last && j.simple_rule.last.health) || {};
@@ -1209,6 +1252,7 @@
                     __healthClient.consecutiveFails = (__healthClient.consecutiveFails||0) + 1;
                 }
             }catch(e){
+                console.error('Health check failed:', e.message);
                 __healthClient.consecutiveFails = (__healthClient.consecutiveFails||0) + 1;
             }
             renderHealthBadge(__healthClient);
