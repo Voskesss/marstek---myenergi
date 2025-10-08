@@ -1845,11 +1845,33 @@ class SimpleRuleState:
             "cooldown_s": 8,
             "max_batt_total_w": 5000,  # total across all batteries
             "per_battery_max_w": 2500, # hard cap per battery
-            "battery_config": {
-                "venus_ev2_92": {"minimum_soc_percent": 35},  # Winter: allow discharge to 35%
-                "venus_ev2_74": {"minimum_soc_percent": 35},  # Winter: allow discharge to 35%
-            }
+            "battery_config": self._load_battery_limits()  # Load from battery_config.json
         }
+    
+    def _load_battery_limits(self) -> dict:
+        """Load minimum SOC limits from battery_config.json"""
+        try:
+            cfg = load_battery_config()
+            limits = {}
+            for bid in ["venus_ev2_92", "venus_ev2_74"]:
+                if bid in cfg:
+                    limits[bid] = {"minimum_soc_percent": cfg[bid].get("minimum_soc_percent", 35)}
+                else:
+                    limits[bid] = {"minimum_soc_percent": 35}
+            logger.info(f"📋 Loaded battery SOC limits: {limits}")
+            return limits
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load battery config, using defaults: {e}")
+            return {
+                "venus_ev2_92": {"minimum_soc_percent": 35},
+                "venus_ev2_74": {"minimum_soc_percent": 35},
+            }
+    
+    def reload_battery_limits(self):
+        """Reload battery limits from config file (call after config update)"""
+        self.cfg["battery_config"] = self._load_battery_limits()
+        logger.info(f"🔄 Battery limits reloaded: {self.cfg['battery_config']}")
+        
         self.last: Dict[str, Any] = {
             "grid_w": None,
             "overschot_w": 0,
@@ -2255,14 +2277,196 @@ async def simple_rule_status():
     return {"success": True, "enabled": simple_rule.enabled, "last": simple_rule.last, "cfg": simple_rule.cfg}
 
 # ---------------------------------
-# Startup/shutdown: auto-start simple rule
+# SOC Safety Monitor (Always running!)
+# ---------------------------------
+soc_safety_task = None
+
+async def _soc_safety_monitor():
+    """Independent SOC safety monitor - runs ALWAYS (even when Simple Rule is disabled).
+    Prevents battery discharge below minimum SOC regardless of manual settings."""
+    global simple_rule
+    logger.info("🛡️ SOC Safety Monitor started (independent of Simple Rule)")
+    
+    while True:
+        try:
+            await asyncio.sleep(10)  # Check every 10 seconds
+            
+            cfg = simple_rule.cfg
+            battery_config = cfg.get("battery_config", {})
+            
+            for bid, bat_cfg in battery_config.items():
+                min_soc = bat_cfg.get("minimum_soc_percent", 15)
+                
+                try:
+                    # Get battery client
+                    entry = battery_clients.get(bid)
+                    if not entry:
+                        continue
+                    
+                    client = entry['client']
+                    lock = entry['lock']
+                    
+                    # Read SOC
+                    async with lock:
+                        battery_data = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                            timeout=5.0
+                        )
+                    
+                    if not battery_data:
+                        continue
+                    
+                    current_soc = battery_data.get("soc_percent", {}).get("value", 100)
+                    battery_power = battery_data.get("battery_power", {}).get("value", 0)
+                    work_mode = battery_data.get("work_mode", {}).get("value", -1)
+                    
+                    # Safety check: if SOC low AND discharging
+                    if current_soc <= min_soc and battery_power < -50:
+                        logger.warning(f"🛡️ SOC SAFETY: {bid} at {current_soc}% (min {min_soc}%) and discharging ({battery_power}W)")
+                        logger.warning(f"🛡️ Emergency stop - switching {bid} to Manual mode!")
+                        
+                        async with lock:
+                            result = client.set_work_mode(0)  # Force Manual
+                        
+                        if result.get("ok"):
+                            logger.info(f"✅ SOC SAFETY: Successfully stopped {bid}")
+                        else:
+                            logger.warning(f"⚠️ SOC SAFETY: Failed to stop {bid}, will retry")
+                
+                except asyncio.TimeoutError:
+                    logger.debug(f"⚠️ SOC SAFETY: Timeout reading {bid}")
+                except Exception as e:
+                    logger.debug(f"⚠️ SOC SAFETY: Error checking {bid}: {e}")
+        
+        except Exception as e:
+            logger.error(f"❌ SOC Safety Monitor error: {e}")
+            await asyncio.sleep(5)
+
+# ---------------------------------
+# WhatsApp Energy Tips Scheduler
+# ---------------------------------
+whatsapp_tips_task = None
+
+async def _whatsapp_tips_scheduler():
+    """Send smart energy tips at 09:00 and 13:00"""
+    try:
+        from whatsapp_notifier import whatsapp
+    except ImportError:
+        logger.error("❌ whatsapp_notifier.py not found, tips disabled")
+        return
+    
+    logger.info("📱 WhatsApp tips scheduler started (09:00 & 13:00)")
+    
+    # Track which tips we sent today
+    sent_today = set()
+    
+    while True:
+        try:
+            now = datetime.now()
+            current_hour = now.hour
+            current_minute = now.minute
+            today_key = now.strftime("%Y-%m-%d")
+            
+            # Reset sent_today at midnight
+            if current_hour == 0 and current_minute == 0:
+                sent_today.clear()
+            
+            # Check if it's time to send (09:00 or 13:00)
+            should_send = False
+            tip_time = ""
+            
+            if current_hour == 9 and current_minute == 0:
+                tip_time = "09:00"
+                should_send = f"{today_key}-09" not in sent_today
+            elif current_hour == 13 and current_minute == 0:
+                tip_time = "13:00"
+                should_send = f"{today_key}-13" not in sent_today
+            
+            if should_send:
+                logger.info(f"📱 Sending energy tip at {tip_time}")
+                
+                # Gather current energy data
+                try:
+                    # Get weather
+                    weather_data = await weather_service.get_current_weather()
+                    clouds = weather_data.get("clouds", 100)
+                    temp = weather_data.get("temperature", 0)
+                    
+                    # Use same data as dashboard - call /api/status
+                    status = await get_status()
+                    
+                    pv_w = status.get("pv_generation_w", 0) or 0
+                    grid_w = status.get("grid_w", 0) or 0
+                    eddi_w = status.get("eddi_power_w", 0) or 0
+                    house_w = status.get("house_consumption_w", 0) or 0
+                    
+                    # Get battery SOC from simple rule status (has all batteries)
+                    avg_soc = 50  # default
+                    total_batt_power = status.get("marstek_power_w", 0) or 0
+                    
+                    # Try to get more accurate SOC from simple rule
+                    try:
+                        sr_status = simple_rule.last
+                        per_battery = sr_status.get("per_battery", {})
+                        if per_battery:
+                            socs = [b.get("soc", 50) for b in per_battery.values() if "soc" in b]
+                            if socs:
+                                avg_soc = sum(socs) / len(socs)
+                    except:
+                        pass
+                    
+                    # Calculate overschot
+                    export_w = max(0, -grid_w) if grid_w else 0
+                    overschot = export_w - eddi_w if export_w > 0 else 0
+                    
+                    energy_data = {
+                        "clouds": clouds,
+                        "temperature": temp,
+                        "pv_now_w": pv_w,
+                        "grid_w": grid_w,
+                        "battery_soc": int(avg_soc),
+                        "battery_power": int(total_batt_power),
+                        "overschot_w": int(overschot),
+                        "eddi_w": eddi_w,
+                        "house_w": house_w
+                    }
+                    
+                    # Send tip!
+                    await whatsapp.send_energy_tip(energy_data)
+                    
+                    # Mark as sent
+                    sent_today.add(f"{today_key}-{current_hour:02d}")
+                    logger.info(f"✅ Energy tip sent at {tip_time}")
+                
+                except Exception as e:
+                    logger.error(f"❌ Failed to gather data for energy tip: {e}")
+            
+            # Check every minute
+            await asyncio.sleep(60)
+        
+        except Exception as e:
+            logger.error(f"❌ WhatsApp tips scheduler error: {e}")
+            await asyncio.sleep(60)
+
+# ---------------------------------
+# Startup/shutdown: auto-start simple rule + SOC safety + WhatsApp tips
 # ---------------------------------
 @app.on_event("startup")
 async def _startup_simple_rule():
     """Auto-start the simple export-driven rule on app boot.
     Keeps behavior resilient after crashes/restarts.
     """
+    global soc_safety_task, whatsapp_tips_task
+    
     try:
+        # Start SOC Safety Monitor (always running!)
+        soc_safety_task = asyncio.create_task(_soc_safety_monitor())
+        logger.info("🛡️ SOC Safety Monitor started")
+        
+        # Start WhatsApp tips scheduler
+        whatsapp_tips_task = asyncio.create_task(_whatsapp_tips_scheduler())
+        logger.info("📱 WhatsApp tips scheduler started")
+        
         # If already running, do nothing
         if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
             return
@@ -2277,8 +2481,27 @@ async def _startup_simple_rule():
 
 @app.on_event("shutdown")
 async def _shutdown_simple_rule():
-    """Ensure the simple rule loop stops cleanly on shutdown."""
+    """Ensure the simple rule loop and SOC safety monitor stop cleanly on shutdown."""
+    global soc_safety_task, whatsapp_tips_task
+    
     try:
+        # Stop SOC Safety Monitor
+        if soc_safety_task and not soc_safety_task.done():
+            try:
+                soc_safety_task.cancel()
+                logger.info("🛑 SOC Safety Monitor stopped")
+            except Exception:
+                pass
+        
+        # Stop WhatsApp tips scheduler
+        if whatsapp_tips_task and not whatsapp_tips_task.done():
+            try:
+                whatsapp_tips_task.cancel()
+                logger.info("🛑 WhatsApp tips scheduler stopped")
+            except Exception:
+                pass
+        
+        # Stop Simple Rule
         if simple_rule.task and not simple_rule.task.done():
             try:
                 simple_rule.task.cancel()
@@ -2319,6 +2542,85 @@ async def get_solar_forecast():
         data = await weather_service.get_solar_forecast()
         return {"success": True, "data": data}
     except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# =========================
+# WhatsApp Test Endpoint
+# =========================
+@app.post("/api/whatsapp/test")
+async def test_whatsapp(contact: str = "jos"):
+    """Send test WhatsApp message"""
+    try:
+        from whatsapp_notifier import whatsapp
+        
+        message = f"🧪 Test bericht van myEnergy systeem!\n\nVerstuurd om {datetime.now().strftime('%H:%M:%S')}\n\n_Dit is een test_"
+        
+        success = await whatsapp.send_message(contact, message)
+        
+        return {
+            "success": success,
+            "message": "Test message sent!" if success else "Failed to send",
+            "contact": contact
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/whatsapp/tip/now")
+async def send_tip_now():
+    """Manually trigger energy tip (for testing)"""
+    try:
+        from whatsapp_notifier import whatsapp
+        
+        # Get weather
+        weather_data = await weather_service.get_current_weather()
+        clouds = weather_data.get("clouds", 100)
+        temp = weather_data.get("temperature", 0)
+        
+        # Use same data as dashboard - call /api/status
+        status = await get_status()
+        
+        pv_w = status.get("pv_generation_w", 0) or 0
+        grid_w = status.get("grid_w", 0) or 0
+        eddi_w = status.get("eddi_power_w", 0) or 0
+        house_w = status.get("house_consumption_w", 0) or 0
+        
+        # Get battery SOC from simple rule status (has all batteries)
+        avg_soc = 50  # default
+        total_batt_power = status.get("marstek_power_w", 0) or 0
+        
+        # Try to get more accurate SOC from simple rule
+        try:
+            sr_status = simple_rule.last
+            per_battery = sr_status.get("per_battery", {})
+            if per_battery:
+                socs = [b.get("soc", 50) for b in per_battery.values() if "soc" in b]
+                if socs:
+                    avg_soc = sum(socs) / len(socs)
+        except:
+            pass
+        
+        # Calculate overschot
+        export_w = max(0, -grid_w) if grid_w else 0
+        overschot = export_w - eddi_w if export_w > 0 else 0
+        
+        energy_data = {
+            "clouds": clouds,
+            "temperature": temp,
+            "pv_now_w": pv_w,
+            "grid_w": grid_w,
+            "battery_soc": int(avg_soc),
+            "battery_power": int(total_batt_power),
+            "overschot_w": int(overschot),
+            "eddi_w": eddi_w,
+            "house_w": house_w
+        }
+        
+        await whatsapp.send_energy_tip(energy_data)
+        
+        return {"success": True, "message": "Energy tip sent!", "data": energy_data}
+    
+    except Exception as e:
+        logger.error(f"Failed to send manual tip: {e}")
         return {"success": False, "error": str(e)}
 
 # =========================
@@ -2671,8 +2973,19 @@ async def list_batteries():
 async def battery_status_by_id(bid: str):
     """Generic status endpoint using BatteryManager by id."""
     try:
-        result = await manager.read_status(bid)
+        # Add timeout to prevent hanging on Modbus issues
+        result = await asyncio.wait_for(manager.read_status(bid), timeout=5.0)
         return result
+    except asyncio.TimeoutError:
+        return {
+            "success": False, 
+            "error": "Battery timeout (Modbus not responding)",
+            "battery_id": bid,
+            "soc_percent": {"value": None, "unit": "%"},
+            "battery_voltage": {"value": None, "unit": "V"},
+            "battery_current": {"value": None, "unit": "A"},
+            "battery_power": {"value": None, "unit": "W"}
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2680,8 +2993,12 @@ async def battery_status_by_id(bid: str):
 async def get_battery2_status():
     """Get real-time battery 2 status via Modbus (WiFi converter)."""
     try:
+        # Wrap sync Modbus call with timeout to prevent hanging
         async with modbus_lock2:
-            battery_data = venus_modbus2.read_battery_data()
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus2.read_battery_data),
+                timeout=5.0
+            )
             try:
                 venus_modbus2.disconnect()
             except Exception:
@@ -2738,6 +3055,13 @@ async def get_battery2_status():
                 "source": "modbus",
                 "host": venus_modbus2.host
             }
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "error": "Battery timeout (Modbus not responding after 5s)",
+            "source": "modbus",
+            "host": venus_modbus2.host
+        }
     except Exception as e:
         return {
             "success": False,
@@ -2822,6 +3146,9 @@ async def api_minimum_soc_per_battery(bid: str, payload: Dict[str, Any] = Body(.
         bc["minimum_soc_percent"] = min_soc
         bc["auto_charge_enabled"] = auto_charge
         save_battery_config(cfg)
+        
+        # Reload limits in SimpleRule so it uses new config immediately
+        simple_rule.reload_battery_limits()
 
         vm = _get_modbus_for(bid)
         if auto_charge:
