@@ -4,7 +4,7 @@
     "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false,
-    "last_updated": "2025-10-06T09:02:40.823443"
+    "last_updated": "2025-10-08T22:36:10.611198"
   },
   "wifi_converter": {
     "minimum_soc_percent": 20,
@@ -23,8 +23,8 @@
     "emergency_charge_active": false
   },
   "venus_ev2_74": {
-    "minimum_soc_percent": 15.0,
-    "auto_charge_enabled": false,
+    "minimum_soc_percent": 19.0,
+    "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false
   }

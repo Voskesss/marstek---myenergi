@@ -1847,6 +1847,28 @@ class SimpleRuleState:
             "per_battery_max_w": 2500, # hard cap per battery
             "battery_config": self._load_battery_limits()  # Load from battery_config.json
         }
+        self.last: Dict[str, Any] = {
+            "grid_w": None,
+            "overschot_w": 0,
+            "target_export_w": 0,
+            "batt_target_total_w": 0,
+            "batt_set_total_w": 0,
+            "per_battery": {},
+            "cooldown": False,
+            "ts": None,
+            "source": "zappi_ct",
+            "health": {
+                "myenergi_ok": False,
+                "myenergi_fail_count": 0,
+                "last_myenergi_ok_ts": None,
+                "simple_rule_ok": False,
+                "simple_rule_fail_count": 0,
+                "last_simple_rule_ok_ts": None,
+            },
+        }
+        self.prev_set_total: float = 0.0
+        self.cooldown_until: float = 0.0
+        self.battery_modes: Dict[str, str] = {}  # Track battery modes: bid -> "manual"|"anti-feed"|"unknown"
     
     def _load_battery_limits(self) -> dict:
         """Load minimum SOC limits from battery_config.json"""
@@ -1871,29 +1893,6 @@ class SimpleRuleState:
         """Reload battery limits from config file (call after config update)"""
         self.cfg["battery_config"] = self._load_battery_limits()
         logger.info(f"🔄 Battery limits reloaded: {self.cfg['battery_config']}")
-        
-        self.last: Dict[str, Any] = {
-            "grid_w": None,
-            "overschot_w": 0,
-            "target_export_w": 0,
-            "batt_target_total_w": 0,
-            "batt_set_total_w": 0,
-            "per_battery": {},
-            "cooldown": False,
-            "ts": None,
-            "source": "zappi_ct",
-            "health": {
-                "myenergi_ok": False,
-                "myenergi_fail_count": 0,
-                "last_myenergi_ok_ts": None,
-                "simple_rule_ok": False,
-                "simple_rule_fail_count": 0,
-                "last_simple_rule_ok_ts": None,
-            },
-        }
-        self.prev_set_total: float = 0.0
-        self.cooldown_until: float = 0.0
-        self.battery_modes: Dict[str, str] = {}  # Track battery modes: bid -> "manual"|"anti-feed"|"unknown"
 
 simple_rule = SimpleRuleState()
 def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
@@ -3107,6 +3106,9 @@ async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
         config["venus_e_78"]["minimum_soc_percent"] = min_soc
         config["venus_e_78"]["auto_charge_enabled"] = auto_charge
         save_battery_config(config)
+        
+        # Reload limits in SimpleRule so it uses new config immediately
+        simple_rule.reload_battery_limits()
         
         if auto_charge:
             result = venus_modbus.check_minimum_soc(min_soc)
