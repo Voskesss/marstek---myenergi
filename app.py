@@ -239,19 +239,23 @@ class VenusEModbusClient:
             current = battery_data["battery_current"]["value"] 
             calculated_power = voltage * current
             
-            # Use calculated power directly (V × A = W)
-            # No additional scaling needed - registers already return correct values
+            # CRITICAL: Venus E registers have pre-scaled values that need correction
+            # Voltage scale: 0.1 (raw 5167 → 516.7V but should be 51.67V)
+            # Current scale: 0.01 (raw -30 → -0.3A but should be -0.03A)
+            # Result: V × A gives 10x too high power
+            # Fix: Apply 0.1 correction factor
+            corrected_power = calculated_power * 0.1
             
-            # Override battery_power with calculated value
+            # Override battery_power with corrected calculated value
             battery_data["battery_power"] = {
-                "value": calculated_power,
-                "formatted": f"{calculated_power:.0f} W",
+                "value": corrected_power,
+                "formatted": f"{corrected_power:.0f} W",
                 "unit": "W", 
-                "description": "Battery Power (calculated)",
+                "description": "Battery Power (calculated, corrected)",
                 "register": "calc",
                 "timestamp": datetime.now().isoformat()
             }
-            logging.info(f"✅ Calculated power: {voltage}V × {current}A = {calculated_power}W")
+            logging.info(f"✅ Power calc: {voltage}V × {current}A = {calculated_power}W → corrected: {corrected_power}W")
         
         # If we got no data at all, return None to signal complete failure
         if not battery_data:
