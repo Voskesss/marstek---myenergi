@@ -2067,6 +2067,22 @@ async def _simple_rule_loop():
                         logger.warning(f"⚠️ SIMPLE RULE: Anti-feed blocked - ALL batteries below min SOC")
                         # Set target to 0 and continue (stay in Manual mode, don't discharge)
                         target_total = 0
+                        
+                        # Mark health as OK - this is normal operation, not an error
+                        try:
+                            h = simple_rule.last.get("health", {})
+                            h.update({
+                                "myenergi_ok": True, 
+                                "myenergi_fail_count": 0, 
+                                "last_myenergi_ok_ts": time.time(),
+                                "simple_rule_ok": True,
+                                "simple_rule_fail_count": 0,
+                                "last_simple_rule_ok_ts": time.time()
+                            })
+                            simple_rule.last["health"] = h
+                        except Exception:
+                            pass
+                        
                         simple_rule.last.update({
                             "grid_w": grid_w,
                             "pv_w": pv_w,
@@ -2173,6 +2189,21 @@ async def _simple_rule_loop():
                             error_type = "modbus_error" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor", "timeout"]) else "logic_error"
                             logger.warning(f"⚠️ Battery {bid} temporary error ({error_type}), will retry next cycle: {e}")
                             per[bid] = {"mode": "error", "ok": False, "error": error_type, "will_retry": True}
+                    
+                    # Mark health as OK for anti-feed mode
+                    try:
+                        h = simple_rule.last.get("health", {})
+                        h.update({
+                            "myenergi_ok": True,
+                            "myenergi_fail_count": 0,
+                            "last_myenergi_ok_ts": time.time(),
+                            "simple_rule_ok": True,
+                            "simple_rule_fail_count": 0,
+                            "last_simple_rule_ok_ts": time.time()
+                        })
+                        simple_rule.last["health"] = h
+                    except Exception:
+                        pass
                     
                     simple_rule.last.update({
                         "grid_w": grid_w,
