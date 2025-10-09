@@ -2464,13 +2464,14 @@ async def _whatsapp_tips_scheduler():
                 sent_today.clear()
             
             # Check if it's time to send (09:00 or 13:00)
+            # Use 5-minute window to handle timing drift (09:00-09:04 or 13:00-13:04)
             should_send = False
             tip_time = ""
             
-            if current_hour == 9 and current_minute == 0:
+            if current_hour == 9 and current_minute < 5:
                 tip_time = "09:00"
                 should_send = f"{today_key}-09" not in sent_today
-            elif current_hour == 13 and current_minute == 0:
+            elif current_hour == 13 and current_minute < 5:
                 tip_time = "13:00"
                 should_send = f"{today_key}-13" not in sent_today
             
