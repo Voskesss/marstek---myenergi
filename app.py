@@ -192,30 +192,46 @@ class VenusEModbusClient:
         }
         
         for reg_addr, param_name in registers.items():
-            try:
-                result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
-                if (not hasattr(result, 'registers')) or result.isError():
-                    # retry once after reconnect
-                    self.disconnect()
-                    if self.connect():
-                        result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
-                
-                if hasattr(result, 'registers') and not result.isError():
-                    raw_value = result.registers[0]
-                    formatted = format_value(reg_addr, raw_value)
+            result = None
+            retry_count = 0
+            max_retries = 2
+            
+            while retry_count < max_retries and result is None:
+                try:
+                    result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
                     
-                    battery_data[param_name] = {
-                        "value": formatted.get("value", raw_value),
-                        "formatted": formatted.get("formatted", str(raw_value)),
-                        "unit": formatted.get("unit", ""),
-                        "description": formatted.get("description", param_name),
-                        "register": reg_addr,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    
-            except Exception as e:
-                logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
-                # Continue to next register instead of failing completely
+                    if hasattr(result, 'registers') and not result.isError():
+                        raw_value = result.registers[0]
+                        formatted = format_value(reg_addr, raw_value)
+                        
+                        battery_data[param_name] = {
+                            "value": formatted.get("value", raw_value),
+                            "formatted": formatted.get("formatted", str(raw_value)),
+                            "unit": formatted.get("unit", ""),
+                            "description": formatted.get("description", param_name),
+                            "register": reg_addr,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        break  # Success, move to next register
+                    else:
+                        # Error response, retry with reconnect only on last attempt
+                        result = None
+                        retry_count += 1
+                        if retry_count >= max_retries:
+                            logging.debug(f"Register {reg_addr} error after {max_retries} attempts")
+                        
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        # Brief pause before retry, keep connection alive
+                        time.sleep(0.05)
+                    else:
+                        # Log only critical errors, not every timeout
+                        if "Connection" in str(e) or "closed" in str(e):
+                            logging.debug(f"Connection issue reading {reg_addr} from {self.host}: {e}")
+                        else:
+                            logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
+                    result = None
         
         # Calculate actual power from voltage × current if we have both
         if "battery_voltage" in battery_data and "battery_current" in battery_data:
@@ -223,19 +239,19 @@ class VenusEModbusClient:
             current = battery_data["battery_current"]["value"] 
             calculated_power = voltage * current
             
-            # Apply scaling to match Marstek app (divide by ~10)
-            scaled_power = calculated_power * 0.1
+            # Use calculated power directly (V × A = W)
+            # No additional scaling needed - registers already return correct values
             
-            # Override battery_power with scaled calculated value
+            # Override battery_power with calculated value
             battery_data["battery_power"] = {
-                "value": scaled_power,
-                "formatted": f"{scaled_power:.0f} W",
+                "value": calculated_power,
+                "formatted": f"{calculated_power:.0f} W",
                 "unit": "W", 
                 "description": "Battery Power (calculated)",
                 "register": "calc",
                 "timestamp": datetime.now().isoformat()
             }
-            logging.info(f"Calculated power: {voltage}V × {current}A = {calculated_power}W, scaled = {scaled_power}W")
+            logging.info(f"✅ Calculated power: {voltage}V × {current}A = {calculated_power}W")
         
         # If we got no data at all, return None to signal complete failure
         if not battery_data:
