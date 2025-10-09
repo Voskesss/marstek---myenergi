@@ -2038,7 +2038,49 @@ async def _simple_rule_loop():
                 
                 # Check for anti-feed condition: no PV + importing from grid
                 if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
-                    # No PV and importing -> activate anti-feed mode
+                    # FIRST: Check if ANY battery has enough SOC to allow anti-feed discharge
+                    # If ALL batteries are below min SOC, skip anti-feed mode entirely
+                    battery_soc_ok = False
+                    try:
+                        items_check = (await list_batteries())['items']  # type: ignore[index]
+                        for it in items_check:
+                            bid = it['id']
+                            entry = _get_entry_for(bid)
+                            if entry:
+                                try:
+                                    battery_data = await asyncio.wait_for(
+                                        asyncio.get_event_loop().run_in_executor(None, entry['client'].read_battery_data),
+                                        timeout=3.0
+                                    )
+                                    if battery_data:
+                                        current_soc = battery_data.get("soc_percent", {}).get("value", 100)
+                                        min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
+                                        if current_soc > min_soc:
+                                            battery_soc_ok = True
+                                            break
+                                except:
+                                    pass
+                    except:
+                        pass
+                    
+                    if not battery_soc_ok:
+                        logger.warning(f"⚠️ SIMPLE RULE: Anti-feed blocked - ALL batteries below min SOC")
+                        # Set target to 0 and continue (stay in Manual mode, don't discharge)
+                        target_total = 0
+                        simple_rule.last.update({
+                            "grid_w": grid_w,
+                            "pv_w": pv_w,
+                            "overschot_w": 0,
+                            "mode": "manual_soc_protection",
+                            "batt_target_total_w": 0,
+                            "batt_set_total_w": 0,
+                            "ts": time.time(),
+                        })
+                        dt = time.time() - t0
+                        await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+                        continue
+                    
+                    # At least one battery has enough SOC -> activate anti-feed mode
                     logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
                     try:
                         items = (await list_batteries())['items']  # type: ignore[index]
