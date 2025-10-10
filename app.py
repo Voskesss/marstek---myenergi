@@ -2391,8 +2391,9 @@ async def _soc_safety_monitor():
                 
                 try:
                     # Get battery client
-                    entry = battery_clients.get(bid)
+                    entry = _get_entry_for(bid)
                     if not entry:
+                        logger.debug(f"🛡️ SOC SAFETY: Battery {bid} not found in registry")
                         continue
                     
                     client = entry['client']
