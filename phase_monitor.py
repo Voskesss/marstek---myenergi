@@ -104,19 +104,20 @@ class PhaseMonitor:
                 if isinstance(section, dict) and "zappi" in section:
                     zappi_list = section.get("zappi") or []
                     for zappi in zappi_list:
-                        # DIRECT MAPPING: ectp4=Fase A, ectp5=Fase B, ectp6=Fase C
-                        # Dashboard: L1, L2, L3
-                        # Correct mapping: ectp4→L1, ectp5→L2, ectp6→L3
-                        ectp4 = zappi.get("ectp4")  # Fase A → L1
-                        ectp5 = zappi.get("ectp5")  # Fase B → L2
-                        ectp6 = zappi.get("ectp6")  # Fase C → L3
+                        # ACTUAL MAPPING (verified with P1 meter):
+                        # ectp4 = Fase B, ectp5 = Fase A, ectp6 = Fase C
+                        # Dashboard expects: L1, L2, L3
+                        # Correct mapping: ectp4(B)→L1, ectp5(A)→L2, ectp6(C)→L3
+                        ectp4 = zappi.get("ectp4")  # Fase B
+                        ectp5 = zappi.get("ectp5")  # Fase A
+                        ectp6 = zappi.get("ectp6")  # Fase C
                         
                         # If Zappi has grid CT data, use it!
                         if ectp4 is not None or ectp5 is not None or ectp6 is not None:
-                            l1 = int(ectp4) if ectp4 is not None else 0  # Fase A
-                            l2 = int(ectp5) if ectp5 is not None else 0  # Fase B
+                            l1 = int(ectp4) if ectp4 is not None else 0  # Fase B
+                            l2 = int(ectp5) if ectp5 is not None else 0  # Fase A
                             l3 = int(ectp6) if ectp6 is not None else 0  # Fase C
-                            logger.debug(f"Using Zappi Grid CT: L1(FaseA)={l1}W L2(FaseB)={l2}W L3(FaseC)={l3}W")
+                            logger.debug(f"Using Zappi Grid CT: L1(FaseB)={l1}W L2(FaseA)={l2}W L3(FaseC)={l3}W")
                             return {
                                 "l1_w": l1,
                                 "l2_w": l2,

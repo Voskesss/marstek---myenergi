@@ -3506,14 +3506,16 @@ async def get_phase_data():
             if isinstance(section, dict) and "zappi" in section:
                 zappi_list = section.get("zappi") or []
                 for zappi in zappi_list:
-                    ectp4 = zappi.get("ectp4")  # Fase A
-                    ectp5 = zappi.get("ectp5")  # Fase B
+                    # ACTUAL MAPPING (verified with P1 meter):
+                    # ectp4 = Fase B, ectp5 = Fase A, ectp6 = Fase C
+                    ectp4 = zappi.get("ectp4")  # Fase B
+                    ectp5 = zappi.get("ectp5")  # Fase A
                     ectp6 = zappi.get("ectp6")  # Fase C
                     
                     if ectp4 is not None or ectp5 is not None or ectp6 is not None:
-                        # DIRECT MAPPING: ectp4→L1, ectp5→L2, ectp6→L3
-                        phases["l1_w"] = int(ectp4) if ectp4 is not None else 0  # Fase A
-                        phases["l2_w"] = int(ectp5) if ectp5 is not None else 0  # Fase B
+                        # Correct mapping: ectp4(B)→L1, ectp5(A)→L2, ectp6(C)→L3
+                        phases["l1_w"] = int(ectp4) if ectp4 is not None else 0  # Fase B
+                        phases["l2_w"] = int(ectp5) if ectp5 is not None else 0  # Fase A
                         phases["l3_w"] = int(ectp6) if ectp6 is not None else 0  # Fase C
                         phases["source"] = f"Zappi Grid CT"
                         break

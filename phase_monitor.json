@@ -70,5 +70,13 @@
     "l3_w": 768,
     "violations": [],
     "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:58:33.055237",
+    "l1_w": 484,
+    "l2_w": 436,
+    "l3_w": 768,
+    "violations": [],
+    "is_violation": false
   }
 ]
