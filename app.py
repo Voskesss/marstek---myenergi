@@ -3511,11 +3511,11 @@ async def get_phase_data():
                     ectp6 = zappi.get("ectp6")  # Fase C
                     
                     if ectp4 is not None or ectp5 is not None or ectp6 is not None:
-                        # REMAP: ectp4(Fase A)→L2, ectp5(Fase B)→L1, ectp6(Fase C)→L3
-                        phases["l1_w"] = int(ectp5) if ectp5 is not None else 0  # Fase B
-                        phases["l2_w"] = int(ectp4) if ectp4 is not None else 0  # Fase A
+                        # DIRECT MAPPING: ectp4→L1, ectp5→L2, ectp6→L3
+                        phases["l1_w"] = int(ectp4) if ectp4 is not None else 0  # Fase A
+                        phases["l2_w"] = int(ectp5) if ectp5 is not None else 0  # Fase B
                         phases["l3_w"] = int(ectp6) if ectp6 is not None else 0  # Fase C
-                        phases["source"] = f"Zappi Grid CT (remapped A→L2, B→L1, C→L3)"
+                        phases["source"] = f"Zappi Grid CT"
                         break
         
         # Priority 2: Find Harvi with CT clamps (fallback)
