@@ -32,9 +32,10 @@ MAX_LOG_ENTRIES = 10000  # Bewaar max 10k entries (ca. 2 dagen)
 class PhaseMonitor:
     """Monitort 3-fase belasting en logt overschrijdingen"""
     
-    def __init__(self, myenergi_client, myenergi_lock):
+    def __init__(self, myenergi_client, myenergi_lock, p1_reader=None):
         self.myenergi = myenergi_client
         self.myenergi_lock = myenergi_lock
+        self.p1_reader = p1_reader  # Optional P1 meter reader
         self.running = False
         self.task = None
         
@@ -75,15 +76,49 @@ class PhaseMonitor:
             logger.error(f"Failed to save phase log: {e}")
     
     async def _read_phases(self) -> Optional[Dict]:
-        """Lees fase data van Harvi"""
+        """Lees fase data van P1 meter / Zappi / Harvi (in volgorde van voorkeur)"""
         try:
+            # Priority 1: P1 meter (most accurate)
+            if self.p1_reader:
+                try:
+                    p1_data = await self.p1_reader.get_phase_data()
+                    if p1_data and p1_data.get("l1_w") is not None:
+                        logger.debug(f"Using P1 data: L1={p1_data['l1_w']}W L2={p1_data['l2_w']}W L3={p1_data['l3_w']}W")
+                        return {
+                            "l1_w": p1_data["l1_w"],
+                            "l2_w": p1_data["l2_w"],
+                            "l3_w": p1_data["l3_w"],
+                            "source": "P1 meter"
+                        }
+                except Exception as e:
+                    logger.debug(f"P1 read failed: {e}")
+            
+            # Priority 2: Zappi Grid CT clamps (ectp4, ectp5, ectp6)
             async with self.myenergi_lock:
                 data = await self.myenergi.status_all()
             
             raw = data.get("raw", [])
-            phases = {"l1_w": None, "l2_w": None, "l3_w": None}
             
-            # Find Harvi with CT clamps
+            # Check Zappi for grid CT clamps (ectp4/5/6 = Grid per fase)
+            for section in raw if isinstance(raw, list) else []:
+                if isinstance(section, dict) and "zappi" in section:
+                    zappi_list = section.get("zappi") or []
+                    for zappi in zappi_list:
+                        ectp4 = zappi.get("ectp4")  # Grid L1
+                        ectp5 = zappi.get("ectp5")  # Grid L2
+                        ectp6 = zappi.get("ectp6")  # Grid L3
+                        
+                        # If Zappi has grid CT data, use it!
+                        if ectp4 is not None or ectp5 is not None or ectp6 is not None:
+                            logger.debug(f"Using Zappi Grid CT: L1={ectp4}W L2={ectp5}W L3={ectp6}W")
+                            return {
+                                "l1_w": int(ectp4) if ectp4 is not None else 0,
+                                "l2_w": int(ectp5) if ectp5 is not None else 0,
+                                "l3_w": int(ectp6) if ectp6 is not None else 0,
+                                "source": "Zappi Grid CT (ectp4/5/6)"
+                            }
+            
+            # Priority 3: Harvi CT clamps (fallback)
             for section in raw if isinstance(raw, list) else []:
                 if isinstance(section, dict) and "harvi" in section:
                     harvi_list = section.get("harvi") or []
@@ -93,13 +128,13 @@ class PhaseMonitor:
                         ectp3 = harvi.get("ectp3")
                         
                         if ectp1 is not None:
-                            phases["l1_w"] = int(ectp1)
-                        if ectp2 is not None:
-                            phases["l2_w"] = int(ectp2)
-                        if ectp3 is not None:
-                            phases["l3_w"] = int(ectp3)
-                        
-                        return phases
+                            logger.debug(f"Using Harvi CT: L1={ectp1}W L2={ectp2}W L3={ectp3}W")
+                            return {
+                                "l1_w": int(ectp1) if ectp1 is not None else 0,
+                                "l2_w": int(ectp2) if ectp2 is not None else 0,
+                                "l3_w": int(ectp3) if ectp3 is not None else 0,
+                                "source": "Harvi CT"
+                            }
             
             return None
         except Exception as e:

@@ -1,1 +1,58 @@
-[]
+[
+  {
+    "timestamp": "2025-10-10T21:12:06.826991",
+    "l1_w": -3,
+    "l2_w": -6,
+    "l3_w": 9,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:17:10.021582",
+    "l1_w": 3,
+    "l2_w": -12,
+    "l3_w": -9,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:22:15.582211",
+    "l1_w": 6,
+    "l2_w": 3,
+    "l3_w": -3,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:27:31.396818",
+    "l1_w": 2,
+    "l2_w": -9,
+    "l3_w": 6,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:32:41.041874",
+    "l1_w": 5,
+    "l2_w": 3,
+    "l3_w": -3,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:37:41.280374",
+    "l1_w": 2,
+    "l2_w": 3,
+    "l3_w": -6,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:42:50.705890",
+    "l1_w": 0,
+    "l2_w": -12,
+    "l3_w": -9,
+    "violations": [],
+    "is_violation": false
+  }
+]

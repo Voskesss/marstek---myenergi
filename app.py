@@ -69,6 +69,7 @@ from pymodbus.client import ModbusTcpClient
 from venus_e_register_map import format_value, get_all_sensors
 from battery_manager import BatteryManager
 from phase_monitor import PhaseMonitor
+from p1_reader import P1Reader
 from dotenv import load_dotenv
 
 # BLE integration
@@ -1280,8 +1281,12 @@ async def ble_set_meter_ip_page2():
 myenergi = MyEnergiClient(MYENERGI_BASE_URL, MYENERGI_HUB_SERIAL, MYENERGI_API_KEY)
 marstek  = MarstekClient(MARSTEK_BASE_URL, MARSTEK_API_TOKEN)
 
+# P1 meter (HomeWizard compatible) - Optional
+P1_METER_IP = os.getenv("P1_METER_IP", "192.168.68.73")
+p1_reader = P1Reader(P1_METER_IP) if P1_METER_IP else None
+
 # Phase monitor voor 3x25A check
-phase_monitor = PhaseMonitor(myenergi, myenergi_lock)
+phase_monitor = PhaseMonitor(myenergi, myenergi_lock, p1_reader)
 
 @app.get("/health")
 async def health():
@@ -3453,6 +3458,30 @@ async def myenergi_summary():
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/api/p1/test")
+async def test_p1_connection():
+    """Test P1 meter connection"""
+    if not p1_reader:
+        return {"success": False, "error": "P1_METER_IP not configured"}
+    
+    try:
+        data = await p1_reader.read_data()
+        if data:
+            return {
+                "success": True,
+                "ip": P1_METER_IP,
+                "data": data,
+                "has_phase_data": "active_power_l1_w" in data
+            }
+        else:
+            return {
+                "success": False,
+                "ip": P1_METER_IP,
+                "error": "No data received - Is Local API enabled?"
+            }
+    except Exception as e:
+        return {"success": False, "ip": P1_METER_IP, "error": str(e)}
 
 @app.get("/api/myenergi/phases")
 async def get_phase_data():
