@@ -25,8 +25,10 @@ logger = logging.getLogger("phase-monitor")
 # Configuratie
 PHASE_LIMIT_W = 5100  # Veilige limiet per fase (25A × 230V × 0.88)
 LOG_FILE = Path(__file__).parent / "phase_monitor.json"
+VIOLATIONS_LOG_FILE = Path(__file__).parent / "phase_violations.json"  # Permanent log
 MONITOR_INTERVAL_S = 5  # Check elke 5 seconden
 MAX_LOG_ENTRIES = 10000  # Bewaar max 10k entries (ca. 2 dagen)
+MAX_VIOLATIONS = 1000  # Bewaar max 1000 violations (permanent)
 
 
 class PhaseMonitor:
@@ -50,8 +52,9 @@ class PhaseMonitor:
             "started_at": None
         }
         
-        # Load existing log
+        # Load existing logs
         self.log = self._load_log()
+        self.violations_log = self._load_violations_log()
     
     def _load_log(self) -> List[Dict]:
         """Laad bestaande log entries"""
@@ -61,6 +64,16 @@ class PhaseMonitor:
                     return json.load(f)
         except Exception as e:
             logger.warning(f"Could not load phase log: {e}")
+        return []
+    
+    def _load_violations_log(self) -> List[Dict]:
+        """Laad permanent violations log"""
+        try:
+            if VIOLATIONS_LOG_FILE.exists():
+                with open(VIOLATIONS_LOG_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load violations log: {e}")
         return []
     
     def _save_log(self):
@@ -74,6 +87,41 @@ class PhaseMonitor:
                 json.dump(self.log, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save phase log: {e}")
+    
+    def _save_violation(self, entry: Dict):
+        """Sla violation op in permanent log (NOOIT verwijderd)"""
+        try:
+            self.violations_log.append(entry)
+            
+            # Trim alleen als echt nodig (keep laatste 1000)
+            if len(self.violations_log) > MAX_VIOLATIONS:
+                self.violations_log = self.violations_log[-MAX_VIOLATIONS:]
+            
+            with open(VIOLATIONS_LOG_FILE, 'w') as f:
+                json.dump(self.violations_log, f, indent=2)
+            
+            logger.info(f"💾 Violation opgeslagen in permanent log")
+        except Exception as e:
+            logger.error(f"Failed to save violation: {e}")
+    
+    async def _get_zappi_power(self) -> int:
+        """Haal Zappi vermogen op (voor load balancing check)"""
+        try:
+            async with self.myenergi_lock:
+                data = await self.myenergi.status_all()
+            
+            raw = data.get("raw", [])
+            for section in raw if isinstance(raw, list) else []:
+                if isinstance(section, dict) and "zappi" in section:
+                    zappi_list = section.get("zappi") or []
+                    for zappi in zappi_list:
+                        # ectp1 = Zappi charging power
+                        ectp1 = zappi.get("ectp1", 0)
+                        if ectp1:
+                            return abs(int(ectp1))
+            return 0
+        except Exception:
+            return 0
     
     async def _read_phases(self) -> Optional[Dict]:
         """Lees fase data van P1 meter / Zappi / Harvi (in volgorde van voorkeur)"""
@@ -165,28 +213,7 @@ class PhaseMonitor:
         
         return violations
     
-    def _update_stats(self, phases: Dict, violations: List[str]):
-        """Update statistieken"""
-        self.stats["total_checks"] += 1
-        
-        l1 = phases.get("l1_w", 0)
-        l2 = phases.get("l2_w", 0)
-        l3 = phases.get("l3_w", 0)
-        
-        # Track maximums
-        if abs(l1) > abs(self.stats["max_l1"]):
-            self.stats["max_l1"] = l1
-        if abs(l2) > abs(self.stats["max_l2"]):
-            self.stats["max_l2"] = l2
-        if abs(l3) > abs(self.stats["max_l3"]):
-            self.stats["max_l3"] = l3
-        
-        # Track violations
-        if violations:
-            self.stats["violations_count"] += 1
-            self.stats["last_violation"] = datetime.now().isoformat()
-    
-    def _log_entry(self, phases: Dict, violations: List[str]):
+    def _log_entry(self, phases: Dict, violations: List[str], zappi_power_w: int = 0):
         """Log entry (alleen als er overschrijding is OF elke 5 minuten)"""
         now = datetime.now()
         
@@ -202,19 +229,31 @@ class PhaseMonitor:
             should_log = True  # First entry
         
         if should_log:
+            # Check if Zappi is charging (load balancing active)
+            zappi_charging = zappi_power_w > 500  # > 500W = aan het laden
+            
             entry = {
                 "timestamp": now.isoformat(),
                 "l1_w": phases.get("l1_w"),
                 "l2_w": phases.get("l2_w"),
                 "l3_w": phases.get("l3_w"),
+                "zappi_w": zappi_power_w,
+                "zappi_charging": zappi_charging,
                 "violations": violations,
-                "is_violation": len(violations) > 0
+                "is_violation": len(violations) > 0,
+                "is_real_violation": len(violations) > 0 and not zappi_charging  # ECHT probleem
             }
             self.log.append(entry)
             self._save_log()
             
             if violations:
-                logger.warning(f"⚠️ FASE OVERSCHRIJDING: {', '.join(violations)}")
+                # Sla ook op in PERMANENT violations log
+                self._save_violation(entry)
+                
+                if zappi_charging:
+                    logger.info(f"ℹ️ Fase overschrijding MET Zappi laden ({zappi_power_w}W) - Load balancing actief: {', '.join(violations)}")
+                else:
+                    logger.warning(f"⚠️ ECHTE FASE OVERSCHRIJDING (zonder Zappi): {', '.join(violations)}")
     
     async def _monitor_loop(self):
         """Main monitoring loop"""
@@ -225,16 +264,15 @@ class PhaseMonitor:
             try:
                 # Read phase data
                 phases = await self._read_phases()
-                
                 if phases and any(v is not None for v in phases.values()):
+                    # Get Zappi power (for load balancing context)
+                    zappi_power = await self._get_zappi_power()
+                    
                     # Check for violations
                     violations = self._check_violations(phases)
                     
-                    # Update statistics
-                    self._update_stats(phases, violations)
-                    
-                    # Log if needed
-                    self._log_entry(phases, violations)
+                    # Log if needed (stats are calculated from log)
+                    self._log_entry(phases, violations, zappi_power)
                 
                 # Wait before next check
                 await asyncio.sleep(MONITOR_INTERVAL_S)
@@ -270,22 +308,41 @@ class PhaseMonitor:
         logger.info("🛑 Phase monitor stopped")
     
     def get_stats(self) -> Dict:
-        """Haal huidige statistieken op"""
+        """Haal huidige statistieken op (persistent via log)"""
+        # Count violations from PERMANENT violations log
+        violations_count = len(self.violations_log)
+        
+        # Get max values from log (persistent)
+        max_l1 = max((abs(entry.get("l1_w", 0)) for entry in self.log), default=0)
+        max_l2 = max((abs(entry.get("l2_w", 0)) for entry in self.log), default=0)
+        max_l3 = max((abs(entry.get("l3_w", 0)) for entry in self.log), default=0)
+        
+        # Find last violation timestamp from permanent log
+        last_violation = None
+        if self.violations_log:
+            last_violation = self.violations_log[-1].get("timestamp")
+        
         return {
-            **self.stats,
+            "total_checks": len(self.log),  # From log
+            "violations_count": violations_count,  # From PERMANENT violations log
+            "last_violation": last_violation,  # From PERMANENT violations log
+            "max_l1": max_l1,  # From log
+            "max_l2": max_l2,  # From log
+            "max_l3": max_l3,  # From log
+            "started_at": self.stats["started_at"],  # Current session
             "limit_per_phase_w": PHASE_LIMIT_W,
             "log_entries": len(self.log),
             "running": self.running
         }
     
     def get_violations(self, hours: int = 24) -> List[Dict]:
-        """Haal overschrijdingen op van laatste X uur"""
+        """Haal overschrijdingen op van laatste X uur uit PERMANENT log"""
         cutoff = datetime.now() - timedelta(hours=hours)
         
+        # Gebruik violations_log (permanent) ipv normale log
         violations = [
-            entry for entry in self.log
-            if entry.get("is_violation") and 
-            datetime.fromisoformat(entry["timestamp"]) > cutoff
+            entry for entry in self.violations_log
+            if datetime.fromisoformat(entry["timestamp"]) > cutoff
         ]
         
         return violations
@@ -295,9 +352,13 @@ class PhaseMonitor:
         return self.log[-count:] if len(self.log) > count else self.log
     
     def analyze_feasibility(self) -> Dict:
-        """Analyseer of 3x25A haalbaar is"""
-        total = len([e for e in self.log if not e.get("is_violation")])
-        violations = len([e for e in self.log if e.get("is_violation")])
+        """Analyseer of 3x25A haalbaar is (ZONDER Zappi load balancing violations)"""
+        total = len(self.log)
+        
+        # BELANGRIJK: Alleen "echte" violations tellen (zonder Zappi laden)
+        real_violations = len([e for e in self.log if e.get("is_real_violation", False)])
+        zappi_violations = len([e for e in self.log if e.get("is_violation", False) and e.get("zappi_charging", False)])
+        total_violations = len([e for e in self.log if e.get("is_violation", False)])
         
         if total == 0:
             return {
@@ -306,26 +367,29 @@ class PhaseMonitor:
                 "confidence": 0
             }
         
-        violation_rate = violations / (total + violations) * 100
+        # Bereken violation rate ALLEEN voor echte violations (zonder Zappi)
+        real_violation_rate = (real_violations / total) * 100
         
-        # Calculate per-phase statistics
-        l1_violations = sum(1 for e in self.log if e.get("is_violation") and any("L1" in v for v in e.get("violations", [])))
-        l2_violations = sum(1 for e in self.log if e.get("is_violation") and any("L2" in v for v in e.get("violations", [])))
-        l3_violations = sum(1 for e in self.log if e.get("is_violation") and any("L3" in v for v in e.get("violations", [])))
+        # Calculate per-phase statistics (alleen echte violations)
+        l1_violations = sum(1 for e in self.log if e.get("is_real_violation") and any("L1" in v for v in e.get("violations", [])))
+        l2_violations = sum(1 for e in self.log if e.get("is_real_violation") and any("L2" in v for v in e.get("violations", [])))
+        l3_violations = sum(1 for e in self.log if e.get("is_real_violation") and any("L3" in v for v in e.get("violations", [])))
         
-        feasible = violation_rate < 1.0  # < 1% overschrijdingen = OK
+        feasible = real_violation_rate < 1.0  # < 1% echte overschrijdingen = OK
         confidence = min(100, (total / 17280) * 100)  # 17280 = 1 dag data @ 5s interval
         
         return {
             "feasible": feasible,
-            "violation_rate_percent": round(violation_rate, 2),
-            "total_measurements": total + violations,
-            "total_violations": violations,
+            "violation_rate_percent": round(real_violation_rate, 2),
+            "total_measurements": total,
+            "total_violations": total_violations,
+            "real_violations": real_violations,
+            "zappi_violations": zappi_violations,
             "l1_violations": l1_violations,
             "l2_violations": l2_violations,
             "l3_violations": l3_violations,
             "confidence_percent": round(confidence, 1),
-            "recommendation": "✅ 3x25A is haalbaar" if feasible else "❌ 3x25A NIET veilig - blijf bij 3x40A",
+            "recommendation": f"✅ 3x25A is haalbaar ({zappi_violations} violations waren tijdens Zappi laden)" if feasible else f"❌ 3x25A NIET veilig ({real_violations} echte violations)",
             "max_recorded": {
                 "l1_w": self.stats["max_l1"],
                 "l2_w": self.stats["max_l2"],

@@ -294,6 +294,16 @@
                         <strong>Tip:</strong> Verdeel grote verbruikers beter over Fase A en B. Overweeg wasmachine/droger naar andere fase.
                     </p>
                 </div>
+
+                <!-- Zappi Load Balancing Info -->
+                <div style="margin-top: 15px; padding: 15px; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px;">
+                    <strong style="color: #1e40af;">ℹ️ Zappi Load Balancing</strong>
+                    <p style="margin: 8px 0 0 0; color: #1e3a8a; font-size: 13px;">
+                        <strong>Zappi violations (oranje) tellen NIET mee</strong> voor 3x25A analyse.<br>
+                        Reden: Zappi heeft eigen load balancing en blijft onder de limiet tijdens laden.<br>
+                        <strong>Alleen "Echte Violations" (rood) zijn belangrijk</strong> voor de downgrade beslissing.
+                    </p>
+                </div>
             </div>
 
             <!-- Statistieken -->
@@ -306,7 +316,15 @@
                     </div>
                     <div class="stat">
                         <div class="stat-value" style="color: #ef4444;" id="violations-count">0</div>
-                        <div class="stat-label">Overschrijdingen</div>
+                        <div class="stat-label">Totaal Violations</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" style="color: #ef4444;" id="real-violations">0</div>
+                        <div class="stat-label">Echte Violations ⚠️</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" style="color: #f59e0b;" id="zappi-violations">0</div>
+                        <div class="stat-label">Zappi Violations ℹ️</div>
                     </div>
                     <div class="stat">
                         <div class="stat-value" id="max-l2">0 W</div>
@@ -471,6 +489,10 @@
                     document.getElementById('violation-rate').textContent = `${vRate.toFixed(2)}%`;
                     document.getElementById('total-measurements').textContent = data.total_measurements || 0;
                     document.getElementById('confidence').textContent = `${data.confidence_percent || 0}%`;
+                    
+                    // Update violation counts
+                    document.getElementById('real-violations').textContent = data.real_violations || 0;
+                    document.getElementById('zappi-violations').textContent = data.zappi_violations || 0;
                     
                     const recEl = document.getElementById('recommendation');
                     if (data.feasible === true) {
