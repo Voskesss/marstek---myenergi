@@ -213,34 +213,60 @@
                 
                 <div class="phase-bar">
                     <div class="phase-label">
-                        <span class="phase-name">Fase A</span>
+                        <span class="phase-name">Fase A <button onclick="toggleDevices('a')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:14px;">▼</button></span>
                         <span class="phase-value safe" id="l2-value">- W</span>
                     </div>
                     <div class="bar-container">
                         <div class="bar-fill safe" id="l2-bar" style="width: 0%"></div>
                         <div class="bar-limit" style="left: 68%"></div>
                     </div>
+                    <div id="devices-a" style="display:none; margin-top:10px; padding:10px; background:#f9fafb; border-radius:6px; font-size:13px;">
+                        <strong>Apparaten op Fase A:</strong>
+                        <ul style="margin:5px 0; padding-left:20px;">
+                            <li>Airco kantoor</li>
+                            <li>2 Aircos (ander stuk huis)</li>
+                            <li>Waterkoker keuken</li>
+                        </ul>
+                    </div>
                 </div>
 
                 <div class="phase-bar">
                     <div class="phase-label">
-                        <span class="phase-name">Fase B</span>
+                        <span class="phase-name">Fase B <button onclick="toggleDevices('b')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:14px;">▼</button></span>
                         <span class="phase-value safe" id="l1-value">- W</span>
                     </div>
                     <div class="bar-container">
                         <div class="bar-fill safe" id="l1-bar" style="width: 0%"></div>
                         <div class="bar-limit" style="left: 68%"></div>
                     </div>
+                    <div id="devices-b" style="display:none; margin-top:10px; padding:10px; background:#f9fafb; border-radius:6px; font-size:13px;">
+                        <strong>Apparaten op Fase B:</strong>
+                        <ul style="margin:5px 0; padding-left:20px;">
+                            <li>Verhuur boven (vermoedelijk)</li>
+                            <li style="color:#999;">Nog te bepalen...</li>
+                        </ul>
+                    </div>
                 </div>
 
                 <div class="phase-bar">
                     <div class="phase-label">
-                        <span class="phase-name">Fase C</span>
+                        <span class="phase-name">Fase C <button onclick="toggleDevices('c')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:14px;">▼</button></span>
                         <span class="phase-value safe" id="l3-value">- W</span>
                     </div>
                     <div class="bar-container">
                         <div class="bar-fill safe" id="l3-bar" style="width: 0%"></div>
                         <div class="bar-limit" style="left: 68%"></div>
+                    </div>
+                    <div id="devices-c" style="display:none; margin-top:10px; padding:10px; background:#f9fafb; border-radius:6px; font-size:13px;">
+                        <strong>Apparaten op Fase C:</strong>
+                        <ul style="margin:5px 0; padding-left:20px;">
+                            <li><strong>2× Zonneboilers</strong> (1.7kWh, alleen PV laden)</li>
+                            <li>Droger</li>
+                            <li>Wasmachine</li>
+                            <li>Airco woonkamer</li>
+                            <li>Boiler keuken beneden</li>
+                            <li>Elektrische vloerverwarming badkamer</li>
+                        </ul>
                     </div>
                 </div>
 
@@ -258,6 +284,15 @@
                     <div style="text-align: center; color: #666;">
                         <small>Bron: <span id="data-source" style="font-weight: 600;">-</span> | Update: <span id="last-update">-</span></small>
                     </div>
+                </div>
+
+                <!-- Balancering Advies -->
+                <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+                    <strong style="color: #92400e;">⚡ Fase Balancering Advies</strong>
+                    <p style="margin: 8px 0 0 0; color: #78350f; font-size: 13px;">
+                        <strong>Fase C is zwaar belast</strong> (zonneboilers 1.7kW + droger + wasmachine + airco + boiler + vloerverwarming).<br>
+                        <strong>Tip:</strong> Verdeel grote verbruikers beter over Fase A en B. Overweeg wasmachine/droger naar andere fase.
+                    </p>
                 </div>
             </div>
 
@@ -474,6 +509,16 @@
                 }
             } catch (e) {
                 console.error('Error fetching violations:', e);
+            }
+        }
+
+        // Toggle device list for a phase
+        function toggleDevices(phase) {
+            const el = document.getElementById(`devices-${phase}`);
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+            } else {
+                el.style.display = 'none';
             }
         }
 
