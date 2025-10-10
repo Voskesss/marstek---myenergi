@@ -104,18 +104,24 @@ class PhaseMonitor:
                 if isinstance(section, dict) and "zappi" in section:
                     zappi_list = section.get("zappi") or []
                     for zappi in zappi_list:
-                        ectp4 = zappi.get("ectp4")  # Grid L1
-                        ectp5 = zappi.get("ectp5")  # Grid L2
-                        ectp6 = zappi.get("ectp6")  # Grid L3
+                        # MAPPING: ectp4=Fase A, ectp5=Fase B, ectp6=Fase C
+                        # But dashboard expects: L1, L2, L3
+                        # Correct mapping: ectp4→L2, ectp5→L1, ectp6→L3
+                        ectp4 = zappi.get("ectp4")  # Fase A → L2
+                        ectp5 = zappi.get("ectp5")  # Fase B → L1
+                        ectp6 = zappi.get("ectp6")  # Fase C → L3
                         
                         # If Zappi has grid CT data, use it!
                         if ectp4 is not None or ectp5 is not None or ectp6 is not None:
-                            logger.debug(f"Using Zappi Grid CT: L1={ectp4}W L2={ectp5}W L3={ectp6}W")
+                            l1 = int(ectp5) if ectp5 is not None else 0  # Fase B
+                            l2 = int(ectp4) if ectp4 is not None else 0  # Fase A
+                            l3 = int(ectp6) if ectp6 is not None else 0  # Fase C
+                            logger.debug(f"Using Zappi Grid CT: L1(FaseB)={l1}W L2(FaseA)={l2}W L3(FaseC)={l3}W")
                             return {
-                                "l1_w": int(ectp4) if ectp4 is not None else 0,
-                                "l2_w": int(ectp5) if ectp5 is not None else 0,
-                                "l3_w": int(ectp6) if ectp6 is not None else 0,
-                                "source": "Zappi Grid CT (ectp4/5/6)"
+                                "l1_w": l1,
+                                "l2_w": l2,
+                                "l3_w": l3,
+                                "source": "Zappi Grid CT (remapped)"
                             }
             
             # Priority 3: Harvi CT clamps (fallback)

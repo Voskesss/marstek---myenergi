@@ -3485,7 +3485,7 @@ async def test_p1_connection():
 
 @app.get("/api/myenergi/phases")
 async def get_phase_data():
-    """Get 3-phase power data from Harvi CT clamps.
+    """Get 3-phase power data from Zappi Grid CT or Harvi CT clamps.
     Returns power per phase (L1, L2, L3) and total.
     """
     try:
@@ -3501,33 +3501,51 @@ async def get_phase_data():
             "source": None
         }
         
-        # Find Harvi with CT clamps
+        # Priority 1: Check Zappi for grid CT clamps (ectp4/5/6)
         for section in raw if isinstance(raw, list) else []:
-            if isinstance(section, dict) and "harvi" in section:
-                harvi_list = section.get("harvi") or []
-                for harvi in harvi_list:
-                    # Check which CT types are configured (Generation/Grid/etc)
-                    ct1_type = harvi.get("ectt1")  # CT type for clamp 1
-                    ct2_type = harvi.get("ectt2")
-                    ct3_type = harvi.get("ectt3")
+            if isinstance(section, dict) and "zappi" in section:
+                zappi_list = section.get("zappi") or []
+                for zappi in zappi_list:
+                    ectp4 = zappi.get("ectp4")  # Fase A
+                    ectp5 = zappi.get("ectp5")  # Fase B
+                    ectp6 = zappi.get("ectp6")  # Fase C
                     
-                    # Read power values (positive or negative depending on direction)
-                    ectp1 = harvi.get("ectp1")  # Phase L1
-                    ectp2 = harvi.get("ectp2")  # Phase L2  
-                    ectp3 = harvi.get("ectp3")  # Phase L3
-                    
-                    if ectp1 is not None:
-                        phases["l1_w"] = int(ectp1)
-                        phases["l1_type"] = ct1_type
-                    if ectp2 is not None:
-                        phases["l2_w"] = int(ectp2)
-                        phases["l2_type"] = ct2_type
-                    if ectp3 is not None:
-                        phases["l3_w"] = int(ectp3)
-                        phases["l3_type"] = ct3_type
-                    
-                    phases["source"] = f"Harvi SN: {harvi.get('sno', 'unknown')}"
-                    break
+                    if ectp4 is not None or ectp5 is not None or ectp6 is not None:
+                        # REMAP: ectp4(Fase A)→L2, ectp5(Fase B)→L1, ectp6(Fase C)→L3
+                        phases["l1_w"] = int(ectp5) if ectp5 is not None else 0  # Fase B
+                        phases["l2_w"] = int(ectp4) if ectp4 is not None else 0  # Fase A
+                        phases["l3_w"] = int(ectp6) if ectp6 is not None else 0  # Fase C
+                        phases["source"] = f"Zappi Grid CT (remapped A→L2, B→L1, C→L3)"
+                        break
+        
+        # Priority 2: Find Harvi with CT clamps (fallback)
+        if phases["source"] is None:
+            for section in raw if isinstance(raw, list) else []:
+                if isinstance(section, dict) and "harvi" in section:
+                    harvi_list = section.get("harvi") or []
+                    for harvi in harvi_list:
+                        # Check which CT types are configured (Generation/Grid/etc)
+                        ct1_type = harvi.get("ectt1")  # CT type for clamp 1
+                        ct2_type = harvi.get("ectt2")
+                        ct3_type = harvi.get("ectt3")
+                        
+                        # Read power values (positive or negative depending on direction)
+                        ectp1 = harvi.get("ectp1")  # Phase L1
+                        ectp2 = harvi.get("ectp2")  # Phase L2  
+                        ectp3 = harvi.get("ectp3")  # Phase L3
+                        
+                        if ectp1 is not None:
+                            phases["l1_w"] = int(ectp1)
+                            phases["l1_type"] = ct1_type
+                        if ectp2 is not None:
+                            phases["l2_w"] = int(ectp2)
+                            phases["l2_type"] = ct2_type
+                        if ectp3 is not None:
+                            phases["l3_w"] = int(ectp3)
+                            phases["l3_type"] = ct3_type
+                        
+                        phases["source"] = f"Harvi SN: {harvi.get('sno', 'unknown')}"
+                        break
         
         # Calculate total (sum of all phases that have data)
         total = 0
