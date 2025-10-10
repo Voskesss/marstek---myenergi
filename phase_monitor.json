@@ -54,5 +54,21 @@
     "l3_w": -9,
     "violations": [],
     "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:48:24.648979",
+    "l1_w": 442,
+    "l2_w": 2525,
+    "l3_w": 749,
+    "violations": [],
+    "is_violation": false
+  },
+  {
+    "timestamp": "2025-10-10T21:53:29.540054",
+    "l1_w": 452,
+    "l2_w": 2670,
+    "l3_w": 768,
+    "violations": [],
+    "is_violation": false
   }
 ]
