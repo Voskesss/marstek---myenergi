@@ -3439,6 +3439,73 @@ async def myenergi_summary():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/api/myenergi/phases")
+async def get_phase_data():
+    """Get 3-phase power data from Harvi CT clamps.
+    Returns power per phase (L1, L2, L3) and total.
+    """
+    try:
+        async with myenergi_lock:
+            data = await myenergi.status_all()
+        
+        raw = data.get("raw", [])
+        phases = {
+            "l1_w": None,
+            "l2_w": None, 
+            "l3_w": None,
+            "total_w": 0,
+            "source": None
+        }
+        
+        # Find Harvi with CT clamps
+        for section in raw if isinstance(raw, list) else []:
+            if isinstance(section, dict) and "harvi" in section:
+                harvi_list = section.get("harvi") or []
+                for harvi in harvi_list:
+                    # Check which CT types are configured (Generation/Grid/etc)
+                    ct1_type = harvi.get("ectt1")  # CT type for clamp 1
+                    ct2_type = harvi.get("ectt2")
+                    ct3_type = harvi.get("ectt3")
+                    
+                    # Read power values (positive or negative depending on direction)
+                    ectp1 = harvi.get("ectp1")  # Phase L1
+                    ectp2 = harvi.get("ectp2")  # Phase L2  
+                    ectp3 = harvi.get("ectp3")  # Phase L3
+                    
+                    if ectp1 is not None:
+                        phases["l1_w"] = int(ectp1)
+                        phases["l1_type"] = ct1_type
+                    if ectp2 is not None:
+                        phases["l2_w"] = int(ectp2)
+                        phases["l2_type"] = ct2_type
+                    if ectp3 is not None:
+                        phases["l3_w"] = int(ectp3)
+                        phases["l3_type"] = ct3_type
+                    
+                    phases["source"] = f"Harvi SN: {harvi.get('sno', 'unknown')}"
+                    break
+        
+        # Calculate total (sum of all phases that have data)
+        total = 0
+        for phase in [phases.get("l1_w"), phases.get("l2_w"), phases.get("l3_w")]:
+            if phase is not None:
+                total += phase
+        phases["total_w"] = total
+        
+        # Calculate balance (how evenly distributed)
+        active_phases = [p for p in [phases.get("l1_w"), phases.get("l2_w"), phases.get("l3_w")] if p is not None]
+        if len(active_phases) > 1:
+            avg = sum(active_phases) / len(active_phases)
+            max_diff = max(abs(p - avg) for p in active_phases)
+            phases["balance_percent"] = round(100 - (max_diff / (abs(avg) + 1) * 100), 1) if avg != 0 else 100
+        else:
+            phases["balance_percent"] = None
+        
+        return {"success": True, "phases": phases}
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/battery/read_many")
 async def modbus_read_many(addrs: str, fn: str = Query("holding"), unit: int = Query(1), delay_ms: int = Query(0)):
     """Read many Modbus registers for diagnostics.
