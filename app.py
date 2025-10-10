@@ -68,6 +68,7 @@ from fastapi.templating import Jinja2Templates
 from pymodbus.client import ModbusTcpClient
 from venus_e_register_map import format_value, get_all_sensors
 from battery_manager import BatteryManager
+from phase_monitor import PhaseMonitor
 from dotenv import load_dotenv
 
 # BLE integration
@@ -1279,6 +1280,9 @@ async def ble_set_meter_ip_page2():
 myenergi = MyEnergiClient(MYENERGI_BASE_URL, MYENERGI_HUB_SERIAL, MYENERGI_API_KEY)
 marstek  = MarstekClient(MARSTEK_BASE_URL, MARSTEK_API_TOKEN)
 
+# Phase monitor voor 3x25A check
+phase_monitor = PhaseMonitor(myenergi, myenergi_lock)
+
 @app.get("/health")
 async def health():
     return {"ok": True}
@@ -1376,6 +1380,13 @@ async def get_status():
             "Expires": "0",
         }
         return JSONResponse(content={"error": str(e), "timestamp": time.time()}, headers=cache_headers)
+
+@app.get("/phase")
+async def phase_dashboard():
+    """3-Fase monitor dashboard voor 3x25A check"""
+    with open("phase_dashboard.html", "r") as f:
+        html = f.read()
+    return HTMLResponse(html)
 
 @app.get("/dashboard")
 async def live_dashboard():
@@ -2561,6 +2572,10 @@ async def _startup_simple_rule():
         whatsapp_tips_task = asyncio.create_task(_whatsapp_tips_scheduler())
         logger.info("📱 WhatsApp tips scheduler started")
         
+        # Start Phase Monitor (3x25A check)
+        await phase_monitor.start()
+        logger.info("🔌 Phase Monitor started")
+        
         # If already running, do nothing
         if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
             return
@@ -3503,6 +3518,76 @@ async def get_phase_data():
         
         return {"success": True, "phases": phases}
         
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# =========================
+# Phase Monitor Endpoints (3x25A Check)
+# =========================
+
+@app.post("/api/phase_monitor/start")
+async def start_phase_monitor():
+    """Start de fase monitor"""
+    try:
+        await phase_monitor.start()
+        return {"success": True, "message": "Phase monitor gestart"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/stop")
+async def stop_phase_monitor():
+    """Stop de fase monitor"""
+    try:
+        await phase_monitor.stop()
+        return {"success": True, "message": "Phase monitor gestopt"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/status")
+async def get_phase_monitor_status():
+    """Haal huidige status en statistieken op"""
+    try:
+        stats = phase_monitor.get_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/violations")
+async def get_phase_violations(hours: int = Query(24)):
+    """Haal overschrijdingen op van laatste X uur"""
+    try:
+        violations = phase_monitor.get_violations(hours)
+        return {
+            "success": True,
+            "hours": hours,
+            "count": len(violations),
+            "violations": violations
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/data")
+async def get_phase_data_history(count: int = Query(100)):
+    """Haal recente fase data op"""
+    try:
+        data = phase_monitor.get_recent_data(count)
+        return {
+            "success": True,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/analysis")
+async def get_feasibility_analysis():
+    """Analyseer of 3x25A haalbaar is"""
+    try:
+        analysis = phase_monitor.analyze_feasibility()
+        return {
+            "success": True,
+            **analysis
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
