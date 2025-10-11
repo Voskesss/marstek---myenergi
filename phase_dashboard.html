@@ -329,14 +329,17 @@
                     <div class="stat">
                         <div class="stat-value" id="max-l2">0 W</div>
                         <div class="stat-label">Max Fase A</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;" id="max-l2-time">-</div>
                     </div>
                     <div class="stat">
                         <div class="stat-value" id="max-l1">0 W</div>
                         <div class="stat-label">Max Fase B</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;" id="max-l1-time">-</div>
                     </div>
                     <div class="stat">
                         <div class="stat-value" id="max-l3">0 W</div>
                         <div class="stat-label">Max Fase C</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;" id="max-l3-time">-</div>
                     </div>
                     <div class="stat">
                         <div class="stat-value" id="confidence">0%</div>
@@ -453,6 +456,17 @@
             barEl.className = `bar-fill ${colorClass}`;
         }
 
+        function formatTimestamp(isoString) {
+            // Format: "11 okt 10:47"
+            const date = new Date(isoString);
+            const day = date.getDate();
+            const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+            const month = months[date.getMonth()];
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${day} ${month} ${hours}:${minutes}`;
+        }
+
         async function updateStats() {
             try {
                 const res = await fetch('/api/phase_monitor/status');
@@ -464,6 +478,11 @@
                     document.getElementById('max-l1').textContent = `${Math.abs(data.max_l1 || 0)} W`;
                     document.getElementById('max-l2').textContent = `${Math.abs(data.max_l2 || 0)} W`;
                     document.getElementById('max-l3').textContent = `${Math.abs(data.max_l3 || 0)} W`;
+                    
+                    // Show timestamps for peak values
+                    document.getElementById('max-l1-time').textContent = data.max_l1_timestamp ? formatTimestamp(data.max_l1_timestamp) : '-';
+                    document.getElementById('max-l2-time').textContent = data.max_l2_timestamp ? formatTimestamp(data.max_l2_timestamp) : '-';
+                    document.getElementById('max-l3-time').textContent = data.max_l3_timestamp ? formatTimestamp(data.max_l3_timestamp) : '-';
                     
                     const badge = document.getElementById('status-badge');
                     if (data.running) {

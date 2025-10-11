@@ -26,6 +26,7 @@ logger = logging.getLogger("phase-monitor")
 PHASE_LIMIT_W = 5100  # Veilige limiet per fase (25A × 230V × 0.88)
 LOG_FILE = Path(__file__).parent / "phase_monitor.json"
 VIOLATIONS_LOG_FILE = Path(__file__).parent / "phase_violations.json"  # Permanent log
+PEAK_VALUES_FILE = Path(__file__).parent / "phase_peaks.json"  # Permanent peak tracking
 MONITOR_INTERVAL_S = 5  # Check elke 5 seconden
 MAX_LOG_ENTRIES = 10000  # Bewaar max 10k entries (ca. 2 dagen)
 MAX_VIOLATIONS = 1000  # Bewaar max 1000 violations (permanent)
@@ -55,6 +56,7 @@ class PhaseMonitor:
         # Load existing logs
         self.log = self._load_log()
         self.violations_log = self._load_violations_log()
+        self.peak_values = self._load_peak_values()
     
     def _load_log(self) -> List[Dict]:
         """Laad bestaande log entries"""
@@ -75,6 +77,34 @@ class PhaseMonitor:
         except Exception as e:
             logger.warning(f"Could not load violations log: {e}")
         return []
+    
+    def _load_peak_values(self) -> Dict:
+        """Laad permanent peak values (NOOIT gereset)"""
+        try:
+            if PEAK_VALUES_FILE.exists():
+                with open(PEAK_VALUES_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load peak values: {e}")
+        
+        # Default structure
+        return {
+            "max_l1": 0,
+            "max_l1_timestamp": None,
+            "max_l2": 0,
+            "max_l2_timestamp": None,
+            "max_l3": 0,
+            "max_l3_timestamp": None,
+            "last_updated": None
+        }
+    
+    def _save_peak_values(self):
+        """Sla peak values op (NOOIT verwijderd)"""
+        try:
+            with open(PEAK_VALUES_FILE, 'w') as f:
+                json.dump(self.peak_values, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save peak values: {e}")
     
     def _save_log(self):
         """Sla log op naar JSON file"""
@@ -217,6 +247,22 @@ class PhaseMonitor:
         """Log entry (alleen als er overschrijding is OF elke 5 minuten)"""
         now = datetime.now()
         
+        # Check if Zappi is charging (load balancing active)
+        zappi_charging = zappi_power_w > 500  # > 500W = aan het laden
+        
+        # Update peak values ALLEEN als:
+        # - GEEN violations, OF
+        # - Violations maar Zappi NIET aan het laden (echte violation)
+        # Reden: Zappi violations zijn niet representatief voor huis belasting
+        is_zappi_violation = len(violations) > 0 and zappi_charging
+        
+        if not is_zappi_violation:
+            # Dit is een echte meting zonder Zappi storing
+            self._update_peak_values(phases, now)
+        else:
+            # Violation maar door Zappi → skip peak update
+            logger.debug(f"⏭️ Skip peak update (Zappi violation): L1={phases.get('l1_w')}W L2={phases.get('l2_w')}W L3={phases.get('l3_w')}W")
+        
         # Always log violations
         should_log = len(violations) > 0
         
@@ -229,9 +275,6 @@ class PhaseMonitor:
             should_log = True  # First entry
         
         if should_log:
-            # Check if Zappi is charging (load balancing active)
-            zappi_charging = zappi_power_w > 500  # > 500W = aan het laden
-            
             entry = {
                 "timestamp": now.isoformat(),
                 "l1_w": phases.get("l1_w"),
@@ -254,6 +297,40 @@ class PhaseMonitor:
                     logger.info(f"ℹ️ Fase overschrijding MET Zappi laden ({zappi_power_w}W) - Load balancing actief: {', '.join(violations)}")
                 else:
                     logger.warning(f"⚠️ ECHTE FASE OVERSCHRIJDING (zonder Zappi): {', '.join(violations)}")
+    
+    def _update_peak_values(self, phases: Dict, timestamp: datetime):
+        """Update permanent peak values (alleen echte huishoudelijke pieken, GEEN Zappi violations)"""
+        updated = False
+        
+        l1 = abs(phases.get("l1_w", 0))
+        l2 = abs(phases.get("l2_w", 0))
+        l3 = abs(phases.get("l3_w", 0))
+        
+        old_l1 = self.peak_values["max_l1"]
+        old_l2 = self.peak_values["max_l2"]
+        old_l3 = self.peak_values["max_l3"]
+        
+        if l1 > old_l1:
+            self.peak_values["max_l1"] = l1
+            self.peak_values["max_l1_timestamp"] = timestamp.isoformat()
+            logger.info(f"📈 NIEUWE ECHTE PEAK Fase B: {l1}W (was {old_l1}W)")
+            updated = True
+        
+        if l2 > old_l2:
+            self.peak_values["max_l2"] = l2
+            self.peak_values["max_l2_timestamp"] = timestamp.isoformat()
+            logger.info(f"📈 NIEUWE ECHTE PEAK Fase A: {l2}W (was {old_l2}W)")
+            updated = True
+        
+        if l3 > old_l3:
+            self.peak_values["max_l3"] = l3
+            self.peak_values["max_l3_timestamp"] = timestamp.isoformat()
+            logger.info(f"📈 NIEUWE ECHTE PEAK Fase C: {l3}W (was {old_l3}W)")
+            updated = True
+        
+        if updated:
+            self.peak_values["last_updated"] = timestamp.isoformat()
+            self._save_peak_values()
     
     async def _monitor_loop(self):
         """Main monitoring loop"""
@@ -308,14 +385,9 @@ class PhaseMonitor:
         logger.info("🛑 Phase monitor stopped")
     
     def get_stats(self) -> Dict:
-        """Haal huidige statistieken op (persistent via log)"""
+        """Haal huidige statistieken op (persistent via log + peak file)"""
         # Count violations from PERMANENT violations log
         violations_count = len(self.violations_log)
-        
-        # Get max values from log (persistent)
-        max_l1 = max((abs(entry.get("l1_w", 0)) for entry in self.log), default=0)
-        max_l2 = max((abs(entry.get("l2_w", 0)) for entry in self.log), default=0)
-        max_l3 = max((abs(entry.get("l3_w", 0)) for entry in self.log), default=0)
         
         # Find last violation timestamp from permanent log
         last_violation = None
@@ -326,9 +398,12 @@ class PhaseMonitor:
             "total_checks": len(self.log),  # From log
             "violations_count": violations_count,  # From PERMANENT violations log
             "last_violation": last_violation,  # From PERMANENT violations log
-            "max_l1": max_l1,  # From log
-            "max_l2": max_l2,  # From log
-            "max_l3": max_l3,  # From log
+            "max_l1": self.peak_values["max_l1"],  # From PERMANENT peak file
+            "max_l2": self.peak_values["max_l2"],  # From PERMANENT peak file
+            "max_l3": self.peak_values["max_l3"],  # From PERMANENT peak file
+            "max_l1_timestamp": self.peak_values["max_l1_timestamp"],
+            "max_l2_timestamp": self.peak_values["max_l2_timestamp"],
+            "max_l3_timestamp": self.peak_values["max_l3_timestamp"],
             "started_at": self.stats["started_at"],  # Current session
             "limit_per_phase_w": PHASE_LIMIT_W,
             "log_entries": len(self.log),
