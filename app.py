@@ -215,6 +215,13 @@ class VenusEModbusClient:
             
             while retry_count < max_retries and result is None:
                 try:
+                    # Ensure we have a valid client connection
+                    if not self.client or not self.connected:
+                        if not self.connect():
+                            retry_count += 1
+                            time.sleep(0.1)
+                            continue
+                    
                     result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
                     
                     if hasattr(result, 'registers') and not result.isError():
