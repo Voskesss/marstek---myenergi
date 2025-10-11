@@ -148,18 +148,33 @@ class VenusEModbusClient:
     
     def connect(self):
         try:
+            # Close old connection first if exists
+            if self.client:
+                try:
+                    self.client.close()
+                except:
+                    pass
+            
             # Add a short timeout to avoid hanging sockets
-            self.client = ModbusTcpClient(self.host, port=self.port, timeout=2)
+            self.client = ModbusTcpClient(self.host, port=self.port, timeout=3, retries=2)
             self.connected = self.client.connect()
+            if not self.connected:
+                logging.warning(f"Failed to connect to Modbus {self.host}:{self.port}")
             return self.connected
         except Exception as e:
             logging.error(f"Modbus connection error: {e}")
+            self.connected = False
             return False
     
     def disconnect(self):
         if self.client:
-            self.client.close()
-            self.connected = False
+            try:
+                self.client.close()
+            except Exception as e:
+                logging.debug(f"Error closing Modbus connection: {e}")
+            finally:
+                self.connected = False
+                self.client = None
 
     def read_battery_data(self):
         """Read all battery data from Venus E via Modbus"""
@@ -224,15 +239,24 @@ class VenusEModbusClient:
                         
                 except Exception as e:
                     retry_count += 1
-                    if retry_count < max_retries:
+                    error_str = str(e).lower()
+                    
+                    # Detect connection errors that need reconnect
+                    is_connection_error = any(x in error_str for x in ["broken pipe", "connection", "bad file descriptor", "closed"])
+                    
+                    if is_connection_error:
+                        logging.debug(f"Connection error on {reg_addr}, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
+                        if retry_count < max_retries:
+                            time.sleep(0.1)  # Give device time to recover
+                            continue
+                    elif retry_count < max_retries:
                         # Brief pause before retry, keep connection alive
                         time.sleep(0.05)
                     else:
-                        # Log only critical errors, not every timeout
-                        if "Connection" in str(e) or "closed" in str(e):
-                            logging.debug(f"Connection issue reading {reg_addr} from {self.host}: {e}")
-                        else:
-                            logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
+                        # Log only on last attempt
+                        logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
                     result = None
         
         # Calculate actual power from voltage × current if we have both
@@ -284,6 +308,12 @@ class VenusEModbusClient:
                     rr = self.client.write_register(address=address, value=value, unit=unit)
                     ok = (not getattr(rr, 'isError', lambda: False)())
                 except Exception as ex:
+                    err_str = str(ex).lower()
+                    # Reconnect on connection errors
+                    if any(x in err_str for x in ["broken pipe", "connection", "bad file descriptor"]):
+                        logging.debug(f"Write connection error, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
                     err = str(ex)
                 attempts.append({"unit": unit, "style": "unit", "ok": ok, "error": err})
                 if ok:
@@ -295,6 +325,11 @@ class VenusEModbusClient:
                     rr2 = self.client.write_register(address=address, value=value, slave=unit)
                     ok2 = (not getattr(rr2, 'isError', lambda: False)())
                 except Exception as ex2:
+                    err2_str = str(ex2).lower()
+                    if any(x in err2_str for x in ["broken pipe", "connection", "bad file descriptor"]):
+                        logging.debug(f"Write connection error, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
                     err2 = str(ex2)
                 attempts.append({"unit": unit, "style": "slave", "ok": ok2, "error": err2})
                 if ok2:
