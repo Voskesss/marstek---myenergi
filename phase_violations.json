@@ -10,7 +10,10 @@
       "L3: 5219W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343746"
   },
   {
     "timestamp": "2025-10-11T20:52:34.933314",
@@ -23,7 +26,10 @@
       "L3: 5531W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343749"
   },
   {
     "timestamp": "2025-10-11T20:52:43.957769",
@@ -36,7 +42,10 @@
       "L3: 5531W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343751"
   },
   {
     "timestamp": "2025-10-11T20:52:49.793642",
@@ -49,7 +58,10 @@
       "L3: 5658W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343754"
   },
   {
     "timestamp": "2025-10-11T20:52:55.889189",
@@ -62,7 +74,10 @@
       "L3: 5695W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343756"
   },
   {
     "timestamp": "2025-10-11T20:53:07.668641",
@@ -75,7 +90,10 @@
       "L3: 5784W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343758"
   },
   {
     "timestamp": "2025-10-11T20:53:13.766487",
@@ -88,7 +106,10 @@
       "L3: 5784W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343760"
   },
   {
     "timestamp": "2025-10-11T20:53:19.919986",
@@ -101,7 +122,10 @@
       "L3: 5854W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343762"
   },
   {
     "timestamp": "2025-10-11T20:53:28.351509",
@@ -114,7 +138,10 @@
       "L3: 5883W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343764"
   },
   {
     "timestamp": "2025-10-11T20:53:34.565306",
@@ -127,7 +154,10 @@
       "L3: 5909W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343767"
   },
   {
     "timestamp": "2025-10-11T20:53:44.241605",
@@ -140,7 +170,10 @@
       "L3: 5927W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343769"
   },
   {
     "timestamp": "2025-10-11T20:53:50.425324",
@@ -153,7 +186,10 @@
       "L3: 5961W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343771"
   },
   {
     "timestamp": "2025-10-11T20:53:57.854740",
@@ -166,7 +202,10 @@
       "L3: 5802W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343779"
   },
   {
     "timestamp": "2025-10-11T20:54:03.743056",
@@ -179,7 +218,10 @@
       "L3: 5730W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343781"
   },
   {
     "timestamp": "2025-10-11T20:54:10.386156",
@@ -192,7 +234,10 @@
       "L3: 5730W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343783"
   },
   {
     "timestamp": "2025-10-11T20:54:19.100026",
@@ -205,7 +250,10 @@
       "L3: 5511W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343785"
   },
   {
     "timestamp": "2025-10-11T20:54:25.734734",
@@ -218,7 +266,10 @@
       "L3: 5437W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343787"
   },
   {
     "timestamp": "2025-10-11T20:54:36.446094",
@@ -231,7 +282,10 @@
       "L3: 5276W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343789"
   },
   {
     "timestamp": "2025-10-11T20:54:53.786476",
@@ -244,7 +298,10 @@
       "L3: 5276W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343792"
   },
   {
     "timestamp": "2025-10-11T20:55:03.987025",
@@ -257,7 +314,10 @@
       "L3: 5129W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343794"
   },
   {
     "timestamp": "2025-10-11T20:55:10.902549",
@@ -270,7 +330,10 @@
       "L3: 5131W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343796"
   },
   {
     "timestamp": "2025-10-11T20:55:17.329563",
@@ -283,7 +346,10 @@
       "L3: 5123W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343798"
   },
   {
     "timestamp": "2025-10-11T20:55:56.431133",
@@ -296,7 +362,10 @@
       "L3: 5178W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343801"
   },
   {
     "timestamp": "2025-10-11T20:56:03.006931",
@@ -309,7 +378,10 @@
       "L3: 5178W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343803"
   },
   {
     "timestamp": "2025-10-11T20:56:16.316521",
@@ -322,7 +394,10 @@
       "L3: 5218W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343805"
   },
   {
     "timestamp": "2025-10-11T20:56:22.897557",
@@ -335,7 +410,10 @@
       "L3: 5220W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343830"
   },
   {
     "timestamp": "2025-10-11T20:56:30.175796",
@@ -348,7 +426,10 @@
       "L3: 5257W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343856"
   },
   {
     "timestamp": "2025-10-11T21:19:19.021032",
@@ -621,7 +702,10 @@
       "L3: 6318W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343907"
   },
   {
     "timestamp": "2025-10-11T21:24:30.845995",
@@ -634,7 +718,10 @@
       "L3: 6328W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343910"
   },
   {
     "timestamp": "2025-10-11T21:24:42.810071",
@@ -647,7 +734,10 @@
       "L3: 6337W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343912"
   },
   {
     "timestamp": "2025-10-11T21:24:50.253383",
@@ -660,7 +750,10 @@
       "L3: 6344W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343914"
   },
   {
     "timestamp": "2025-10-11T21:24:56.666398",
@@ -673,7 +766,10 @@
       "L3: 6347W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343916"
   },
   {
     "timestamp": "2025-10-11T21:25:03.579441",
@@ -686,7 +782,10 @@
       "L3: 6384W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343919"
   },
   {
     "timestamp": "2025-10-11T21:25:09.382141",
@@ -699,7 +798,10 @@
       "L3: 6332W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343921"
   },
   {
     "timestamp": "2025-10-11T21:25:17.769357",
@@ -712,7 +814,10 @@
       "L3: 6296W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343923"
   },
   {
     "timestamp": "2025-10-11T21:25:23.950586",
@@ -725,7 +830,10 @@
       "L3: 6296W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343925"
   },
   {
     "timestamp": "2025-10-11T21:25:56.095021",
@@ -738,7 +846,10 @@
       "L3: 6152W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343945"
   },
   {
     "timestamp": "2025-10-11T21:26:06.268820",
@@ -751,7 +862,10 @@
       "L3: 6268W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343948"
   },
   {
     "timestamp": "2025-10-11T21:26:23.666816",
@@ -764,7 +878,10 @@
       "L3: 6340W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343950"
   },
   {
     "timestamp": "2025-10-11T21:26:30.614039",
@@ -777,7 +894,10 @@
       "L3: 6340W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343952"
   },
   {
     "timestamp": "2025-10-11T21:26:38.713088",
@@ -790,7 +910,10 @@
       "L3: 6330W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343954"
   },
   {
     "timestamp": "2025-10-11T21:26:45.014200",
@@ -803,7 +926,10 @@
       "L3: 6330W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343957"
   },
   {
     "timestamp": "2025-10-11T21:26:55.827028",
@@ -816,7 +942,10 @@
       "L3: 6344W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343959"
   },
   {
     "timestamp": "2025-10-11T21:27:09.870007",
@@ -829,7 +958,10 @@
       "L3: 6345W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343961"
   },
   {
     "timestamp": "2025-10-11T21:27:18.050755",
@@ -842,7 +974,10 @@
       "L3: 6359W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343963"
   },
   {
     "timestamp": "2025-10-11T21:27:24.572477",
@@ -855,7 +990,10 @@
       "L3: 6359W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343965"
   },
   {
     "timestamp": "2025-10-11T21:27:30.758515",
@@ -868,7 +1006,10 @@
       "L3: 6367W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343967"
   },
   {
     "timestamp": "2025-10-11T22:16:55.607667",
@@ -881,7 +1022,10 @@
       "L3: 6412W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343970"
   },
   {
     "timestamp": "2025-10-11T22:17:07.371265",
@@ -894,7 +1038,10 @@
       "L3: 6411W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343972"
   },
   {
     "timestamp": "2025-10-11T22:17:13.700509",
@@ -907,7 +1054,10 @@
       "L3: 6407W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343974"
   },
   {
     "timestamp": "2025-10-11T22:17:22.415376",
@@ -920,7 +1070,10 @@
       "L3: 6367W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343976"
   },
   {
     "timestamp": "2025-10-11T22:17:28.758627",
@@ -933,7 +1086,10 @@
       "L3: 6364W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343978"
   },
   {
     "timestamp": "2025-10-11T22:17:37.226029",
@@ -946,7 +1102,10 @@
       "L3: 6362W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343980"
   },
   {
     "timestamp": "2025-10-11T22:17:43.203023",
@@ -959,7 +1118,10 @@
       "L3: 6361W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343988"
   },
   {
     "timestamp": "2025-10-11T22:17:54.739700",
@@ -972,7 +1134,10 @@
       "L3: 6362W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343990"
   },
   {
     "timestamp": "2025-10-11T22:18:00.602634",
@@ -985,7 +1150,10 @@
       "L3: 6364W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343992"
   },
   {
     "timestamp": "2025-10-11T22:18:07.305155",
@@ -998,7 +1166,10 @@
       "L3: 6362W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343995"
   },
   {
     "timestamp": "2025-10-11T22:18:13.124900",
@@ -1011,7 +1182,10 @@
       "L3: 6362W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343997"
   },
   {
     "timestamp": "2025-10-11T22:18:18.946473",
@@ -1024,7 +1198,10 @@
       "L3: 6367W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.343999"
   },
   {
     "timestamp": "2025-10-11T22:18:24.763301",
@@ -1037,7 +1214,10 @@
       "L3: 6367W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344001"
   },
   {
     "timestamp": "2025-10-11T22:18:31.644135",
@@ -1050,7 +1230,10 @@
       "L3: 6413W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344003"
   },
   {
     "timestamp": "2025-10-11T22:18:37.728001",
@@ -1063,7 +1246,10 @@
       "L3: 6413W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344005"
   },
   {
     "timestamp": "2025-10-11T22:18:44.767840",
@@ -1076,7 +1262,10 @@
       "L3: 6413W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344009"
   },
   {
     "timestamp": "2025-10-11T22:18:50.843432",
@@ -1089,7 +1278,10 @@
       "L3: 6393W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344011"
   },
   {
     "timestamp": "2025-10-11T22:18:58.170257",
@@ -1102,7 +1294,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344013"
   },
   {
     "timestamp": "2025-10-11T22:19:03.959096",
@@ -1115,7 +1310,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344015"
   },
   {
     "timestamp": "2025-10-11T22:19:10.954661",
@@ -1128,7 +1326,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344017"
   },
   {
     "timestamp": "2025-10-11T22:19:16.811119",
@@ -1141,7 +1342,10 @@
       "L3: 6408W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344019"
   },
   {
     "timestamp": "2025-10-11T22:19:22.612223",
@@ -1154,7 +1358,10 @@
       "L3: 6408W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344022"
   },
   {
     "timestamp": "2025-10-11T22:19:36.171026",
@@ -1167,7 +1374,10 @@
       "L3: 6394W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344024"
   },
   {
     "timestamp": "2025-10-11T22:19:42.434251",
@@ -1180,7 +1390,10 @@
       "L3: 6414W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344026"
   },
   {
     "timestamp": "2025-10-11T22:19:48.225387",
@@ -1193,7 +1406,10 @@
       "L3: 6404W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344028"
   },
   {
     "timestamp": "2025-10-11T22:19:54.048249",
@@ -1206,7 +1422,10 @@
       "L3: 6404W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344030"
   },
   {
     "timestamp": "2025-10-11T22:20:00.686289",
@@ -1219,7 +1438,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344032"
   },
   {
     "timestamp": "2025-10-11T22:20:06.825757",
@@ -1232,7 +1454,10 @@
       "L3: 6407W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344034"
   },
   {
     "timestamp": "2025-10-11T22:20:12.616829",
@@ -1245,7 +1470,10 @@
       "L3: 6410W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344036"
   },
   {
     "timestamp": "2025-10-11T22:20:23.465771",
@@ -1258,7 +1486,10 @@
       "L3: 6413W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344038"
   },
   {
     "timestamp": "2025-10-11T22:20:29.810247",
@@ -1271,7 +1502,10 @@
       "L3: 6403W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344040"
   },
   {
     "timestamp": "2025-10-11T22:20:47.286268",
@@ -1284,7 +1518,10 @@
       "L3: 6410W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344050"
   },
   {
     "timestamp": "2025-10-11T22:20:55.728761",
@@ -1297,7 +1534,10 @@
       "L3: 6410W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344052"
   },
   {
     "timestamp": "2025-10-11T22:21:01.573393",
@@ -1310,7 +1550,10 @@
       "L3: 6416W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344054"
   },
   {
     "timestamp": "2025-10-11T22:21:07.421810",
@@ -1323,7 +1566,10 @@
       "L3: 6415W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344056"
   },
   {
     "timestamp": "2025-10-11T22:21:13.388871",
@@ -1336,7 +1582,10 @@
       "L3: 6415W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344058"
   },
   {
     "timestamp": "2025-10-11T22:21:19.204256",
@@ -1349,7 +1598,10 @@
       "L3: 6416W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344062"
   },
   {
     "timestamp": "2025-10-11T22:21:26.407258",
@@ -1362,7 +1614,10 @@
       "L3: 6406W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344064"
   },
   {
     "timestamp": "2025-10-11T22:21:32.165793",
@@ -1375,7 +1630,10 @@
       "L3: 6407W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344066"
   },
   {
     "timestamp": "2025-10-11T22:21:40.461861",
@@ -1388,7 +1646,10 @@
       "L3: 6393W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344068"
   },
   {
     "timestamp": "2025-10-11T22:21:46.716742",
@@ -1401,7 +1662,10 @@
       "L3: 6412W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344070"
   },
   {
     "timestamp": "2025-10-11T22:21:54.124766",
@@ -1414,7 +1678,10 @@
       "L3: 6412W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344072"
   },
   {
     "timestamp": "2025-10-11T22:21:59.995894",
@@ -1427,7 +1694,10 @@
       "L3: 6401W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344074"
   },
   {
     "timestamp": "2025-10-11T22:22:07.320948",
@@ -1440,7 +1710,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344078"
   },
   {
     "timestamp": "2025-10-11T22:22:13.517982",
@@ -1453,7 +1726,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344080"
   },
   {
     "timestamp": "2025-10-11T22:22:24.614440",
@@ -1466,7 +1742,10 @@
       "L3: 6406W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344083"
   },
   {
     "timestamp": "2025-10-11T22:22:30.764855",
@@ -1479,7 +1758,10 @@
       "L3: 6398W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344085"
   },
   {
     "timestamp": "2025-10-11T22:22:36.606159",
@@ -1492,7 +1774,10 @@
       "L3: 6386W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344087"
   },
   {
     "timestamp": "2025-10-11T22:22:42.418268",
@@ -1505,7 +1790,10 @@
       "L3: 6386W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344089"
   },
   {
     "timestamp": "2025-10-11T22:22:51.129599",
@@ -1518,7 +1806,10 @@
       "L3: 6408W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344091"
   },
   {
     "timestamp": "2025-10-11T22:22:57.062134",
@@ -1531,7 +1822,10 @@
       "L3: 6403W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344093"
   },
   {
     "timestamp": "2025-10-11T22:23:08.111345",
@@ -1544,7 +1838,10 @@
       "L3: 6391W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344095"
   },
   {
     "timestamp": "2025-10-11T22:23:13.903871",
@@ -1557,7 +1854,10 @@
       "L3: 6391W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344097"
   },
   {
     "timestamp": "2025-10-11T22:23:24.812601",
@@ -1570,7 +1870,10 @@
       "L3: 6409W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344100"
   },
   {
     "timestamp": "2025-10-11T22:23:30.879679",
@@ -1583,7 +1886,10 @@
       "L3: 6392W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344102"
   },
   {
     "timestamp": "2025-10-11T22:23:36.741981",
@@ -1596,7 +1902,10 @@
       "L3: 6400W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344104"
   },
   {
     "timestamp": "2025-10-11T22:23:42.561263",
@@ -1609,7 +1918,10 @@
       "L3: 6400W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344106"
   },
   {
     "timestamp": "2025-10-11T22:23:52.732611",
@@ -1622,7 +1934,10 @@
       "L3: 6397W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344108"
   },
   {
     "timestamp": "2025-10-11T22:23:59.485405",
@@ -1635,7 +1950,10 @@
       "L3: 6424W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344110"
   },
   {
     "timestamp": "2025-10-11T22:24:10.497446",
@@ -1648,7 +1966,10 @@
       "L3: 6324W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344113"
   },
   {
     "timestamp": "2025-10-11T22:24:16.752943",
@@ -1661,7 +1982,10 @@
       "L3: 6324W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344115"
   },
   {
     "timestamp": "2025-10-11T22:24:32.629023",
@@ -1674,7 +1998,10 @@
       "L3: 6302W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344117"
   },
   {
     "timestamp": "2025-10-11T22:24:38.468338",
@@ -1687,7 +2014,10 @@
       "L3: 6314W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344119"
   },
   {
     "timestamp": "2025-10-11T22:24:48.085340",
@@ -1700,7 +2030,10 @@
       "L3: 6302W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344121"
   },
   {
     "timestamp": "2025-10-11T22:24:53.861195",
@@ -1713,7 +2046,10 @@
       "L3: 6302W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344123"
   },
   {
     "timestamp": "2025-10-11T22:25:06.996125",
@@ -1726,7 +2062,10 @@
       "L3: 6261W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344125"
   },
   {
     "timestamp": "2025-10-11T22:25:12.807488",
@@ -1739,7 +2078,10 @@
       "L3: 6261W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344128"
   },
   {
     "timestamp": "2025-10-11T22:25:21.244669",
@@ -1752,7 +2094,10 @@
       "L3: 6277W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344130"
   },
   {
     "timestamp": "2025-10-11T22:25:27.124525",
@@ -1765,7 +2110,10 @@
       "L3: 6280W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344132"
   },
   {
     "timestamp": "2025-10-11T22:25:33.264021",
@@ -1778,7 +2126,10 @@
       "L3: 6299W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344134"
   },
   {
     "timestamp": "2025-10-11T22:25:39.097263",
@@ -1791,7 +2142,10 @@
       "L3: 6311W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344137"
   },
   {
     "timestamp": "2025-10-11T22:25:45.690134",
@@ -1804,7 +2158,10 @@
       "L3: 6311W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344139"
   },
   {
     "timestamp": "2025-10-11T22:25:51.887920",
@@ -1817,6 +2174,185 @@
       "L3: 6374W (>5100W)"
     ],
     "is_violation": true,
-    "is_real_violation": false
+    "is_real_violation": false,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344141"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:06.227320",
+    "l1_w": 456,
+    "l2_w": 2254,
+    "l3_w": 5165,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5165W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344143"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:13.144325",
+    "l1_w": 473,
+    "l2_w": 2251,
+    "l3_w": 5156,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5156W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344145"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:19.334102",
+    "l1_w": 473,
+    "l2_w": 2251,
+    "l3_w": 5156,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5156W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344147"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:26.994984",
+    "l1_w": 468,
+    "l2_w": 2252,
+    "l3_w": 5149,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5149W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344149"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:33.702316",
+    "l1_w": 460,
+    "l2_w": 2246,
+    "l3_w": 5150,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5150W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344151"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:39.498729",
+    "l1_w": 460,
+    "l2_w": 2246,
+    "l3_w": 5150,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5150W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344153"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:46.929926",
+    "l1_w": 476,
+    "l2_w": 2248,
+    "l3_w": 5148,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5148W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344161"
+  },
+  {
+    "timestamp": "2025-10-12T22:12:53.182191",
+    "l1_w": 469,
+    "l2_w": 2250,
+    "l3_w": 5155,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5155W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344163"
+  },
+  {
+    "timestamp": "2025-10-12T22:13:01.000083",
+    "l1_w": 470,
+    "l2_w": 2253,
+    "l3_w": 5152,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5152W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344165"
+  },
+  {
+    "timestamp": "2025-10-12T22:13:07.315165",
+    "l1_w": 470,
+    "l2_w": 2253,
+    "l3_w": 5152,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5152W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Alle L3 violations - balancering issue",
+    "dismissed_at": "2025-10-12T22:28:47.344167"
+  },
+  {
+    "timestamp": "2025-10-12T22:13:13.391899",
+    "l1_w": 482,
+    "l2_w": 2258,
+    "l3_w": 5146,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5146W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true,
+    "dismissed": true,
+    "dismiss_reason": "Batterij laden",
+    "dismissed_at": "2025-10-12T22:25:20.947102"
   }
 ]

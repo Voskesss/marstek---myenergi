@@ -203,6 +203,14 @@
             <p style="margin-top: 10px;">
                 <span class="status-badge running" id="status-badge">● Monitoring...</span>
                 <span style="margin-left: 10px; color: #666;">Limiet: 5100W per fase</span>
+                <button onclick="resetPeaks()" 
+                        style="margin-left: 20px; background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+                    🔄 Reset Max
+                </button>
+                <button onclick="resetStats()" 
+                        style="margin-left: 10px; background:#ef4444;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+                    🔄 Reset Alles
+                </button>
             </p>
         </div>
 
@@ -243,6 +251,7 @@
                         <strong>Apparaten op Fase B:</strong>
                         <ul style="margin:5px 0; padding-left:20px;">
                             <li>Verhuur boven (vermoedelijk)</li>
+                            <li>Stopcontact computer kantoor</li>
                             <li style="color:#999;">Nog te bepalen...</li>
                         </ul>
                     </div>
@@ -367,9 +376,100 @@
             </div>
         </div>
 
+        <!-- Patroon Analyse -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>📊 Piekbelasting Patronen (zonder Zappi)</h2>
+            <div style="margin-bottom: 15px; padding: 10px; background: #dbeafe; border-radius: 6px; font-size: 13px; color: #1e3a8a;">
+                <strong>ℹ️ Data filtering:</strong> Alleen metingen zonder Zappi laden - Zappi zou zich aanpassen aan 3x25A
+            </div>
+            
+            <div id="pattern-loading" style="text-align: center; padding: 20px; color: #666;">
+                <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
+                Data analyseren...
+            </div>
+            
+            <div id="pattern-content" style="display: none;">
+                <!-- Filter Info -->
+                <div style="padding: 15px; background: #f9fafb; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; text-align: center;">
+                        <div>
+                            <div style="font-size: 20px; font-weight: 700; color: #333;" id="pattern-used">-</div>
+                            <div style="font-size: 11px; color: #666;">METINGEN GEBRUIKT</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 20px; font-weight: 700; color: #f59e0b;" id="pattern-excluded">-</div>
+                            <div style="font-size: 11px; color: #666;">ZAPPI UITGESLOTEN</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 20px; font-weight: 700; color: #6366f1;" id="pattern-exclusion-rate">-</div>
+                            <div style="font-size: 11px; color: #666;">EXCLUSIE %</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div style="padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; margin-bottom: 20px;">
+                    <strong style="color: #92400e;">🎯 Belangrijkste Bevindingen</strong>
+                    <div style="margin-top: 10px; color: #78350f; font-size: 13px;">
+                        <div><strong>Gevaarlijkste uren:</strong> <span id="pattern-peak-hours">-</span></div>
+                        <div><strong>Risicodag:</strong> <span id="pattern-risky-day">-</span></div>
+                        <div><strong>Risicoperiode:</strong> <span id="pattern-risky-period">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Top Uren -->
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-bottom: 10px; font-size: 16px;">⏰ Top 5 Gevaarlijkste Uren</h3>
+                    <div id="pattern-top-hours" style="font-size: 13px;"></div>
+                </div>
+
+                <!-- Weekdagen -->
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-bottom: 10px; font-size: 16px;">📅 Belasting per Weekdag</h3>
+                    <div id="pattern-weekdays" style="font-size: 13px;"></div>
+                </div>
+
+                <!-- Dagdelen -->
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-bottom: 10px; font-size: 16px;">🌓 Belasting per Dagdeel</h3>
+                    <div id="pattern-periods" style="font-size: 13px;"></div>
+                </div>
+
+                <!-- Aanbevelingen -->
+                <div id="pattern-recommendations" style="padding: 15px; background: #d1fae5; border-left: 4px solid #10b981; border-radius: 6px;">
+                    <strong style="color: #065f46;">💡 Aanbevelingen</strong>
+                    <div id="pattern-recommendations-list" style="margin-top: 10px; color: #065f46; font-size: 13px;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Recente Overschrijdingen -->
         <div class="card" style="margin-top: 20px;">
             <h2>⚠️ Recente Overschrijdingen (24u)</h2>
+            
+            <!-- Bulk Dismiss Opties -->
+            <div style="margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <strong style="color: #333; display: block; margin-bottom: 10px;">🔧 Bulk Dismiss</strong>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    <button onclick="bulkDismissSmall()" 
+                            style="background:#6366f1;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;">
+                        Kleine pieken (&lt;200W)
+                    </button>
+                    <button onclick="bulkDismissPhase('L3')" 
+                            style="background:#8b5cf6;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;">
+                        Alle L3 (Fase C)
+                    </button>
+                    <button onclick="bulkDismissLast30Min()" 
+                            style="background:#ec4899;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;">
+                        Laatste 30 min
+                    </button>
+                    <button onclick="bulkDismissCustom()" 
+                            style="background:#10b981;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-size:13px;">
+                        Custom...
+                    </button>
+                </div>
+            </div>
+            
             <div class="violation-list" id="violations-list">
                 <p style="text-align: center; color: #666; padding: 20px;">Geen overschrijdingen</p>
             </div>
@@ -529,6 +629,218 @@
             }
         }
 
+        async function dismissViolation(timestamp, reason) {
+            try {
+                const res = await fetch(`/api/phase_monitor/violations/${encodeURIComponent(timestamp)}/dismiss`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({reason})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log('Violation dismissed:', timestamp);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout bij dismiss: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error dismissing violation:', e);
+                alert('Fout bij dismiss: ' + e);
+            }
+        }
+
+        async function undismissViolation(timestamp) {
+            try {
+                const res = await fetch(`/api/phase_monitor/violations/${encodeURIComponent(timestamp)}/undismiss`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log('Violation undismissed:', timestamp);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout bij undismiss: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error undismissing violation:', e);
+                alert('Fout bij undismiss: ' + e);
+            }
+        }
+
+        async function bulkDismissSmall() {
+            if (!confirm('Dismiss alle violations <200W over limiet?')) return;
+            try {
+                const res = await fetch('/api/phase_monitor/violations/bulk_dismiss', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        max_overshoot_w: 200,
+                        reason: 'Kleine pieken (<200W over limiet), niet significant'
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.count} violations dismissed!`);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                alert('Fout bij bulk dismiss: ' + e);
+            }
+        }
+
+        async function bulkDismissPhase(phase) {
+            if (!confirm(`Dismiss alle ${phase} violations?`)) return;
+            try {
+                const res = await fetch('/api/phase_monitor/violations/bulk_dismiss', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phase: phase,
+                        reason: `Alle ${phase} violations - balancering issue`
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.count} ${phase} violations dismissed!`);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                alert('Fout bij bulk dismiss: ' + e);
+            }
+        }
+
+        async function bulkDismissLast30Min() {
+            if (!confirm('Dismiss alle violations van laatste 30 minuten?')) return;
+            const now = new Date();
+            const start = new Date(now.getTime() - 30 * 60 * 1000); // 30 min geleden
+            
+            try {
+                const res = await fetch('/api/phase_monitor/violations/bulk_dismiss', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        start_time: start.toISOString(),
+                        reason: 'Laatste 30 minuten - test/bekende oorzaak'
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.count} violations van laatste 30 min dismissed!`);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                alert('Fout bij bulk dismiss: ' + e);
+            }
+        }
+
+        async function resetPeaks() {
+            const confirmMsg = 'RESET MAX WAARDEN?\n\n' +
+                              'Dit reset:\n' +
+                              '- Max Fase A (4784W → 0W)\n' +
+                              '- Max Fase B (2727W → 0W)\n' +
+                              '- Max Fase C (5165W → 0W)\n' +
+                              '- Peak history\n\n' +
+                              'Alle metingen en violations blijven behouden.\n\n' +
+                              'Weet je het zeker?';
+            
+            if (!confirm(confirmMsg)) return;
+            
+            try {
+                const res = await fetch('/api/phase_monitor/reset_peaks', {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ Max waarden gereset!\n\n${data.message}`);
+                    // Refresh displays
+                    updateStats();
+                } else {
+                    alert('Fout bij reset: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error resetting peaks:', e);
+                alert('Fout bij reset: ' + e);
+            }
+        }
+
+        async function resetStats() {
+            const confirmMsg = 'RESET ALLE STATISTIEKEN?\n\n' +
+                              'Dit verwijdert:\n' +
+                              '- Alle metingen\n' +
+                              '- Alle max waarden\n' +
+                              '- Peak history\n\n' +
+                              'Violations log blijft behouden.\n\n' +
+                              'Weet je het zeker?';
+            
+            if (!confirm(confirmMsg)) return;
+            
+            try {
+                const res = await fetch('/api/phase_monitor/reset?keep_violations=true', {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ Stats gereset!\n\n${data.log_entries_removed} metingen verwijderd\n${data.violations_kept} violations behouden`);
+                    // Refresh alle displays
+                    updatePhaseData();
+                    updateStats();
+                    updateAnalysis();
+                    updateViolations();
+                    updatePatterns();
+                } else {
+                    alert('Fout bij reset: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error resetting stats:', e);
+                alert('Fout bij reset: ' + e);
+            }
+        }
+
+        async function bulkDismissCustom() {
+            const maxOvershoot = prompt('Max overschrijding in Watt (leeg = geen filter):', '');
+            const phaseFilter = prompt('Fase filter (L1/L2/L3 of leeg voor alle):', '');
+            const reason = prompt('Reden voor dismiss:', 'Custom bulk dismiss');
+            
+            if (!reason) return;
+            
+            const body = { reason };
+            if (maxOvershoot) body.max_overshoot_w = parseInt(maxOvershoot);
+            if (phaseFilter) body.phase = phaseFilter;
+            
+            try {
+                const res = await fetch('/api/phase_monitor/violations/bulk_dismiss', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.count} violations dismissed!`);
+                    updateViolations();
+                    updateAnalysis();
+                } else {
+                    alert('Fout: ' + data.error);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+                alert('Fout bij bulk dismiss: ' + e);
+            }
+        }
+
         async function updateViolations() {
             try {
                 const res = await fetch('/api/phase_monitor/violations?hours=24');
@@ -538,12 +850,48 @@
                     const listEl = document.getElementById('violations-list');
                     
                     if (data.violations && data.violations.length > 0) {
-                        listEl.innerHTML = data.violations.slice(-10).reverse().map(v => `
-                            <div class="violation-item">
-                                <div class="violation-time">${new Date(v.timestamp).toLocaleString('nl-NL')}</div>
-                                <div class="violation-details">${v.violations.join(', ')}</div>
-                            </div>
-                        `).join('');
+                        listEl.innerHTML = data.violations.slice(-10).reverse().map(v => {
+                            const isDismissed = v.dismissed || false;
+                            const isZappi = v.zappi_charging || false;
+                            const bgColor = isDismissed ? '#f3f4f6' : (isZappi ? '#fef3c7' : '#fef2f2');
+                            const borderColor = isDismissed ? '#9ca3af' : (isZappi ? '#f59e0b' : '#ef4444');
+                            const icon = isDismissed ? '✓' : (isZappi ? 'ℹ️' : '⚠️');
+                            
+                            let dismissBtn = '';
+                            if (isDismissed) {
+                                dismissBtn = `
+                                    <button onclick="undismissViolation('${v.timestamp}')" 
+                                            style="background:#3b82f6;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:5px;">
+                                        Herstel
+                                    </button>
+                                    <div style="font-size:11px;color:#666;margin-top:4px;font-style:italic;">
+                                        Reden: ${v.dismiss_reason || 'Geen reden'}
+                                    </div>
+                                `;
+                            } else {
+                                dismissBtn = `
+                                    <button onclick="dismissViolation('${v.timestamp}', prompt('Reden voor dismiss:', 'Batterij laden'))"
+                                            style="background:#6366f1;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:5px;">
+                                        Dismiss
+                                    </button>
+                                `;
+                            }
+                            
+                            return `
+                                <div class="violation-item" style="background:${bgColor};border-left-color:${borderColor};">
+                                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                                        <div style="flex:1;">
+                                            <div class="violation-time">${icon} ${new Date(v.timestamp).toLocaleString('nl-NL')}</div>
+                                            <div class="violation-details">${v.violations.join(', ')}</div>
+                                            ${isDismissed ? '<div style="color:#059669;font-weight:600;font-size:12px;margin-top:4px;">✓ DISMISSED - telt niet mee</div>' : ''}
+                                        </div>
+                                        <div style="margin-left:10px;">
+                                            ${dismissBtn}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
                     } else {
                         listEl.innerHTML = '<p style="text-align: center; color: #10b981; padding: 20px;">✅ Geen overschrijdingen</p>';
                     }
@@ -563,17 +911,161 @@
             }
         }
 
+        async function updatePatterns() {
+            try {
+                const res = await fetch('/api/phase_monitor/patterns');
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('pattern-loading').style.display = 'none';
+                    document.getElementById('pattern-content').style.display = 'block';
+                    
+                    // Filter info
+                    if (data.data_filter) {
+                        document.getElementById('pattern-used').textContent = data.data_filter.used_measurements;
+                        document.getElementById('pattern-excluded').textContent = data.data_filter.excluded_zappi_measurements;
+                        document.getElementById('pattern-exclusion-rate').textContent = `${data.data_filter.exclusion_rate_percent}%`;
+                    }
+                    
+                    // Summary
+                    if (data.summary) {
+                        document.getElementById('pattern-peak-hours').textContent = data.summary.peak_hours_of_day?.join(', ') || '-';
+                        document.getElementById('pattern-risky-day').textContent = data.summary.riskiest_day || '-';
+                        document.getElementById('pattern-risky-period').textContent = data.summary.riskiest_period || '-';
+                    }
+                    
+                    // Top 5 uren
+                    if (data.by_hour && data.by_hour.length > 0) {
+                        const topHours = data.by_hour.slice(0, 5);
+                        document.getElementById('pattern-top-hours').innerHTML = topHours.map((h, i) => {
+                            const isOverLimit = h.max_overall_w > PHASE_LIMIT;
+                            const color = isOverLimit ? '#ef4444' : (h.max_overall_w > PHASE_LIMIT * 0.9 ? '#f59e0b' : '#10b981');
+                            
+                            // Determine which phase is highest
+                            let highestPhase = 'Fase A';
+                            let highestValue = h.max_l2_w;
+                            if (h.max_l1_w > highestValue) {
+                                highestPhase = 'Fase B';
+                                highestValue = h.max_l1_w;
+                            }
+                            if (h.max_l3_w > highestValue) {
+                                highestPhase = 'Fase C';
+                                highestValue = h.max_l3_w;
+                            }
+                            
+                            return `
+                                <div style="padding: 10px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${color};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span><strong>${i + 1}. ${h.time_label}</strong></span>
+                                        <span style="color: ${color}; font-weight: 700;">${h.max_overall_w}W (${highestPhase})</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                                        <strong>Per fase:</strong> A=${h.max_l2_w}W, B=${h.max_l1_w}W, C=${h.max_l3_w}W
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 2px;">
+                                        <strong>Gemiddeld:</strong> A=${h.avg_l2_w}W, B=${h.avg_l1_w}W, C=${h.avg_l3_w}W | ${h.measurements} metingen
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                    
+                    // Weekdagen
+                    if (data.by_weekday && data.by_weekday.length > 0) {
+                        document.getElementById('pattern-weekdays').innerHTML = data.by_weekday.slice(0, 7).map(d => {
+                            const isOverLimit = d.max_overall_w > PHASE_LIMIT;
+                            const color = isOverLimit ? '#ef4444' : (d.max_overall_w > PHASE_LIMIT * 0.9 ? '#f59e0b' : '#10b981');
+                            
+                            // Determine which phase is highest
+                            let highestPhase = 'Fase A';
+                            let highestValue = d.max_l2_w;
+                            if (d.max_l1_w > highestValue) {
+                                highestPhase = 'Fase B';
+                                highestValue = d.max_l1_w;
+                            }
+                            if (d.max_l3_w > highestValue) {
+                                highestPhase = 'Fase C';
+                                highestValue = d.max_l3_w;
+                            }
+                            
+                            return `
+                                <div style="padding: 10px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${color};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span><strong>${d.name}</strong></span>
+                                        <span style="color: ${color}; font-weight: 700;">${d.max_overall_w}W (${highestPhase})</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                                        <strong>Max per fase:</strong> A=${d.max_l2_w}W, B=${d.max_l1_w}W, C=${d.max_l3_w}W
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 2px;">
+                                        <strong>Gemiddeld:</strong> A=${d.avg_l2_w}W, B=${d.avg_l1_w}W, C=${d.avg_l3_w}W | ${d.measurements} metingen
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                    
+                    // Dagdelen
+                    if (data.by_period && data.by_period.length > 0) {
+                        document.getElementById('pattern-periods').innerHTML = data.by_period.map(p => {
+                            const isOverLimit = p.max_overall_w > PHASE_LIMIT;
+                            const color = isOverLimit ? '#ef4444' : (p.max_overall_w > PHASE_LIMIT * 0.9 ? '#f59e0b' : '#10b981');
+                            
+                            // Determine which phase is highest
+                            let highestPhase = 'Fase A';
+                            let highestValue = p.max_l2_w;
+                            if (p.max_l1_w > highestValue) {
+                                highestPhase = 'Fase B';
+                                highestValue = p.max_l1_w;
+                            }
+                            if (p.max_l3_w > highestValue) {
+                                highestPhase = 'Fase C';
+                                highestValue = p.max_l3_w;
+                            }
+                            
+                            return `
+                                <div style="padding: 10px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid ${color};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span><strong>${p.name}</strong></span>
+                                        <span style="color: ${color}; font-weight: 700;">${p.max_overall_w}W (${highestPhase})</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                                        <strong>Max per fase:</strong> A=${p.max_l2_w}W, B=${p.max_l1_w}W, C=${p.max_l3_w}W
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 2px;">
+                                        Pieken > 80%: ${p.significant_peaks} | Metingen: ${p.measurements}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                    
+                    // Aanbevelingen
+                    if (data.recommendations && data.recommendations.length > 0) {
+                        document.getElementById('pattern-recommendations-list').innerHTML = data.recommendations.map(r => 
+                            `<div style="margin-bottom: 8px;">• ${r}</div>`
+                        ).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Error fetching patterns:', e);
+                document.getElementById('pattern-loading').innerHTML = '<p style="color: #ef4444;">❌ Fout bij laden patronen</p>';
+            }
+        }
+
         // Update cycles - LIVE monitoring!
         setInterval(updatePhaseData, 1000);   // Elke 1s (LIVE!)
         setInterval(updateStats, 5000);       // Elke 5s
         setInterval(updateAnalysis, 10000);   // Elke 10s
         setInterval(updateViolations, 15000); // Elke 15s
+        setInterval(updatePatterns, 30000);   // Elke 30s (patronen veranderen minder snel)
 
         // Initial load
         updatePhaseData();
         updateStats();
         updateAnalysis();
         updateViolations();
+        updatePatterns();
         
         console.log('🔌 Live fase monitoring gestart!');
     </script>

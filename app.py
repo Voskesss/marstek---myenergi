@@ -156,7 +156,7 @@ class VenusEModbusClient:
                     pass
             
             # Add a short timeout to avoid hanging sockets
-            self.client = ModbusTcpClient(self.host, port=self.port, timeout=3, retries=2)
+            self.client = ModbusTcpClient(self.host, port=self.port, timeout=2, retries=1)
             self.connected = self.client.connect()
             if not self.connected:
                 logging.warning(f"Failed to connect to Modbus {self.host}:{self.port}")
@@ -211,7 +211,7 @@ class VenusEModbusClient:
         for reg_addr, param_name in registers.items():
             result = None
             retry_count = 0
-            max_retries = 2
+            max_retries = 1
             
             while retry_count < max_retries and result is None:
                 try:
@@ -424,9 +424,14 @@ class VenusEModbusClient:
             except Exception:
                 pass
 
-    def check_minimum_soc(self, min_soc_percent: float = 20.0, hysteresis: float = 2.0) -> dict:
+    def check_minimum_soc(self, min_soc_percent: float = 20.0, hysteresis: float = 2.0, simple_rule_enabled: bool = False) -> dict:
         """Check if current SoC is above minimum and take action if needed
         Uses hysteresis to prevent toggling around the threshold
+        
+        Args:
+            min_soc_percent: Minimum SOC threshold
+            hysteresis: Hysteresis band to prevent toggling
+            simple_rule_enabled: If True, emergency charge is DISABLED (Simple Rule manages charging)
         """
         try:
             # Get current battery data
@@ -442,8 +447,17 @@ class VenusEModbusClient:
                 "current_soc": current_soc,
                 "min_soc_limit": min_soc_percent,
                 "stop_threshold": stop_threshold,
-                "action_taken": None
+                "action_taken": None,
+                "simple_rule_enabled": simple_rule_enabled
             }
+            
+            # BELANGRIJK: Emergency charge alleen als Simple Rule UIT staat!
+            if simple_rule_enabled:
+                result.update({
+                    "action_taken": "simple_rule_active",
+                    "status": f"SoC {current_soc}% - Simple Rule manages charging (emergency charge disabled)"
+                })
+                return result
             
             if current_soc <= min_soc_percent:
                 # SoC too low - activate emergency charge
@@ -2550,6 +2564,7 @@ async def _whatsapp_tips_scheduler():
                     pv_w = status.get("pv_generation_w", 0) or 0
                     grid_w = status.get("grid_w", 0) or 0
                     eddi_w = status.get("eddi_power_w", 0) or 0
+                    zappi_w = status.get("zappi_power_w", 0) or 0
                     house_w = status.get("house_consumption_w", 0) or 0
                     
                     # Get battery SOC from simple rule status (has all batteries)
@@ -2567,9 +2582,9 @@ async def _whatsapp_tips_scheduler():
                     except:
                         pass
                     
-                    # Calculate overschot
+                    # Calculate overschot (excluding Eddi AND Zappi)
                     export_w = max(0, -grid_w) if grid_w else 0
-                    overschot = export_w - eddi_w if export_w > 0 else 0
+                    overschot = export_w - eddi_w - zappi_w if export_w > 0 else 0
                     
                     energy_data = {
                         "clouds": clouds,
@@ -2580,6 +2595,7 @@ async def _whatsapp_tips_scheduler():
                         "battery_power": int(total_batt_power),
                         "overschot_w": int(overschot),
                         "eddi_w": eddi_w,
+                        "zappi_w": zappi_w,
                         "house_w": house_w
                     }
                     
@@ -2738,6 +2754,7 @@ async def send_tip_now():
         pv_w = status.get("pv_generation_w", 0) or 0
         grid_w = status.get("grid_w", 0) or 0
         eddi_w = status.get("eddi_power_w", 0) or 0
+        zappi_w = status.get("zappi_power_w", 0) or 0
         house_w = status.get("house_consumption_w", 0) or 0
         
         # Get battery SOC from simple rule status (has all batteries)
@@ -2755,9 +2772,9 @@ async def send_tip_now():
         except:
             pass
         
-        # Calculate overschot
+        # Calculate overschot (excluding Eddi AND Zappi)
         export_w = max(0, -grid_w) if grid_w else 0
-        overschot = export_w - eddi_w if export_w > 0 else 0
+        overschot = export_w - eddi_w - zappi_w if export_w > 0 else 0
         
         energy_data = {
             "clouds": clouds,
@@ -2768,6 +2785,7 @@ async def send_tip_now():
             "battery_power": int(total_batt_power),
             "overschot_w": int(overschot),
             "eddi_w": eddi_w,
+            "zappi_w": zappi_w,
             "house_w": house_w
         }
         
@@ -3045,7 +3063,11 @@ async def get_battery_status():
     try:
         # Serialize access to the Modbus client to avoid broken pipes
         async with modbus_lock:
-            battery_data = venus_modbus.read_battery_data()
+            # Wrap in timeout to prevent hanging if Modbus doesn't respond
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             # Use short session: disconnect after a full read to prevent stale sockets
             try:
                 venus_modbus.disconnect()
@@ -3271,7 +3293,10 @@ async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
             result = venus_modbus.check_minimum_soc(min_soc)
         else:
             # Just check, don't take action
-            battery_data = venus_modbus.read_battery_data()
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             if not battery_data or "soc_percent" not in battery_data:
                 return {"success": False, "error": "Could not read SoC data"}
             
@@ -3312,12 +3337,16 @@ async def api_minimum_soc_per_battery(bid: str, payload: Dict[str, Any] = Body(.
         vm = _get_modbus_for(bid)
         if auto_charge:
             # enforce and/or start emergency charge if needed
-            result = vm.check_minimum_soc(min_soc)
+            # BELANGRIJK: Geef Simple Rule status mee - emergency charge alleen als Simple Rule UIT staat!
+            result = vm.check_minimum_soc(min_soc, simple_rule_enabled=simple_rule.enabled)
             ok = bool(result.get("ok", False))
             return {"success": ok, **result, "id": bid}
         else:
             # passive check
-            bd = vm.read_battery_data()
+            bd = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, vm.read_battery_data),
+                timeout=5.0
+            )
             if not bd or "soc_percent" not in bd:
                 return {"success": False, "error": "Could not read SoC data", "id": bid}
             current_soc = float(bd["soc_percent"]["value"]) if isinstance(bd["soc_percent"], dict) else float(bd["soc_percent"]) 
@@ -3346,7 +3375,10 @@ async def set_battery_control(payload: Dict[str, Any] = Body(...)):
         async with modbus_lock:
             # Enforce SoC reserve for discharge
             try:
-                bd = venus_modbus.read_battery_data()
+                bd = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                    timeout=5.0
+                )
                 try:
                     venus_modbus.disconnect()
                 except Exception:
@@ -3373,7 +3405,10 @@ async def get_battery_raw():
     """Return raw Modbus battery data for debugging mapping/scaling."""
     try:
         async with modbus_lock:
-            data = venus_modbus.read_battery_data()
+            data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             try:
                 venus_modbus.disconnect()
             except Exception:
@@ -3657,6 +3692,129 @@ async def get_phase_violations(hours: int = Query(24)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/phase_monitor/violations/{timestamp}/dismiss")
+async def dismiss_phase_violation(timestamp: str, reason: str = Body(..., embed=True)):
+    """Markeer een violation als dismissed met reden
+    
+    Deze violation blijft zichtbaar maar telt NIET mee voor 3x25A analyse.
+    Gebruik voor: batterij laden, test situaties, bewuste overschrijdingen.
+    
+    Args:
+        timestamp: ISO timestamp van de violation
+        reason: Reden voor dismiss (bijv. "Batterij laden vanaf grid")
+    
+    Example:
+        POST /api/phase_monitor/violations/2025-10-12T22:00:00/dismiss
+        Body: {"reason": "Batterij laden vanaf grid"}
+    """
+    try:
+        result = phase_monitor.dismiss_violation(timestamp, reason)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/violations/{timestamp}/undismiss")
+async def undismiss_phase_violation(timestamp: str):
+    """Verwijder dismiss markering van een violation
+    
+    Args:
+        timestamp: ISO timestamp van de violation
+    
+    Example:
+        POST /api/phase_monitor/violations/2025-10-12T22:00:00/undismiss
+    """
+    try:
+        result = phase_monitor.undismiss_violation(timestamp)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/reset_peaks")
+async def reset_phase_monitor_peaks():
+    """Reset alleen de max waarden per fase (niet de metingen)
+    
+    Dit reset:
+    - Max Fase A/B/C waarden
+    - Peak history
+    
+    Behoudt:
+    - Alle metingen
+    - Violations log
+    
+    Example:
+        POST /api/phase_monitor/reset_peaks
+    """
+    try:
+        result = phase_monitor.reset_peak_values()
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/reset")
+async def reset_phase_monitor_stats(keep_violations: bool = True):
+    """Reset alle phase monitor statistieken
+    
+    Args:
+        keep_violations: Behoud violations_log (default True) of ook resetten
+    
+    Returns:
+        Aantal verwijderde entries
+    
+    Example:
+        POST /api/phase_monitor/reset
+        Body: {"keep_violations": true}
+        
+        Of zonder body (gebruikt default True):
+        POST /api/phase_monitor/reset
+    """
+    try:
+        result = phase_monitor.reset_stats(keep_violations=keep_violations)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/violations/bulk_dismiss")
+async def bulk_dismiss_violations(
+    start_time: str = Body(None),
+    end_time: str = Body(None),
+    max_overshoot_w: int = Body(None),
+    phase: str = Body(None),
+    reason: str = Body("Bulk dismiss")
+):
+    """Dismiss meerdere violations in één keer
+    
+    Args:
+        start_time: ISO timestamp start (optioneel)
+        end_time: ISO timestamp einde (optioneel)
+        max_overshoot_w: Max overschrijding in Watt (bijv. 200 = <200W over limiet)
+        phase: Filter op fase (L1/L2/L3) of None voor alle
+        reason: Reden voor dismiss
+    
+    Examples:
+        # Dismiss alles tussen 22:12-22:14
+        POST /api/phase_monitor/violations/bulk_dismiss
+        Body: {"start_time": "2025-10-12T22:12:00", "end_time": "2025-10-12T22:14:00", "reason": "Batterij laden test"}
+        
+        # Dismiss alle kleine overschrijdingen (<200W)
+        POST /api/phase_monitor/violations/bulk_dismiss  
+        Body: {"max_overshoot_w": 200, "reason": "Kleine pieken, niet significant"}
+        
+        # Dismiss alle L3 violations vandaag
+        POST /api/phase_monitor/violations/bulk_dismiss
+        Body: {"phase": "L3", "start_time": "2025-10-12T00:00:00", "reason": "L3 balancering issue"}
+    """
+    try:
+        result = phase_monitor.bulk_dismiss_violations(
+            start_time=start_time,
+            end_time=end_time,
+            max_overshoot_w=max_overshoot_w,
+            phase=phase,
+            reason=reason
+        )
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/phase_monitor/data")
 async def get_phase_data_history(count: int = Query(100)):
     """Haal recente fase data op"""
@@ -3678,6 +3836,94 @@ async def get_feasibility_analysis():
         return {
             "success": True,
             **analysis
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/patterns")
+async def get_peak_patterns():
+    """Analyseer patronen in piekbelasting: uren, weekdagen, periodes
+    
+    BELANGRIJK: Gebruikt ALLEEN metingen ZONDER Zappi laden!
+    Reden: Zappi heeft load balancing en zou zich aanpassen aan 3x25A.
+    Dit geeft het échte huishoudelijke verbruik zonder vertekening.
+    
+    Returns:
+        - data_filter: Info over gefilterde data (hoeveel Zappi metingen uitgesloten)
+        - summary: Snelle overview met hoogste uren en dagen
+        - by_hour: Statistieken per uur van de dag (0-23)
+        - by_weekday: Statistieken per dag van de week
+        - by_period: Statistieken per dagdeel (nacht/ochtend/middag/avond)
+        - risky_hours: Uren waar gemiddeld >80% van limiet wordt gebruikt
+        - recommendations: Concrete aanbevelingen op basis van patronen
+    """
+    try:
+        patterns = phase_monitor.analyze_peak_patterns()
+        return {
+            "success": True,
+            **patterns
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/peak_history")
+async def get_peak_history(phase: str = Query(None)):
+    """Haal peak history op - alle keren dat een nieuwe max werd bereikt"""
+    try:
+        history = phase_monitor.get_peak_history(phase)
+        return {
+            "success": True,
+            "history": history
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/top_peaks")
+async def get_top_peaks(limit: int = Query(50), include_below_limit: bool = Query(True)):
+    """Haal TOP N hoogste pieken op (inclusief die ONDER de limiet blijven)
+    
+    Args:
+        limit: Aantal top pieken per fase (default 50, max 200)
+        include_below_limit: Ook metingen onder limiet tonen (default True)
+    
+    Returns:
+        - overall_top: Top pieken over alle fases
+        - l1_top, l2_top, l3_top: Top per specifieke fase
+        - near_misses: Hoge waarden die net onder limiet blijven (80-100%)
+        - Elk item: value, distance_to_limit, timestamp, zappi status, alle fase waarden
+    """
+    try:
+        # Limiteer tot max 200 voor performance
+        limit = min(limit, 200)
+        
+        top = phase_monitor.get_top_peaks(limit, include_below_limit)
+        return {
+            "success": True,
+            **top
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/top_violations")
+async def get_top_violations(limit: int = Query(20)):
+    """Haal TOP N ergste fase overschrijdingen op met alle details
+    
+    Args:
+        limit: Aantal top violations per fase (default 20, max 100)
+    
+    Returns:
+        - overall_top: Top violations over alle fases
+        - l1_top, l2_top, l3_top: Top per specifieke fase
+        - Elk item bevat: value, overshoot, timestamp, zappi status, alle fase waarden
+    """
+    try:
+        # Limiteer tot max 100 voor performance
+        limit = min(limit, 100)
+        
+        top = phase_monitor.get_top_violations(limit)
+        return {
+            "success": True,
+            **top
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -3845,7 +4091,10 @@ async def test_battery_connection():
         
         if connected:
             # Quick test read
-            test_data = venus_modbus.read_battery_data()
+            test_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             venus_modbus.disconnect()
             
             return {
