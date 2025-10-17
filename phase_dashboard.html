@@ -843,13 +843,15 @@
 
         async function updateViolations() {
             try {
-                const res = await fetch('/api/phase_monitor/violations?hours=24');
+                // Alleen laatste 6 uur ophalen ipv 24 uur -> minder data
+                const res = await fetch('/api/phase_monitor/violations?hours=6');
                 const data = await res.json();
                 
                 if (data.success) {
                     const listEl = document.getElementById('violations-list');
                     
                     if (data.violations && data.violations.length > 0) {
+                        // Toon max laatste 10 violations
                         listEl.innerHTML = data.violations.slice(-10).reverse().map(v => {
                             const isDismissed = v.dismissed || false;
                             const isZappi = v.zappi_charging || false;
@@ -1057,8 +1059,8 @@
         setInterval(updatePhaseData, 1000);   // Elke 1s (LIVE!)
         setInterval(updateStats, 5000);       // Elke 5s
         setInterval(updateAnalysis, 10000);   // Elke 10s
-        setInterval(updateViolations, 15000); // Elke 15s
-        setInterval(updatePatterns, 30000);   // Elke 30s (patronen veranderen minder snel)
+        setInterval(updateViolations, 30000); // Elke 30s (was 15s - minder refresh)
+        setInterval(updatePatterns, 60000);   // Elke 60s (was 30s - patronen veranderen langzaam)
 
         // Initial load
         updatePhaseData();

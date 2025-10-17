@@ -226,6 +226,22 @@ def format_value(address: int, raw_value: int) -> dict:
     # Apply scaling
     scaled_value = raw_value * reg_info["scale"]
     
+    # SANITY CHECK: SoC percentage should be 0-100%
+    # Some batteries intermittently return incorrect values due to Modbus errors
+    if address == 32104:  # SoC register
+        if scaled_value > 100:
+            # Try dividing by 100 first (0.01% units like 1300 = 13%)
+            corrected = scaled_value / 100.0
+            if 0 <= corrected <= 100:
+                import logging
+                logging.warning(f"⚠️ SoC sanity fix: raw={raw_value} -> {scaled_value}% -> {corrected:.1f}%")
+                scaled_value = corrected
+            else:
+                # Still invalid, clamp to 0-100
+                import logging
+                logging.error(f"❌ Invalid SoC value: raw={raw_value}, scaled={scaled_value}% - CLAMPING to valid range")
+                scaled_value = max(0, min(100, scaled_value))
+    
     # Format with max 1 decimal place
     if "values" in reg_info and raw_value in reg_info["values"]:
         # Use enumerated value

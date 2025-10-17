@@ -85,44 +85,67 @@ class WhatsAppNotifier:
             return "☁️"
     
     async def send_energy_tip(self, energy_data: Dict[str, Any]):
-        """Send smart energy tip based on current situation
+        """Send smart energy tip based on current situation + forecast
         
         Args:
             energy_data: {
-                "clouds": 45,           # Cloud coverage %
-                "temperature": 18,      # Celsius
-                "pv_now_w": 3500,      # Current PV generation
-                "grid_w": -800,        # Grid import/export (negative = export)
-                "battery_soc": 85,     # Battery %
-                "battery_power": 1200, # Battery charging power
-                "overschot_w": 1500,   # Available surplus
-                "eddi_w": 2000,        # Eddi using
-                "house_w": 1200        # House consumption
+                "clouds": 45,              # Current cloud coverage %
+                "forecast_clouds": 30,     # Avg clouds next 6h
+                "temperature": 18,         # Celsius
+                "pv_now_w": 3500,         # Current PV generation
+                "grid_w": -800,           # Grid import/export (negative = export)
+                "battery_soc": 85,        # Battery %
+                "battery_power": 1200,    # Battery charging power
+                "overschot_w": 1500,      # Available surplus
+                "eddi_w": 2000,           # Eddi using
+                "house_w": 1200,          # House consumption
+                "hour": 9                 # Hour of day (9 or 13)
             }
         """
         clouds = energy_data.get("clouds", 100)
+        forecast_clouds = energy_data.get("forecast_clouds", clouds)  # Forecast next 6h
         pv_now = energy_data.get("pv_now_w", 0)
         grid_w = energy_data.get("grid_w", 0)
         battery_soc = energy_data.get("battery_soc", 0)
         overschot = energy_data.get("overschot_w", 0)
         eddi_w = energy_data.get("eddi_w", 0)
         house_w = energy_data.get("house_w", 0)
+        hour = energy_data.get("hour", 9)
         
         # Determine scenario
         emoji = self._get_weather_emoji(clouds)
         now = datetime.now()
         time_str = now.strftime("%H:%M")
         
-        # Scenario 1: Slecht weer (weinig zon)
-        if clouds > 70 or pv_now < 500:
+        # Scenario 1: Check FORECAST ipv alleen nu
+        # Om 09:00 vaak nog donker, maar straks wel zon!
+        is_morning = hour < 12
+        will_improve = forecast_clouds < clouds - 20  # Forecast 20% beter
+        
+        if (clouds > 70 or pv_now < 500) and not will_improve:
+            # Echt slecht weer hele dag
             message = f"""{emoji} *Energie Tip ({time_str})*
 
 Vandaag is het waardeloos weer...
 Weinig zon, dus geen verschil wanneer je de vaatwasser of wasmachine aanzet.
 
-☁️ Bewolking: {clouds}%
-⚡ PV nu: {pv_now}W
+☁️ Bewolking nu: {clouds}%
+📊 Verwachting: {forecast_clouds}% (blijft slecht)
 💡 Tip: Gewoon doen wanneer het uitkomt!
+
+_myEnergy systeem_"""
+        
+        elif (clouds > 70 or pv_now < 500) and will_improve and is_morning:
+            # Nu nog donker, maar straks zon!
+            forecast_emoji = self._get_weather_emoji(forecast_clouds)
+            message = f"""{emoji}→{forecast_emoji} *Energie Tip ({time_str})*
+
+Goede morgen! Nu nog weinig zon, maar het klaart op! ☀️
+
+☁️ Nu: {clouds}% bewolkt, {pv_now}W
+📈 Straks: {forecast_clouds}% bewolkt (wordt beter!)
+
+💡 Tip: Wacht met grote apparaten tot 11:00-12:00, dan is er meer gratis energie!
 
 _myEnergy systeem_"""
         

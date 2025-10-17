@@ -135,7 +135,7 @@ USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
 # Modbus Client for Venus E Battery 78
 # =========================
 class VenusEModbusClient:
-    def __init__(self, host=None, port=None):
+    def __init__(self, host=None, port=None, timeout=5, retries=3):
         env_host = os.getenv('VENUS_MODBUS_HOST')
         env_port = os.getenv('VENUS_MODBUS_PORT')
         self.host = (host or env_host or '192.168.68.92')
@@ -143,8 +143,11 @@ class VenusEModbusClient:
             self.port = int(port or env_port or 502)
         except Exception:
             self.port = 502
+        self.timeout = timeout
+        self.retries = retries
         self.client = None
         self.connected = False
+        self.last_valid_soc = None  # Cache for last known good SoC value
     
     def connect(self):
         try:
@@ -156,7 +159,7 @@ class VenusEModbusClient:
                     pass
             
             # Add a short timeout to avoid hanging sockets
-            self.client = ModbusTcpClient(self.host, port=self.port, timeout=2, retries=1)
+            self.client = ModbusTcpClient(self.host, port=self.port, timeout=self.timeout, retries=self.retries)
             self.connected = self.client.connect()
             if not self.connected:
                 logging.warning(f"Failed to connect to Modbus {self.host}:{self.port}")
@@ -211,7 +214,7 @@ class VenusEModbusClient:
         for reg_addr, param_name in registers.items():
             result = None
             retry_count = 0
-            max_retries = 1
+            max_retries = 3
             
             while retry_count < max_retries and result is None:
                 try:
@@ -294,6 +297,22 @@ class VenusEModbusClient:
         if not battery_data:
             logging.error(f"No battery data retrieved from {self.host}:{self.port}")
             return None
+        
+        # SANITY CHECK: Validate SoC and use cached value if invalid
+        if "soc_percent" in battery_data:
+            soc_value = battery_data["soc_percent"]["value"]
+            # Check if SoC is in valid range (0-100%)
+            if 0 <= soc_value <= 100:
+                # Valid - update cache
+                self.last_valid_soc = battery_data["soc_percent"].copy()
+            else:
+                # Invalid - use cached value if available
+                if self.last_valid_soc:
+                    logging.warning(f"⚠️ Invalid SoC {soc_value}% from {self.host} - using cached {self.last_valid_soc['value']}%")
+                    battery_data["soc_percent"] = self.last_valid_soc.copy()
+                    battery_data["soc_percent"]["cached"] = True
+                else:
+                    logging.error(f"❌ Invalid SoC {soc_value}% from {self.host} and no cache available")
         
         return battery_data
 
@@ -567,8 +586,12 @@ class VenusEModbusClient:
 
 # Global Modbus clients
 venus_modbus = VenusEModbusClient()  # Battery 1 (default host 192.168.68.92)
-# Battery 2 (WiFi converter), configurable via env VENUS_MODBUS_HOST2
-venus_modbus2 = VenusEModbusClient(host=os.getenv('VENUS_MODBUS_HOST2', '192.168.68.74'))
+# Battery 2 (WiFi converter) - needs longer timeout due to WiFi latency
+venus_modbus2 = VenusEModbusClient(
+    host=os.getenv('VENUS_MODBUS_HOST2', '192.168.68.74'),
+    timeout=10,  # WiFi converter needs more time
+    retries=5    # More retries for unstable WiFi
+)
 # Ensure only one Modbus read at a time (per device)
 modbus_lock = asyncio.Lock()
 modbus_lock2 = asyncio.Lock()
@@ -2553,10 +2576,18 @@ async def _whatsapp_tips_scheduler():
                 
                 # Gather current energy data
                 try:
-                    # Get weather
+                    # Get weather + FORECAST
                     weather_data = await weather_service.get_current_weather()
                     clouds = weather_data.get("clouds", 100)
                     temp = weather_data.get("temperature", 0)
+                    
+                    # Get hourly forecast for next 6 hours
+                    forecast_data = await weather_service.get_hourly_forecast()
+                    forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data.get("success") else []
+                    
+                    # Calculate average clouds next 6 hours
+                    future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]
+                    avg_future_clouds = sum(future_clouds) / len(future_clouds) if future_clouds else clouds
                     
                     # Use same data as dashboard - call /api/status
                     status = await get_status()
@@ -2588,6 +2619,7 @@ async def _whatsapp_tips_scheduler():
                     
                     energy_data = {
                         "clouds": clouds,
+                        "forecast_clouds": int(avg_future_clouds),  # Avg clouds next 6h
                         "temperature": temp,
                         "pv_now_w": pv_w,
                         "grid_w": grid_w,
@@ -2596,7 +2628,8 @@ async def _whatsapp_tips_scheduler():
                         "overschot_w": int(overschot),
                         "eddi_w": eddi_w,
                         "zappi_w": zappi_w,
-                        "house_w": house_w
+                        "house_w": house_w,
+                        "hour": current_hour  # 9 of 13
                     }
                     
                     # Send tip!
@@ -2743,10 +2776,18 @@ async def send_tip_now():
     try:
         from whatsapp_notifier import whatsapp
         
-        # Get weather
+        # Get weather + FORECAST
         weather_data = await weather_service.get_current_weather()
         clouds = weather_data.get("clouds", 100)
         temp = weather_data.get("temperature", 0)
+        
+        # Get hourly forecast for next 6 hours
+        forecast_data = await weather_service.get_hourly_forecast()
+        forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data.get("success") else []
+        
+        # Calculate average clouds next 6 hours
+        future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]
+        avg_future_clouds = sum(future_clouds) / len(future_clouds) if future_clouds else clouds
         
         # Use same data as dashboard - call /api/status
         status = await get_status()
@@ -2778,6 +2819,7 @@ async def send_tip_now():
         
         energy_data = {
             "clouds": clouds,
+            "forecast_clouds": int(avg_future_clouds),  # Avg clouds next 6h
             "temperature": temp,
             "pv_now_w": pv_w,
             "grid_w": grid_w,
@@ -2786,7 +2828,8 @@ async def send_tip_now():
             "overschot_w": int(overschot),
             "eddi_w": eddi_w,
             "zappi_w": zappi_w,
-            "house_w": house_w
+            "house_w": house_w,
+            "hour": datetime.now().hour  # Current hour
         }
         
         await whatsapp.send_energy_tip(energy_data)

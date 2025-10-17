@@ -1257,7 +1257,7 @@
             }
             renderHealthBadge(__healthClient);
         }
-        setInterval(updateBackendHealthBadge, 5000);
+        setInterval(updateBackendHealthBadge, 10000); // Elke 10s ipv 5s
         document.addEventListener('DOMContentLoaded', updateBackendHealthBadge);
 
         // Weather update function
@@ -1648,7 +1648,7 @@
         }
         
         // Auto-refresh rule status
-        setInterval(updateRuleStatus, 5000);  // Every 5 seconds
+        setInterval(updateRuleStatus, 10000);  // Elke 10s ipv 5s
         
         // Load rules when page loads
         document.addEventListener("DOMContentLoaded", loadCurrentRules);
@@ -1724,7 +1724,7 @@
         }
 
         // Poll the status to keep the card updated
-        setInterval(updateSimpleRuleStatus, 2000);
+        setInterval(updateSimpleRuleStatus, 5000); // Elke 5s ipv 2s
         document.addEventListener('DOMContentLoaded', updateSimpleRuleStatus);
     </script>
 
