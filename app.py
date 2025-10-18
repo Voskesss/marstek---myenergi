@@ -2582,8 +2582,8 @@ async def _whatsapp_tips_scheduler():
                     temp = weather_data.get("temperature", 0)
                     
                     # Get hourly forecast for next 6 hours
-                    forecast_data = await weather_service.get_hourly_forecast()
-                    forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data.get("success") else []
+                    forecast_data = await weather_service.get_forecast(hours=6)
+                    forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data else []
                     
                     # Calculate average clouds next 6 hours
                     future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]
@@ -2782,8 +2782,8 @@ async def send_tip_now():
         temp = weather_data.get("temperature", 0)
         
         # Get hourly forecast for next 6 hours
-        forecast_data = await weather_service.get_hourly_forecast()
-        forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data.get("success") else []
+        forecast_data = await weather_service.get_forecast(hours=6)
+        forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data else []
         
         # Calculate average clouds next 6 hours
         future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]

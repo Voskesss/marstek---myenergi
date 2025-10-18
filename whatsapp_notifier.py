@@ -119,10 +119,13 @@ class WhatsAppNotifier:
         
         # Scenario 1: Check FORECAST ipv alleen nu
         # Om 09:00 vaak nog donker, maar straks wel zon!
+        # BELANGRIJK: Gebruik PV als waarheid, niet alleen clouds!
         is_morning = hour < 12
         will_improve = forecast_clouds < clouds - 20  # Forecast 20% beter
+        actually_sunny = pv_now > 1000  # Als PV > 1kW, schijnt zon echt!
         
-        if (clouds > 70 or pv_now < 500) and not will_improve:
+        # Skip "slecht weer" bericht als PV zegt dat zon schijnt
+        if (clouds > 70 or pv_now < 500) and not will_improve and not actually_sunny:
             # Echt slecht weer hele dag
             message = f"""{emoji} *Energie Tip ({time_str})*
 
@@ -135,7 +138,7 @@ Weinig zon, dus geen verschil wanneer je de vaatwasser of wasmachine aanzet.
 
 _myEnergy systeem_"""
         
-        elif (clouds > 70 or pv_now < 500) and will_improve and is_morning:
+        elif (clouds > 70 or pv_now < 500) and will_improve and is_morning and not actually_sunny:
             # Nu nog donker, maar straks zon!
             forecast_emoji = self._get_weather_emoji(forecast_clouds)
             message = f"""{emoji}→{forecast_emoji} *Energie Tip ({time_str})*
@@ -144,8 +147,30 @@ Goede morgen! Nu nog weinig zon, maar het klaart op! ☀️
 
 ☁️ Nu: {clouds}% bewolkt, {pv_now}W
 📈 Straks: {forecast_clouds}% bewolkt (wordt beter!)
+⚡ PV nu: {pv_now}W
 
 💡 Tip: Wacht met grote apparaten tot 11:00-12:00, dan is er meer gratis energie!
+
+_myEnergy systeem_"""
+        
+        # Scenario 1b: OpenWeatherMap zegt bewolkt, maar PV laat zon zien!
+        elif actually_sunny and clouds > 70:
+            # PV is de waarheid - zon schijnt ondanks slechte forecast
+            sun_emoji = "☀️"
+            message = f"""{sun_emoji} *Energie Tip ({time_str})*
+
+De zon schijnt! 🌞
+
+(OpenWeather zegt {clouds}% bewolkt, maar je PV laat de waarheid zien!)
+
+⚡ PV nu: {pv_now}W
+🔋 Batterijen: {battery_soc}%
+⚡ Overschot: {overschot}W
+
+💡 Tip: {
+    "PERFECT moment voor apparaten! Veel gratis energie!" if overschot > 500 
+    else "Batterijen laden, straks meer overschot beschikbaar!"
+}
 
 _myEnergy systeem_"""
         
