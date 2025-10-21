@@ -6794,5 +6794,16 @@
     "violations": [],
     "is_violation": false,
     "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T17:36:35.340118",
+    "l1_w": 4111,
+    "l2_w": 4116,
+    "l3_w": 4304,
+    "zappi_w": 3497,
+    "zappi_charging": true,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
   }
 ]
