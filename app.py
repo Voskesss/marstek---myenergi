@@ -22,7 +22,8 @@ if not logging.getLogger().handlers:
     except Exception:
         pass
     try:
-        rot = RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=5)
+        # Smaller rotation for Raspberry Pi: 2MB per file, max 2 backups = ~6MB total
+        rot = RotatingFileHandler(LOG_FILE, maxBytes=2_000_000, backupCount=2)
         rot.setFormatter(formatter)
         handlers.append(rot)
     except Exception:
