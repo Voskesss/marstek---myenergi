@@ -1,10 +1,11 @@
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 
 # Logging configuration (must run after importing os/logging)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_FILE = os.getenv("LOG_FILE", "")
+LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 
 if not logging.getLogger().handlers:
     handlers = []
@@ -15,10 +16,18 @@ if not logging.getLogger().handlers:
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     handlers.append(stream_handler)
-    if LOG_FILE:
-        file_handler = logging.FileHandler(LOG_FILE)
-        file_handler.setFormatter(formatter)
-        handlers.append(file_handler)
+    # Ensure directory
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    except Exception:
+        pass
+    try:
+        # Smaller rotation for Raspberry Pi: 2MB per file, max 2 backups = ~6MB total
+        rot = RotatingFileHandler(LOG_FILE, maxBytes=2_000_000, backupCount=2)
+        rot.setFormatter(formatter)
+        handlers.append(rot)
+    except Exception:
+        pass
     logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO), handlers=handlers)
 
 logger = logging.getLogger("myenergi-marstek")
@@ -48,18 +57,20 @@ import time
 import asyncio
 import json
 import logging
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import FastAPI, BackgroundTasks, Request, Query, Body, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pymodbus.client import ModbusTcpClient
 from venus_e_register_map import format_value, get_all_sensors
+from battery_manager import BatteryManager
+from phase_monitor import PhaseMonitor
+from p1_reader import P1Reader
 from dotenv import load_dotenv
 
 # BLE integration
@@ -125,7 +136,7 @@ USER_AGENT = {"User-Agent": "Wget/1.14 (linux-gnu)"}
 # Modbus Client for Venus E Battery 78
 # =========================
 class VenusEModbusClient:
-    def __init__(self, host=None, port=None):
+    def __init__(self, host=None, port=None, timeout=5, retries=3):
         env_host = os.getenv('VENUS_MODBUS_HOST')
         env_port = os.getenv('VENUS_MODBUS_PORT')
         self.host = (host or env_host or '192.168.68.92')
@@ -133,29 +144,52 @@ class VenusEModbusClient:
             self.port = int(port or env_port or 502)
         except Exception:
             self.port = 502
+        self.timeout = timeout
+        self.retries = retries
         self.client = None
         self.connected = False
+        self.last_valid_soc = None  # Cache for last known good SoC value
     
     def connect(self):
         try:
+            # Close old connection first if exists
+            if self.client:
+                try:
+                    self.client.close()
+                except:
+                    pass
+            
             # Add a short timeout to avoid hanging sockets
-            self.client = ModbusTcpClient(self.host, port=self.port, timeout=2)
+            self.client = ModbusTcpClient(self.host, port=self.port, timeout=self.timeout, retries=self.retries)
             self.connected = self.client.connect()
+            if not self.connected:
+                logging.warning(f"Failed to connect to Modbus {self.host}:{self.port}")
             return self.connected
         except Exception as e:
             logging.error(f"Modbus connection error: {e}")
+            self.connected = False
             return False
     
     def disconnect(self):
         if self.client:
-            self.client.close()
-            self.connected = False
+            try:
+                self.client.close()
+            except Exception as e:
+                logging.debug(f"Error closing Modbus connection: {e}")
+            finally:
+                self.connected = False
+                self.client = None
 
     def read_battery_data(self):
         """Read all battery data from Venus E via Modbus"""
-        if not self.connected:
-            if not self.connect():
-                return None
+        try:
+            if not self.connected:
+                if not self.connect():
+                    logging.warning(f"Modbus connection to {self.host}:{self.port} failed, returning None")
+                    return None
+        except Exception as e:
+            logging.error(f"Modbus connect exception on {self.host}:{self.port}: {e}")
+            return None
 
         battery_data = {}
 
@@ -179,29 +213,62 @@ class VenusEModbusClient:
         }
         
         for reg_addr, param_name in registers.items():
-            try:
-                result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
-                if (not hasattr(result, 'registers')) or result.isError():
-                    # retry once after reconnect
-                    self.disconnect()
-                    if self.connect():
-                        result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
-                
-                if hasattr(result, 'registers') and not result.isError():
-                    raw_value = result.registers[0]
-                    formatted = format_value(reg_addr, raw_value)
+            result = None
+            retry_count = 0
+            max_retries = 3
+            
+            while retry_count < max_retries and result is None:
+                try:
+                    # Ensure we have a valid client connection
+                    if not self.client or not self.connected:
+                        if not self.connect():
+                            retry_count += 1
+                            time.sleep(0.1)
+                            continue
                     
-                    battery_data[param_name] = {
-                        "value": formatted.get("value", raw_value),
-                        "formatted": formatted.get("formatted", str(raw_value)),
-                        "unit": formatted.get("unit", ""),
-                        "description": formatted.get("description", param_name),
-                        "register": reg_addr,
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
                     
-            except Exception as e:
-                logging.error(f"Error reading register {reg_addr}: {e}")
+                    if hasattr(result, 'registers') and not result.isError():
+                        raw_value = result.registers[0]
+                        formatted = format_value(reg_addr, raw_value)
+                        
+                        battery_data[param_name] = {
+                            "value": formatted.get("value", raw_value),
+                            "formatted": formatted.get("formatted", str(raw_value)),
+                            "unit": formatted.get("unit", ""),
+                            "description": formatted.get("description", param_name),
+                            "register": reg_addr,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        break  # Success, move to next register
+                    else:
+                        # Error response, retry with reconnect only on last attempt
+                        result = None
+                        retry_count += 1
+                        if retry_count >= max_retries:
+                            logging.debug(f"Register {reg_addr} error after {max_retries} attempts")
+                        
+                except Exception as e:
+                    retry_count += 1
+                    error_str = str(e).lower()
+                    
+                    # Detect connection errors that need reconnect
+                    is_connection_error = any(x in error_str for x in ["broken pipe", "connection", "bad file descriptor", "closed"])
+                    
+                    if is_connection_error:
+                        logging.debug(f"Connection error on {reg_addr}, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
+                        if retry_count < max_retries:
+                            time.sleep(0.1)  # Give device time to recover
+                            continue
+                    elif retry_count < max_retries:
+                        # Brief pause before retry, keep connection alive
+                        time.sleep(0.05)
+                    else:
+                        # Log only on last attempt
+                        logging.warning(f"Error reading register {reg_addr} from {self.host}: {e}")
+                    result = None
         
         # Calculate actual power from voltage × current if we have both
         if "battery_voltage" in battery_data and "battery_current" in battery_data:
@@ -209,19 +276,44 @@ class VenusEModbusClient:
             current = battery_data["battery_current"]["value"] 
             calculated_power = voltage * current
             
-            # Apply scaling to match Marstek app (divide by ~10)
-            scaled_power = calculated_power * 0.1
+            # CRITICAL: Venus E registers have pre-scaled values that need correction
+            # Voltage scale: 0.1 (raw 5167 → 516.7V but should be 51.67V)
+            # Current scale: 0.01 (raw -30 → -0.3A but should be -0.03A)
+            # Result: V × A gives 10x too high power
+            # Fix: Apply 0.1 correction factor
+            corrected_power = calculated_power * 0.1
             
-            # Override battery_power with scaled calculated value
+            # Override battery_power with corrected calculated value
             battery_data["battery_power"] = {
-                "value": scaled_power,
-                "formatted": f"{scaled_power:.0f} W",
+                "value": corrected_power,
+                "formatted": f"{corrected_power:.0f} W",
                 "unit": "W", 
-                "description": "Battery Power (calculated)",
+                "description": "Battery Power (calculated, corrected)",
                 "register": "calc",
                 "timestamp": datetime.now().isoformat()
             }
-            logging.info(f"Calculated power: {voltage}V × {current}A = {calculated_power}W, scaled = {scaled_power}W")
+            logging.info(f"✅ Power calc: {voltage}V × {current}A = {calculated_power}W → corrected: {corrected_power}W")
+        
+        # If we got no data at all, return None to signal complete failure
+        if not battery_data:
+            logging.error(f"No battery data retrieved from {self.host}:{self.port}")
+            return None
+        
+        # SANITY CHECK: Validate SoC and use cached value if invalid
+        if "soc_percent" in battery_data:
+            soc_value = battery_data["soc_percent"]["value"]
+            # Check if SoC is in valid range (0-100%)
+            if 0 <= soc_value <= 100:
+                # Valid - update cache
+                self.last_valid_soc = battery_data["soc_percent"].copy()
+            else:
+                # Invalid - use cached value if available
+                if self.last_valid_soc:
+                    logging.warning(f"⚠️ Invalid SoC {soc_value}% from {self.host} - using cached {self.last_valid_soc['value']}%")
+                    battery_data["soc_percent"] = self.last_valid_soc.copy()
+                    battery_data["soc_percent"]["cached"] = True
+                else:
+                    logging.error(f"❌ Invalid SoC {soc_value}% from {self.host} and no cache available")
         
         return battery_data
 
@@ -243,6 +335,12 @@ class VenusEModbusClient:
                     rr = self.client.write_register(address=address, value=value, unit=unit)
                     ok = (not getattr(rr, 'isError', lambda: False)())
                 except Exception as ex:
+                    err_str = str(ex).lower()
+                    # Reconnect on connection errors
+                    if any(x in err_str for x in ["broken pipe", "connection", "bad file descriptor"]):
+                        logging.debug(f"Write connection error, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
                     err = str(ex)
                 attempts.append({"unit": unit, "style": "unit", "ok": ok, "error": err})
                 if ok:
@@ -254,6 +352,11 @@ class VenusEModbusClient:
                     rr2 = self.client.write_register(address=address, value=value, slave=unit)
                     ok2 = (not getattr(rr2, 'isError', lambda: False)())
                 except Exception as ex2:
+                    err2_str = str(ex2).lower()
+                    if any(x in err2_str for x in ["broken pipe", "connection", "bad file descriptor"]):
+                        logging.debug(f"Write connection error, reconnecting...")
+                        self.disconnect()
+                        self.connected = False
                     err2 = str(ex2)
                 attempts.append({"unit": unit, "style": "slave", "ok": ok2, "error": err2})
                 if ok2:
@@ -341,9 +444,14 @@ class VenusEModbusClient:
             except Exception:
                 pass
 
-    def check_minimum_soc(self, min_soc_percent: float = 20.0, hysteresis: float = 2.0) -> dict:
+    def check_minimum_soc(self, min_soc_percent: float = 20.0, hysteresis: float = 2.0, simple_rule_enabled: bool = False) -> dict:
         """Check if current SoC is above minimum and take action if needed
         Uses hysteresis to prevent toggling around the threshold
+        
+        Args:
+            min_soc_percent: Minimum SOC threshold
+            hysteresis: Hysteresis band to prevent toggling
+            simple_rule_enabled: If True, emergency charge is DISABLED (Simple Rule manages charging)
         """
         try:
             # Get current battery data
@@ -359,8 +467,17 @@ class VenusEModbusClient:
                 "current_soc": current_soc,
                 "min_soc_limit": min_soc_percent,
                 "stop_threshold": stop_threshold,
-                "action_taken": None
+                "action_taken": None,
+                "simple_rule_enabled": simple_rule_enabled
             }
+            
+            # BELANGRIJK: Emergency charge alleen als Simple Rule UIT staat!
+            if simple_rule_enabled:
+                result.update({
+                    "action_taken": "simple_rule_active",
+                    "status": f"SoC {current_soc}% - Simple Rule manages charging (emergency charge disabled)"
+                })
+                return result
             
             if current_soc <= min_soc_percent:
                 # SoC too low - activate emergency charge
@@ -470,11 +587,31 @@ class VenusEModbusClient:
 
 # Global Modbus clients
 venus_modbus = VenusEModbusClient()  # Battery 1 (default host 192.168.68.92)
-# Battery 2 (WiFi converter), configurable via env VENUS_MODBUS_HOST2
-venus_modbus2 = VenusEModbusClient(host=os.getenv('VENUS_MODBUS_HOST2', '192.168.68.74'))
+# Battery 2 (WiFi converter) - needs longer timeout due to WiFi latency
+venus_modbus2 = VenusEModbusClient(
+    host=os.getenv('VENUS_MODBUS_HOST2', '192.168.68.74'),
+    timeout=10,  # WiFi converter needs more time
+    retries=5    # More retries for unstable WiFi
+)
 # Ensure only one Modbus read at a time (per device)
 modbus_lock = asyncio.Lock()
 modbus_lock2 = asyncio.Lock()
+
+# Multi-battery manager (ids aligned to user naming)
+#  - venus_ev2_92 → 192.168.68.92 (Battery 1)
+#  - venus_ev2_74 → 192.168.68.74 (Battery 2)
+manager = BatteryManager({
+    'venus_ev2_92': {'client': venus_modbus,  'lock': modbus_lock},
+    'venus_ev2_74': {'client': venus_modbus2, 'lock': modbus_lock2},
+})
+
+def _get_entry_for(bid: str):
+    entry = None
+    try:
+        entry = {'client': manager.registry[bid]['client'], 'lock': manager.registry[bid]['lock']}
+    except Exception:
+        entry = None
+    return entry
 
 # Battery configuration management
 BATTERY_CONFIG_FILE = "battery_config.json"
@@ -1224,6 +1361,13 @@ async def ble_set_meter_ip_page2():
 myenergi = MyEnergiClient(MYENERGI_BASE_URL, MYENERGI_HUB_SERIAL, MYENERGI_API_KEY)
 marstek  = MarstekClient(MARSTEK_BASE_URL, MARSTEK_API_TOKEN)
 
+# P1 meter (HomeWizard compatible) - Optional
+P1_METER_IP = os.getenv("P1_METER_IP", "192.168.68.73")
+p1_reader = P1Reader(P1_METER_IP) if P1_METER_IP else None
+
+# Phase monitor voor 3x25A check
+phase_monitor = PhaseMonitor(myenergi, myenergi_lock, p1_reader)
+
 @app.get("/health")
 async def health():
     return {"ok": True}
@@ -1255,8 +1399,10 @@ async def get_status():
             power = await asyncio.wait_for(marstek.get_power(), timeout=2.0)
             
             # Extract battery power for house consumption calculation
-            if power and hasattr(power, 'value'):
-                battery_power_w = int(power.value)  # Positive = charging (consuming), Negative = discharging (providing)
+            # get_power() returns an int (W) or None. Convention:
+            #  +ve = charging (consuming), -ve = discharging (providing)
+            if isinstance(power, (int, float)):
+                battery_power_w = int(power)
         except asyncio.TimeoutError:
             marstek_error = "Battery connection timeout"
         except Exception as e:
@@ -1265,10 +1411,15 @@ async def get_status():
         # Calculate house consumption with battery power included
         house_w = extract_house_consumption_w(m, battery_power_w)
         
+        # Grid import-positief waarde (compat voor flow.html)
+        grid_import_w = None if export_w is None else (-export_w)
+        
         return {
             "timestamp": time.time(),
             "myenergi_raw": m,
             "grid_export_w": export_w,
+            "grid_import_w": grid_import_w,
+            "grid_w": grid_import_w,  # alias used by some UIs (import = +)
             "eddi_power_w": eddi_w,
             "zappi_power_w": zappi_w,
             "house_consumption_w": house_w,
@@ -1277,10 +1428,19 @@ async def get_status():
             "should_block": should_block,
             "block_reason": block_reason,
             "marstek_soc": soc,
-            "marstek_power_w": power,
+            "marstek_power_w": battery_power_w,
             "marstek_error": marstek_error,
             "battery_blocked": state.battery_blocked,
             "last_switch": state.last_switch,
+            # Minimal derived block for legacy UI on "/" route
+            "derived": {
+                "grid_export_w": export_w,
+                "eddi_power_w": eddi_w,
+                "zappi_power_w": zappi_w,
+                "house_consumption_w": house_w,
+                "pv_generation_w": pv_w,
+                "battery_power_w": battery_power_w,
+            },
             "config": {
                 "priority_mode": EDDI_PRIORITY_MODE,
                 "target_temp_1": EDDI_TARGET_TEMP_1,
@@ -1305,6 +1465,13 @@ async def get_status():
             "Expires": "0",
         }
         return JSONResponse(content={"error": str(e), "timestamp": time.time()}, headers=cache_headers)
+
+@app.get("/phase")
+async def phase_dashboard():
+    """3-Fase monitor dashboard voor 3x25A check"""
+    with open("phase_dashboard.html", "r") as f:
+        html = f.read()
+    return HTMLResponse(html)
 
 @app.get("/dashboard")
 async def live_dashboard():
@@ -1776,6 +1943,975 @@ async def ble_connect():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# =========================
+# Simple Battery Rule Engine (export-driven, manual setpoints)
+# =========================
+class SimpleRuleState:
+    def __init__(self):
+        self.enabled: bool = False
+        self.task: Optional[asyncio.Task] = None
+        # defaults (can be overridden via enable payload)
+        self.cfg: Dict[str, Any] = {
+            "buffer_w": 200,
+            "export_margin_w": 100,
+            "threshold_start_w": 150,
+            "threshold_stop_w": 100,
+            "ramp_step_w": 150,        # per tick
+            "loop_interval_s": 5.0,    # 5 seconds (was 0.5s)
+            "cooldown_s": 8,
+            "max_batt_total_w": 5000,  # total across all batteries
+            "per_battery_max_w": 2500, # hard cap per battery
+            "battery_config": self._load_battery_limits()  # Load from battery_config.json
+        }
+        self.last: Dict[str, Any] = {
+            "grid_w": None,
+            "overschot_w": 0,
+            "target_export_w": 0,
+            "batt_target_total_w": 0,
+            "batt_set_total_w": 0,
+            "per_battery": {},
+            "cooldown": False,
+            "ts": None,
+            "source": "zappi_ct",
+            "health": {
+                "myenergi_ok": False,
+                "myenergi_fail_count": 0,
+                "last_myenergi_ok_ts": None,
+                "simple_rule_ok": False,
+                "simple_rule_fail_count": 0,
+                "last_simple_rule_ok_ts": None,
+            },
+        }
+        self.prev_set_total: float = 0.0
+        self.cooldown_until: float = 0.0
+        self.battery_modes: Dict[str, str] = {}  # Track battery modes: bid -> "manual"|"anti-feed"|"unknown"
+    
+    def _load_battery_limits(self) -> dict:
+        """Load minimum SOC limits from battery_config.json"""
+        try:
+            cfg = load_battery_config()
+            limits = {}
+            for bid in ["venus_ev2_92", "venus_ev2_74"]:
+                if bid in cfg:
+                    limits[bid] = {"minimum_soc_percent": cfg[bid].get("minimum_soc_percent", 35)}
+                else:
+                    limits[bid] = {"minimum_soc_percent": 35}
+            logger.info(f"📋 Loaded battery SOC limits: {limits}")
+            return limits
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load battery config, using defaults: {e}")
+            return {
+                "venus_ev2_92": {"minimum_soc_percent": 35},
+                "venus_ev2_74": {"minimum_soc_percent": 35},
+            }
+    
+    def reload_battery_limits(self):
+        """Reload battery limits from config file (call after config update)"""
+        self.cfg["battery_config"] = self._load_battery_limits()
+        logger.info(f"🔄 Battery limits reloaded: {self.cfg['battery_config']}")
+
+simple_rule = SimpleRuleState()
+def _extract_grid_from_raw(raw: Dict[str, Any]) -> Optional[int]:
+    """Prefer Zappi CT ectp4..6 sum. Fallback to Eddi 'grd' or top-level 'grd'."""
+    try:
+        blocks = raw.get("raw") or []
+        z_sum = None
+        for b in blocks:
+            if "zappi" in b and isinstance(b["zappi"], list):
+                for z in b["zappi"]:
+                    try:
+                        e4 = int(z.get("ectp4") or 0)
+                        e5 = int(z.get("ectp5") or 0)
+                        e6 = int(z.get("ectp6") or 0)
+                        z_sum = (z_sum or 0) + (e4 + e5 + e6)
+                    except Exception:
+                        continue
+        if z_sum is not None:
+            return z_sum
+        # fallback: see if eddi.grd exists
+        for b in blocks:
+            if "eddi" in b and isinstance(b["eddi"], list):
+                for e in b["eddi"]:
+                    if e.get("grd") is not None:
+                        return int(e.get("grd"))
+        # last chance: top-level
+        if isinstance(raw, dict) and raw.get("grd") is not None:
+            return int(raw.get("grd"))
+    except Exception:
+        return None
+    return None
+
+def _extract_pv_from_raw(raw: Dict[str, Any]) -> Optional[int]:
+    """Extract PV generation from raw data. Prefer 'gen' field."""
+    try:
+        blocks = raw.get("raw") or []
+        # Try to get from eddi or zappi 'gen' field
+        for b in blocks:
+            if "eddi" in b and isinstance(b["eddi"], list):
+                for e in b["eddi"]:
+                    if e.get("gen") is not None:
+                        return int(e.get("gen"))
+            if "zappi" in b and isinstance(b["zappi"], list):
+                for z in b["zappi"]:
+                    if z.get("gen") is not None:
+                        return int(z.get("gen"))
+        # Fallback to top-level
+        if isinstance(raw, dict) and raw.get("gen") is not None:
+            return int(raw.get("gen"))
+    except Exception:
+        return None
+    return None
+
+async def _set_battery_power(bid: str, power_w: int) -> Dict[str, Any]:
+    """Helper to send manual charge setpoint to a battery id; power_w=0 -> stop."""
+    try:
+        if power_w and power_w > 0:
+            payload = {"action": "charge", "power_w": int(power_w)}
+        else:
+            payload = {"action": "stop"}
+        # reuse endpoint logic directly
+        result = await battery_control_by_id(bid, payload)  # type: ignore[arg-type]
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+async def _simple_rule_loop():
+    global simple_rule
+    cfg = simple_rule.cfg
+    alpha = 0.3  # light smoothing for overschot
+    ema_overschot = 0.0
+    while simple_rule.enabled:
+        t0 = time.time()
+        try:
+            # fetch myenergi raw with small retry/backoff and compute grid
+            data = None
+            last_err = None
+            for attempt in range(3):
+                try:
+                    data = await myenergi.status_all()
+                    break
+                except Exception as e:
+                    last_err = str(e)
+                    await asyncio.sleep(0.2 * (attempt + 1))
+            grid_w = _extract_grid_from_raw(data) if data is not None else None
+            pv_w = _extract_pv_from_raw(data) if data is not None else None
+            if grid_w is None:
+                # no data -> safe stop
+                target_total = 0
+                simple_rule.last.update({
+                    "grid_w": None,
+                    "overschot_w": 0,
+                    "target_export_w": cfg["buffer_w"] + cfg["export_margin_w"],
+                    "batt_target_total_w": target_total,
+                    "batt_set_total_w": 0,
+                    "per_battery": {},
+                    "cooldown": False,
+                    "ts": time.time(),
+                    "error": last_err or "no_grid_data",
+                })
+                # degrade health
+                try:
+                    h = simple_rule.last.get("health", {})
+                    h["myenergi_ok"] = False
+                    h["myenergi_fail_count"] = int(h.get("myenergi_fail_count", 0)) + 1
+                    simple_rule.last["health"] = h
+                except Exception:
+                    pass
+                # stop all
+                for it in (await list_batteries())['items']:  # type: ignore[index]
+                    await _set_battery_power(it['id'], 0)
+            else:
+                overschot_raw = max(0, -int(grid_w))
+                ema_overschot = alpha * overschot_raw + (1 - alpha) * ema_overschot
+                target_export = cfg["buffer_w"] + cfg["export_margin_w"]
+                error = ema_overschot - target_export
+
+                # cooldown logic
+                now = time.time()
+                in_cooldown = now < simple_rule.cooldown_until
+
+                target_total = simple_rule.prev_set_total
+                
+                # Anti-feed mode parameters
+                pv_threshold = cfg.get("pv_threshold_w", 50)
+                import_threshold = cfg.get("import_threshold_w", 100)
+                
+                # Check for anti-feed condition: no PV + importing from grid
+                if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
+                    # Anti-feed mode: discharge batteries to grid
+                    # Each battery is checked INDIVIDUALLY for min SOC
+                    logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
+                    try:
+                        items = (await list_batteries())['items']  # type: ignore[index]
+                        logger.info(f"🔋 Found {len(items)} batteries: {[it['id'] for it in items]}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to list batteries: {e}")
+                        continue
+                    per: Dict[str, Any] = {}
+                    logger.info(f"🔄 Starting battery loop for {len(items)} batteries")
+                    for it in items:
+                        bid = it['id']
+                        logger.info(f"🔄 Processing battery {bid}")
+                        try:
+                            # Get the existing battery client from registry
+                            logger.info(f"🔍 Getting entry for {bid}")
+                            entry = _get_entry_for(bid)
+                            if not entry:
+                                logger.warning(f"⚡ Battery {bid} not found in registry")
+                                per[bid] = {"mode": "anti-feed", "ok": False, "error": "not_in_registry"}
+                                continue
+                            
+                            logger.info(f"🔍 Got client and lock for {bid}")
+                            client = entry['client']
+                            lock = entry['lock']
+                            
+                            # Check SOC before allowing discharge (anti-feed) - INDIVIDUAL battery check
+                            # Use async timeout to prevent blocking
+                            try:
+                                battery_data = await asyncio.wait_for(
+                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                    timeout=5.0
+                                )
+                                current_soc = battery_data.get("soc_percent", {}).get("value", 100) if battery_data else 100
+                                min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
+                                
+                                if current_soc <= min_soc:
+                                    logger.warning(f"🔋 Battery {bid} SOC too low ({current_soc}% <= {min_soc}%) - SKIP this battery (others continue)")
+                                    # Check ACTUAL mode from battery (work_mode register 42000)
+                                    # Work mode: 0=Manual, 1=Anti-Feed, 2=Trade
+                                    actual_mode = battery_data.get("work_mode", {}).get("value", -1) if battery_data else -1
+                                    logger.info(f"🔍 Actual battery mode from Modbus: {actual_mode} (0=Manual, 1=Anti-Feed, 2=Trade)")
+                                    
+                                    # If in anti-feed or discharging (power < 0), STOP it immediately
+                                    battery_power = battery_data.get("battery_power", {}).get("value", 0) if battery_data else 0
+                                    if actual_mode == 1 or battery_power < -50:  # Anti-feed or actively discharging
+                                        logger.warning(f"⚠️ Battery {bid} is discharging ({battery_power}W) - Switching to Manual mode to STOP!")
+                                        async with lock:
+                                            stop_result = client.set_work_mode(0)  # Manual mode
+                                        simple_rule.battery_modes[bid] = "manual"
+                                        logger.info(f"✅ Mode switch result: {stop_result}")
+                                    else:
+                                        logger.info(f"ℹ️ Battery {bid} not actively discharging (mode={actual_mode}, power={battery_power}W)")
+                                    
+                                    per[bid] = {"mode": "blocked_min_soc", "ok": True, "soc": current_soc, "min_soc": min_soc}
+                                    continue
+                            except Exception as e:
+                                error_type = "timeout" if "timeout" in str(e).lower() else "connection" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor"]) else "unknown"
+                                logger.warning(f"⚠️ Modbus {error_type} for {bid} - BLOCKING anti-feed for safety (app continues)")
+                                # If battery is currently in anti-feed, STOP it immediately (safety first!)
+                                current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                                if current_mode == "anti-feed":
+                                    logger.warning(f"⚠️ Battery {bid} in anti-feed but SOC unknown - Attempting emergency stop...")
+                                    try:
+                                        async with lock:
+                                            stop_result = client.set_work_mode(0)  # Manual mode
+                                        if stop_result.get("ok"):
+                                            simple_rule.battery_modes[bid] = "manual"
+                                            logger.info(f"✅ Emergency stop successful for {bid}")
+                                        else:
+                                            logger.warning(f"⚠️ Emergency stop failed for {bid}, will retry next cycle")
+                                    except Exception as stop_error:
+                                        logger.warning(f"⚠️ Could not emergency stop {bid} (Modbus issue), will retry: {stop_error}")
+                                per[bid] = {"mode": "blocked", "ok": False, "error": f"modbus_{error_type}", "will_retry": True}
+                                continue
+                            
+                            # Set work mode to Anti-Feed (1) - only if not already in anti-feed
+                            current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                            logger.info(f"🔍 Current mode for {bid}: {current_mode}")
+                            if current_mode != "anti-feed":
+                                async with lock:
+                                    result = client.set_work_mode(1)
+                                if result.get("ok"):
+                                    simple_rule.battery_modes[bid] = "anti-feed"
+                                per[bid] = {"mode": "anti-feed", "ok": result.get("ok", False)}
+                                logger.info(f"⚡ Battery {bid} switched to anti-feed: {result}")
+                            else:
+                                per[bid] = {"mode": "anti-feed", "ok": True, "already_set": True}
+                                logger.info(f"✅ Battery {bid} already in anti-feed mode (skipping)")
+                        except Exception as e:
+                            error_type = "modbus_error" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor", "timeout"]) else "logic_error"
+                            logger.warning(f"⚠️ Battery {bid} temporary error ({error_type}), will retry next cycle: {e}")
+                            per[bid] = {"mode": "error", "ok": False, "error": error_type, "will_retry": True}
+                    
+                    # Mark health as OK for anti-feed mode
+                    try:
+                        h = simple_rule.last.get("health", {})
+                        h.update({
+                            "myenergi_ok": True,
+                            "myenergi_fail_count": 0,
+                            "last_myenergi_ok_ts": time.time(),
+                            "simple_rule_ok": True,
+                            "simple_rule_fail_count": 0,
+                            "last_simple_rule_ok_ts": time.time()
+                        })
+                        simple_rule.last["health"] = h
+                    except Exception:
+                        pass
+                    
+                    simple_rule.last.update({
+                        "grid_w": grid_w,
+                        "pv_w": pv_w,
+                        "overschot_w": 0,
+                        "mode": "anti-feed",
+                        "target_export_w": target_export,
+                        "batt_target_total_w": 0,
+                        "batt_set_total_w": 0,
+                        "per_battery": per,
+                        "cooldown": False,
+                        "ts": time.time(),
+                    })
+                    # Continue to next iteration
+                    dt = time.time() - t0
+                    await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+                    continue
+                    
+                if grid_w >= 0:
+                    # importing but PV is available -> stop charging
+                    target_total = 0
+                    simple_rule.cooldown_until = now + cfg["cooldown_s"]
+                else:
+                    if error > cfg["threshold_start_w"] and not in_cooldown:
+                        # ramp up proportionally but bounded
+                        step = min(cfg["ramp_step_w"], int(error))
+                        target_total = min(cfg["max_batt_total_w"], simple_rule.prev_set_total + step)
+                    elif error < -cfg["threshold_stop_w"]:
+                        # ramp down quickly
+                        step = cfg["ramp_step_w"]
+                        target_total = max(0, simple_rule.prev_set_total - step)
+                        if target_total == 0:
+                            simple_rule.cooldown_until = now + cfg["cooldown_s"]
+                    # else hold
+
+                # distribute across batteries with per-battery cap and leftover redistribution
+                per: Dict[str, Any] = {}
+                items = (await list_batteries())['items']  # type: ignore[index]
+                n = max(1, len(items))
+                setpoints: Dict[str, int] = {}
+                remaining = int(target_total)
+                base_share = int(target_total / n) if n > 0 else 0
+                base_share = min(base_share, int(simple_rule.cfg.get("per_battery_max_w", 2500)))
+                # first pass: assign base share
+                for it in items:
+                    bid = it['id']
+                    sp = max(0, min(base_share, remaining))
+                    setpoints[bid] = sp
+                    remaining -= sp
+                # second pass: distribute leftover up to per-battery max
+                if remaining > 0 and items:
+                    cap = int(simple_rule.cfg.get("per_battery_max_w", 2500))
+                    idx = 0
+                    L = len(items)
+                    while remaining > 0 and idx < L * 2:  # limited cycles
+                        bid = items[idx % L]['id']
+                        space = max(0, cap - setpoints.get(bid, 0))
+                        if space > 0:
+                            give = min(space, remaining)
+                            setpoints[bid] = setpoints.get(bid, 0) + give
+                            remaining -= give
+                        idx += 1
+                # apply setpoints (with mode switching back to Manual if charging)
+                set_total = 0
+                for it in items:
+                    bid = it['id']
+                    sp = int(setpoints.get(bid, 0))
+                    
+                    # If we're going to charge (sp > 0), CHECK MAX SOC FIRST
+                    if sp > 0:
+                        # Check if battery is already at max SOC - INDIVIDUAL check
+                        try:
+                            entry = _get_entry_for(bid)
+                            if entry:
+                                client = entry['client']
+                                lock = entry['lock']
+                                
+                                # Read current SOC
+                                battery_data = await asyncio.wait_for(
+                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                    timeout=3.0
+                                )
+                                current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                                max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
+                                
+                                if current_soc >= max_soc:
+                                    logger.info(f"🔋 Battery {bid} at max SOC ({current_soc}% >= {max_soc}%) - SKIP charging (others continue)")
+                                    per[bid] = {"set": 0, "ok": True, "mode": "blocked_max_soc", "soc": current_soc, "max_soc": max_soc}
+                                    continue
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not check SOC for {bid}: {e} - will try to charge anyway")
+                        
+                        # Ensure battery is in Manual mode for charging
+                        # Only switch if not already in manual mode to prevent flipping
+                        current_mode = simple_rule.battery_modes.get(bid, "unknown")
+                        if current_mode != "manual":
+                            try:
+                                logger.info(f"🔋 SIMPLE RULE: Setting {bid} to Manual mode for charging {sp}W")
+                                # Get the existing battery client from registry
+                                entry = _get_entry_for(bid)
+                                if entry:
+                                    client = entry['client']
+                                    lock = entry['lock']
+                                    async with lock:
+                                        mode_result = client.set_work_mode(0)  # 0 = Manual mode
+                                    if mode_result.get("ok"):
+                                        simple_rule.battery_modes[bid] = "manual"
+                                    logger.info(f"🔋 Mode switch result: {mode_result}")
+                                else:
+                                    logger.warning(f"🔋 Battery {bid} not found in registry for mode switch")
+                            except Exception as e:
+                                logger.error(f"🔋 Mode switch error for {bid}: {e}")
+                        else:
+                            logger.info(f"✅ Battery {bid} already in manual mode (skipping)")
+                    
+                    res = await _set_battery_power(bid, sp)
+                    per[bid] = {"set": sp, "ok": bool(res.get("success")), "mode": "charging" if sp > 0 else "idle"}
+                    set_total += sp
+
+                simple_rule.prev_set_total = set_total
+                # mark health ok
+                try:
+                    h = simple_rule.last.get("health", {})
+                    h.update({"myenergi_ok": True, "myenergi_fail_count": 0, "last_myenergi_ok_ts": time.time()})
+                    simple_rule.last["health"] = h
+                except Exception:
+                    pass
+                simple_rule.last.update({
+                    "grid_w": grid_w,
+                    "overschot_w": int(ema_overschot),
+                    "target_export_w": target_export,
+                    "batt_target_total_w": int(target_total),
+                    "batt_set_total_w": int(set_total),
+                    "per_battery": per,
+                    "cooldown": in_cooldown,
+                    "ts": time.time(),
+                })
+        except Exception as e:
+            simple_rule.last.update({"error": str(e), "ts": time.time()})
+        # sleep remaining interval
+        dt = time.time() - t0
+        await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+
+@app.post("/api/simple_rule/enable")
+async def simple_rule_enable(payload: Dict[str, Any] = Body(default={})):  # type: ignore[assignment]
+    """Enable the simple export-driven battery rule engine.
+    Optional payload overrides defaults: buffer_w, export_margin_w, threshold_start_w, threshold_stop_w, ramp_step_w, loop_interval_s, cooldown_s, max_batt_total_w
+    """
+    if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
+        return {"success": True, "status": "already_enabled", "cfg": simple_rule.cfg}
+    # merge cfg
+    for k, v in (payload or {}).items():
+        if k in simple_rule.cfg:
+            simple_rule.cfg[k] = v
+    simple_rule.enabled = True
+    simple_rule.prev_set_total = 0
+    simple_rule.cooldown_until = 0
+    simple_rule.task = asyncio.create_task(_simple_rule_loop())
+    return {"success": True, "status": "enabled", "cfg": simple_rule.cfg}
+
+@app.post("/api/simple_rule/disable")
+async def simple_rule_disable():
+    if not simple_rule.enabled:
+        return {"success": True, "status": "already_disabled"}
+    simple_rule.enabled = False
+    if simple_rule.task:
+        try:
+            simple_rule.task.cancel()
+        except Exception:
+            pass
+    # stop batteries safely
+    try:
+        items = (await list_batteries())['items']  # type: ignore[index]
+        for it in items:
+            await _set_battery_power(it['id'], 0)
+    except Exception:
+        pass
+    return {"success": True, "status": "disabled"}
+
+@app.get("/api/simple_rule/status")
+async def simple_rule_status():
+    return {"success": True, "enabled": simple_rule.enabled, "last": simple_rule.last, "cfg": simple_rule.cfg}
+
+# ---------------------------------
+# SOC Safety Monitor (Always running!)
+# ---------------------------------
+soc_safety_task = None
+
+async def _soc_safety_monitor():
+    """Independent SOC safety monitor - runs ALWAYS (even when Simple Rule is disabled).
+    Prevents battery discharge below minimum SOC regardless of manual settings."""
+    global simple_rule
+    logger.info("🛡️ SOC Safety Monitor started (independent of Simple Rule)")
+    
+    while True:
+        try:
+            await asyncio.sleep(10)  # Check every 10 seconds
+            
+            cfg = simple_rule.cfg
+            battery_config = cfg.get("battery_config", {})
+            
+            for bid, bat_cfg in battery_config.items():
+                min_soc = bat_cfg.get("minimum_soc_percent", 15)
+                
+                try:
+                    # Get battery client
+                    entry = _get_entry_for(bid)
+                    if not entry:
+                        logger.debug(f"🛡️ SOC SAFETY: Battery {bid} not found in registry")
+                        continue
+                    
+                    client = entry['client']
+                    lock = entry['lock']
+                    
+                    # Read SOC
+                    async with lock:
+                        battery_data = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                            timeout=5.0
+                        )
+                    
+                    if not battery_data:
+                        continue
+                    
+                    current_soc = battery_data.get("soc_percent", {}).get("value", 100)
+                    battery_power = battery_data.get("battery_power", {}).get("value", 0)
+                    work_mode = battery_data.get("work_mode", {}).get("value", -1)
+                    
+                    # Safety check: if SOC low AND discharging
+                    if current_soc <= min_soc and battery_power < -50:
+                        logger.warning(f"🛡️ SOC SAFETY: {bid} at {current_soc}% (min {min_soc}%) and discharging ({battery_power}W)")
+                        logger.warning(f"🛡️ Emergency stop - switching {bid} to Manual mode!")
+                        
+                        async with lock:
+                            result = client.set_work_mode(0)  # Force Manual
+                        
+                        if result.get("ok"):
+                            logger.info(f"✅ SOC SAFETY: Successfully stopped {bid}")
+                        else:
+                            logger.warning(f"⚠️ SOC SAFETY: Failed to stop {bid}, will retry")
+                
+                except asyncio.TimeoutError:
+                    logger.debug(f"⚠️ SOC SAFETY: Timeout reading {bid}")
+                except Exception as e:
+                    logger.debug(f"⚠️ SOC SAFETY: Error checking {bid}: {e}")
+        
+        except Exception as e:
+            logger.error(f"❌ SOC Safety Monitor error: {e}")
+            await asyncio.sleep(5)
+
+# ---------------------------------
+# WhatsApp Energy Tips Scheduler
+# ---------------------------------
+whatsapp_tips_task = None
+
+async def _whatsapp_tips_scheduler():
+    """Send smart energy tips at 09:00 and 13:00"""
+    try:
+        from whatsapp_notifier import whatsapp
+    except ImportError:
+        logger.error("❌ whatsapp_notifier.py not found, tips disabled")
+        return
+    
+    logger.info("📱 WhatsApp tips scheduler started (09:00 & 13:00)")
+    
+    # Track which tips we sent today
+    sent_today = set()
+    
+    while True:
+        try:
+            now = datetime.now()
+            current_hour = now.hour
+            current_minute = now.minute
+            today_key = now.strftime("%Y-%m-%d")
+            
+            # Reset sent_today at midnight
+            if current_hour == 0 and current_minute == 0:
+                sent_today.clear()
+            
+            # Check if it's time to send (09:00 or 13:00)
+            # Use 5-minute window to handle timing drift (09:00-09:04 or 13:00-13:04)
+            should_send = False
+            tip_time = ""
+            
+            if current_hour == 9 and current_minute < 5:
+                tip_time = "09:00"
+                should_send = f"{today_key}-09" not in sent_today
+            elif current_hour == 13 and current_minute < 5:
+                tip_time = "13:00"
+                should_send = f"{today_key}-13" not in sent_today
+            
+            if should_send:
+                logger.info(f"📱 Sending energy tip at {tip_time}")
+                
+                # Gather current energy data
+                try:
+                    # Get weather + FORECAST
+                    weather_data = await weather_service.get_current_weather()
+                    clouds = weather_data.get("clouds", 100)
+                    temp = weather_data.get("temperature", 0)
+                    
+                    # Get hourly forecast for next 6 hours
+                    forecast_data = await weather_service.get_forecast(hours=6)
+                    forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data else []
+                    
+                    # Calculate average clouds next 6 hours
+                    future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]
+                    avg_future_clouds = sum(future_clouds) / len(future_clouds) if future_clouds else clouds
+                    
+                    # Use same data as dashboard - call /api/status
+                    status = await get_status()
+                    
+                    pv_w = status.get("pv_generation_w", 0) or 0
+                    grid_w = status.get("grid_w", 0) or 0
+                    eddi_w = status.get("eddi_power_w", 0) or 0
+                    zappi_w = status.get("zappi_power_w", 0) or 0
+                    house_w = status.get("house_consumption_w", 0) or 0
+                    
+                    # Get battery SOC from simple rule status (has all batteries)
+                    avg_soc = 50  # default
+                    total_batt_power = status.get("marstek_power_w", 0) or 0
+                    
+                    # Try to get more accurate SOC from simple rule
+                    try:
+                        sr_status = simple_rule.last
+                        per_battery = sr_status.get("per_battery", {})
+                        if per_battery:
+                            socs = [b.get("soc", 50) for b in per_battery.values() if "soc" in b]
+                            if socs:
+                                avg_soc = sum(socs) / len(socs)
+                    except:
+                        pass
+                    
+                    # Calculate overschot (excluding Eddi AND Zappi)
+                    export_w = max(0, -grid_w) if grid_w else 0
+                    overschot = export_w - eddi_w - zappi_w if export_w > 0 else 0
+                    
+                    energy_data = {
+                        "clouds": clouds,
+                        "forecast_clouds": int(avg_future_clouds),  # Avg clouds next 6h
+                        "temperature": temp,
+                        "pv_now_w": pv_w,
+                        "grid_w": grid_w,
+                        "battery_soc": int(avg_soc),
+                        "battery_power": int(total_batt_power),
+                        "overschot_w": int(overschot),
+                        "eddi_w": eddi_w,
+                        "zappi_w": zappi_w,
+                        "house_w": house_w,
+                        "hour": current_hour  # 9 of 13
+                    }
+                    
+                    # Send tip!
+                    await whatsapp.send_energy_tip(energy_data)
+                    
+                    # Mark as sent
+                    sent_today.add(f"{today_key}-{current_hour:02d}")
+                    logger.info(f"✅ Energy tip sent at {tip_time}")
+                
+                except Exception as e:
+                    logger.error(f"❌ Failed to gather data for energy tip: {e}")
+            
+            # Check every minute
+            await asyncio.sleep(60)
+        
+        except Exception as e:
+            logger.error(f"❌ WhatsApp tips scheduler error: {e}")
+            await asyncio.sleep(60)
+
+# ---------------------------------
+# Startup/shutdown: auto-start simple rule + SOC safety + WhatsApp tips
+# ---------------------------------
+@app.on_event("startup")
+async def _startup_simple_rule():
+    """Auto-start the simple export-driven rule on app boot.
+    Keeps behavior resilient after crashes/restarts.
+    """
+    global soc_safety_task, whatsapp_tips_task
+    
+    try:
+        # Start SOC Safety Monitor (always running!)
+        soc_safety_task = asyncio.create_task(_soc_safety_monitor())
+        logger.info("🛡️ SOC Safety Monitor started")
+        
+        # Start WhatsApp tips scheduler
+        whatsapp_tips_task = asyncio.create_task(_whatsapp_tips_scheduler())
+        logger.info("📱 WhatsApp tips scheduler started")
+        
+        # Start Phase Monitor (3x25A check)
+        await phase_monitor.start()
+        logger.info("🔌 Phase Monitor started")
+        
+        # If already running, do nothing
+        if simple_rule.enabled and simple_rule.task and not simple_rule.task.done():
+            return
+        # Start with default cfg; can be overridden later via API
+        simple_rule.enabled = True
+        simple_rule.prev_set_total = 0
+        simple_rule.cooldown_until = 0
+        simple_rule.task = asyncio.create_task(_simple_rule_loop())
+        logger.info("🚀 Simple Rule auto-started on startup")
+    except Exception as e:
+        logger.error(f"❌ Failed to auto-start Simple Rule: {e}")
+
+@app.on_event("shutdown")
+async def _shutdown_simple_rule():
+    """Ensure the simple rule loop and SOC safety monitor stop cleanly on shutdown."""
+    global soc_safety_task, whatsapp_tips_task
+    
+    try:
+        # Stop SOC Safety Monitor
+        if soc_safety_task and not soc_safety_task.done():
+            try:
+                soc_safety_task.cancel()
+                logger.info("🛑 SOC Safety Monitor stopped")
+            except Exception:
+                pass
+        
+        # Stop WhatsApp tips scheduler
+        if whatsapp_tips_task and not whatsapp_tips_task.done():
+            try:
+                whatsapp_tips_task.cancel()
+                logger.info("🛑 WhatsApp tips scheduler stopped")
+            except Exception:
+                pass
+        
+        # Stop Simple Rule
+        if simple_rule.task and not simple_rule.task.done():
+            try:
+                simple_rule.task.cancel()
+            except Exception:
+                pass
+        simple_rule.enabled = False
+        logger.info("🛑 Simple Rule stopped on shutdown")
+    except Exception as e:
+        logger.error(f"❌ Failed to stop Simple Rule on shutdown: {e}")
+
+# =========================
+# Weather API
+# =========================
+from weather import weather_service
+
+@app.get("/api/weather/current")
+async def get_current_weather():
+    """Get current weather conditions"""
+    try:
+        data = await weather_service.get_current_weather()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/weather/forecast")
+async def get_weather_forecast():
+    """Get weather forecast for next 24 hours"""
+    try:
+        data = await weather_service.get_forecast(hours=24)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/weather/solar")
+async def get_solar_forecast():
+    """Get solar-relevant weather forecast"""
+    try:
+        data = await weather_service.get_solar_forecast()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# =========================
+# WhatsApp Test Endpoint
+# =========================
+@app.post("/api/whatsapp/test")
+async def test_whatsapp(contact: str = "jos"):
+    """Send test WhatsApp message"""
+    try:
+        from whatsapp_notifier import whatsapp
+        
+        message = f"🧪 Test bericht van myEnergy systeem!\n\nVerstuurd om {datetime.now().strftime('%H:%M:%S')}\n\n_Dit is een test_"
+        
+        success = await whatsapp.send_message(contact, message)
+        
+        return {
+            "success": success,
+            "message": "Test message sent!" if success else "Failed to send",
+            "contact": contact
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/whatsapp/tip/now")
+async def send_tip_now():
+    """Manually trigger energy tip (for testing)"""
+    try:
+        from whatsapp_notifier import whatsapp
+        
+        # Get weather + FORECAST
+        weather_data = await weather_service.get_current_weather()
+        clouds = weather_data.get("clouds", 100)
+        temp = weather_data.get("temperature", 0)
+        
+        # Get hourly forecast for next 6 hours
+        forecast_data = await weather_service.get_forecast(hours=6)
+        forecast_6h = forecast_data.get("forecasts", [])[:6] if forecast_data else []
+        
+        # Calculate average clouds next 6 hours
+        future_clouds = [f.get("clouds", 100) for f in forecast_6h] if forecast_6h else [clouds]
+        avg_future_clouds = sum(future_clouds) / len(future_clouds) if future_clouds else clouds
+        
+        # Use same data as dashboard - call /api/status
+        status = await get_status()
+        
+        pv_w = status.get("pv_generation_w", 0) or 0
+        grid_w = status.get("grid_w", 0) or 0
+        eddi_w = status.get("eddi_power_w", 0) or 0
+        zappi_w = status.get("zappi_power_w", 0) or 0
+        house_w = status.get("house_consumption_w", 0) or 0
+        
+        # Get battery SOC from simple rule status (has all batteries)
+        avg_soc = 50  # default
+        total_batt_power = status.get("marstek_power_w", 0) or 0
+        
+        # Try to get more accurate SOC from simple rule
+        try:
+            sr_status = simple_rule.last
+            per_battery = sr_status.get("per_battery", {})
+            if per_battery:
+                socs = [b.get("soc", 50) for b in per_battery.values() if "soc" in b]
+                if socs:
+                    avg_soc = sum(socs) / len(socs)
+        except:
+            pass
+        
+        # Calculate overschot (excluding Eddi AND Zappi)
+        export_w = max(0, -grid_w) if grid_w else 0
+        overschot = export_w - eddi_w - zappi_w if export_w > 0 else 0
+        
+        energy_data = {
+            "clouds": clouds,
+            "forecast_clouds": int(avg_future_clouds),  # Avg clouds next 6h
+            "temperature": temp,
+            "pv_now_w": pv_w,
+            "grid_w": grid_w,
+            "battery_soc": int(avg_soc),
+            "battery_power": int(total_batt_power),
+            "overschot_w": int(overschot),
+            "eddi_w": eddi_w,
+            "zappi_w": zappi_w,
+            "house_w": house_w,
+            "hour": datetime.now().hour  # Current hour
+        }
+        
+        await whatsapp.send_energy_tip(energy_data)
+        
+        return {"success": True, "message": "Energy tip sent!", "data": energy_data}
+    
+    except Exception as e:
+        logger.error(f"Failed to send manual tip: {e}")
+        return {"success": False, "error": str(e)}
+
+# =========================
+# Health and Logs endpoints
+# =========================
+@app.get("/api/health")
+async def api_health():
+    try:
+        sr = {"enabled": simple_rule.enabled, "last": simple_rule.last}
+        return {"success": True, "simple_rule": sr}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/logs/tail")
+async def api_logs_tail(n: int = 200):
+    try:
+        path = LOG_FILE
+        if not path or not os.path.exists(path):
+            return {"success": False, "error": "log file not found", "path": path}
+        # Tail last n lines efficiently
+        lines = []
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            block = -1024
+            data = b""
+            while len(lines) <= n and -block < size:
+                f.seek(block, os.SEEK_END)
+                data = f.read(-block) + data
+                lines = data.splitlines()
+                block *= 2
+        text_lines = [ln.decode("utf-8", errors="ignore") for ln in lines[-n:]]
+        return {"success": True, "lines": text_lines, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/flow.html")
+async def flow_visualization_page():
+    """Serve the energy flow visualization page."""
+    try:
+        with open("flow.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"Flow page not available: {e}", status_code=500)
+
+# ----------------------
+# Helpers for per-battery config/control
+# ----------------------
+def _get_modbus_for(bid: str):
+    try:
+        if bid == "venus_ev2_92":
+            return venus_modbus
+        if bid == "venus_ev2_74":
+            return venus_modbus2
+    except Exception:
+        pass
+    return venus_modbus
+
+def _get_or_init_battery_config(cfg: Dict[str, Any], bid: str) -> Dict[str, Any]:
+    if bid not in cfg:
+        cfg[bid] = {
+            "minimum_soc_percent": 20.0,
+            "auto_charge_enabled": True,
+            "original_work_mode": None,
+            "emergency_charge_active": False,
+        }
+    return cfg[bid]
+
+@app.post("/api/batteries/{bid}/control")
+async def battery_control_by_id(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Generic control endpoint: action in {'charge','discharge','stop'}, optional power_w."""
+    entry = _get_entry_for(bid)
+    if not entry:
+        return {"success": False, "error": f"unknown battery id: {bid}"}
+    action = str(payload.get("action") or "").strip().lower()
+    power_w = payload.get("power_w")
+    if action not in {"charge", "discharge", "stop"}:
+        return {"success": False, "error": "invalid action"}
+    client = entry['client']
+    lock = entry['lock']
+    async with lock:
+        try:
+            result = client.set_control(action, power_w)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    return {"success": bool(result.get("ok")), **result, "id": bid}
+
+@app.post("/api/batteries/{bid}/mode")
+async def battery_mode_by_id(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Generic work mode endpoint. Payload: { mode: 0|1|2|3 }"""
+    entry = _get_entry_for(bid)
+    if not entry:
+        return {"success": False, "error": f"unknown battery id: {bid}"}
+    try:
+        mode = int(payload.get("mode"))
+    except Exception:
+        return {"success": False, "error": "invalid mode"}
+    client = entry['client']
+    lock = entry['lock']
+    async with lock:
+        try:
+            result = client.set_work_mode(mode)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    return {"success": bool(result.get("ok")), **result, "id": bid}
+
 @app.post("/api/battery/diagnostics/work_mode")
 async def diagnostics_work_mode(payload: Dict[str, Any] = Body(default={})):  
     """Diagnose setting user work mode by trying multiple unit IDs and tokens.
@@ -1937,7 +3073,11 @@ async def get_battery_status():
     try:
         # Serialize access to the Modbus client to avoid broken pipes
         async with modbus_lock:
-            battery_data = venus_modbus.read_battery_data()
+            # Wrap in timeout to prevent hanging if Modbus doesn't respond
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             # Use short session: disconnect after a full read to prevent stale sockets
             try:
                 venus_modbus.disconnect()
@@ -2006,12 +3146,47 @@ async def get_battery_status():
             "source": "modbus"
         }
 
+@app.get("/api/batteries")
+async def list_batteries():
+    """List available batteries (ids and hosts)."""
+    return {
+        "success": True,
+        "items": [
+            {"id": "venus_ev2_92", "host": venus_modbus.host,  "port": venus_modbus.port},
+            {"id": "venus_ev2_74", "host": venus_modbus2.host, "port": venus_modbus2.port},
+        ]
+    }
+
+@app.get("/api/batteries/{bid}/status")
+async def battery_status_by_id(bid: str):
+    """Generic status endpoint using BatteryManager by id."""
+    try:
+        # Add timeout to prevent hanging on Modbus issues
+        result = await asyncio.wait_for(manager.read_status(bid), timeout=5.0)
+        return result
+    except asyncio.TimeoutError:
+        return {
+            "success": False, 
+            "error": "Battery timeout (Modbus not responding)",
+            "battery_id": bid,
+            "soc_percent": {"value": None, "unit": "%"},
+            "battery_voltage": {"value": None, "unit": "V"},
+            "battery_current": {"value": None, "unit": "A"},
+            "battery_power": {"value": None, "unit": "W"}
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/battery2/status")
 async def get_battery2_status():
     """Get real-time battery 2 status via Modbus (WiFi converter)."""
     try:
+        # Wrap sync Modbus call with timeout to prevent hanging
         async with modbus_lock2:
-            battery_data = venus_modbus2.read_battery_data()
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus2.read_battery_data),
+                timeout=5.0
+            )
             try:
                 venus_modbus2.disconnect()
             except Exception:
@@ -2068,6 +3243,13 @@ async def get_battery2_status():
                 "source": "modbus",
                 "host": venus_modbus2.host
             }
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "error": "Battery timeout (Modbus not responding after 5s)",
+            "source": "modbus",
+            "host": venus_modbus2.host
+        }
     except Exception as e:
         return {
             "success": False,
@@ -2083,6 +3265,18 @@ async def get_battery_config():
         return {"success": True, "config": config["venus_e_78"]}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/api/batteries/{bid}/config")
+async def get_battery_config_by_id(bid: str):
+    """Get per-battery configuration (min SoC etc.)."""
+    try:
+        cfg = load_battery_config()
+        bc = _get_or_init_battery_config(cfg, bid)
+        # persist defaults if missing
+        save_battery_config(cfg)
+        return {"success": True, "config": bc, "id": bid}
+    except Exception as e:
+        return {"success": False, "error": str(e), "id": bid}
 
 @app.post("/api/battery/minimum_soc")
 async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
@@ -2102,11 +3296,17 @@ async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
         config["venus_e_78"]["auto_charge_enabled"] = auto_charge
         save_battery_config(config)
         
+        # Reload limits in SimpleRule so it uses new config immediately
+        simple_rule.reload_battery_limits()
+        
         if auto_charge:
             result = venus_modbus.check_minimum_soc(min_soc)
         else:
             # Just check, don't take action
-            battery_data = venus_modbus.read_battery_data()
+            battery_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             if not battery_data or "soc_percent" not in battery_data:
                 return {"success": False, "error": "Could not read SoC data"}
             
@@ -2124,6 +3324,53 @@ async def api_check_minimum_soc(payload: Dict[str, Any] = Body(...)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/api/batteries/{bid}/minimum_soc")
+async def api_minimum_soc_per_battery(bid: str, payload: Dict[str, Any] = Body(...)):
+    """Set/check minimum SoC limit per battery.
+    Payload: { min_soc_percent: float, auto_charge?: bool }
+    """
+    try:
+        min_soc = float(payload.get("min_soc_percent", 20.0))
+        auto_charge = bool(payload.get("auto_charge", True))
+        if not (15.0 <= min_soc <= 100.0):
+            return {"success": False, "error": "min_soc_percent must be between 15 and 100"}
+
+        cfg = load_battery_config()
+        bc = _get_or_init_battery_config(cfg, bid)
+        bc["minimum_soc_percent"] = min_soc
+        bc["auto_charge_enabled"] = auto_charge
+        save_battery_config(cfg)
+        
+        # Reload limits in SimpleRule so it uses new config immediately
+        simple_rule.reload_battery_limits()
+
+        vm = _get_modbus_for(bid)
+        if auto_charge:
+            # enforce and/or start emergency charge if needed
+            # BELANGRIJK: Geef Simple Rule status mee - emergency charge alleen als Simple Rule UIT staat!
+            result = vm.check_minimum_soc(min_soc, simple_rule_enabled=simple_rule.enabled)
+            ok = bool(result.get("ok", False))
+            return {"success": ok, **result, "id": bid}
+        else:
+            # passive check
+            bd = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, vm.read_battery_data),
+                timeout=5.0
+            )
+            if not bd or "soc_percent" not in bd:
+                return {"success": False, "error": "Could not read SoC data", "id": bid}
+            current_soc = float(bd["soc_percent"]["value"]) if isinstance(bd["soc_percent"], dict) else float(bd["soc_percent"]) 
+            return {
+                "success": True,
+                "current_soc": current_soc,
+                "min_soc_limit": min_soc,
+                "below_limit": current_soc <= min_soc,
+                "action_taken": None,
+                "id": bid,
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e), "id": bid}
+
 @app.post("/api/battery/control")
 async def set_battery_control(payload: Dict[str, Any] = Body(...)):
     """Force battery actions via Modbus controls.
@@ -2138,7 +3385,10 @@ async def set_battery_control(payload: Dict[str, Any] = Body(...)):
         async with modbus_lock:
             # Enforce SoC reserve for discharge
             try:
-                bd = venus_modbus.read_battery_data()
+                bd = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                    timeout=5.0
+                )
                 try:
                     venus_modbus.disconnect()
                 except Exception:
@@ -2165,7 +3415,10 @@ async def get_battery_raw():
     """Return raw Modbus battery data for debugging mapping/scaling."""
     try:
         async with modbus_lock:
-            data = venus_modbus.read_battery_data()
+            data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             try:
                 venus_modbus.disconnect()
             except Exception:
@@ -2208,6 +3461,482 @@ async def battery_ping():
         return {"success": ok, "host": venus_modbus.host, "port": venus_modbus.port, "sample": {"address": addr, "value": val}}
     except Exception as e:
         return {"success": False, "error": str(e), "host": venus_modbus.host, "port": venus_modbus.port}
+
+# =========================
+# MyEnergi raw helpers (to inspect Harvi/CT data)
+# =========================
+@app.get("/api/myenergi/raw")
+async def myenergi_raw():
+    """Return the unmodified MyEnergi status payload for debugging CT/Harvi fields."""
+    try:
+        data = await myenergi.status_all()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/myenergi/summary")
+async def myenergi_summary():
+    """Summarize grid/export, eddi power, zappi power and any Harvi ectp* readings we can find."""
+    try:
+        data = await myenergi.status_all()
+        grid_w = None
+        eddi_w = 0
+        zappi_w = 0
+        harvi = []
+
+        # Top-level grid if present
+        try:
+            grid_w = int(data.get("grd")) if isinstance(data.get("grd"), (int, float, str)) else None
+        except Exception:
+            grid_w = None
+
+        # Walk devices
+        for key in ("eddi", "zappi", "harvi", "as", "devices"):
+            devs = data.get(key)
+            if not isinstance(devs, list):
+                continue
+            for d in devs:
+                typ = d.get("typ") or d.get("type") or key
+                # Eddi
+                if str(typ).lower().startswith("eddi") or key == "eddi":
+                    try:
+                        # 'div' diverter power (W) commonly used
+                        eddi_w += int(d.get("div", 0) or 0)
+                    except Exception:
+                        pass
+                    # Some payloads expose grid under device as 'grd'
+                    if grid_w is None and d.get("grd") is not None:
+                        try:
+                            grid_w = int(d.get("grd"))
+                        except Exception:
+                            pass
+                # Zappi
+                if str(typ).lower().startswith("zappi") or key == "zappi":
+                    try:
+                        zappi_w += int(d.get("ectp1", 0) or 0)
+                    except Exception:
+                        pass
+                    if grid_w is None and d.get("grd") is not None:
+                        try:
+                            grid_w = int(d.get("grd"))
+                        except Exception:
+                            pass
+                # Harvi (wireless CT): ectp1..3 values
+                if str(typ).lower().startswith("harvi") or key == "harvi":
+                    rec = {
+                        "sn": d.get("sno") or d.get("serial") or d.get("sn"),
+                        "ectp1": d.get("ectp1"),
+                        "ectp2": d.get("ectp2"),
+                        "ectp3": d.get("ectp3"),
+                        "ct1": d.get("ct1"),
+                        "ct2": d.get("ct2"),
+                        "ct3": d.get("ct3"),
+                        "grd": d.get("grd"),
+                    }
+                    harvi.append(rec)
+
+        return {
+            "success": True,
+            "grid_w": grid_w,
+            "eddi_w": eddi_w,
+            "zappi_w": zappi_w,
+            "harvi": harvi,
+            "raw_keys": list(data.keys()) if isinstance(data, dict) else None,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/p1/test")
+async def test_p1_connection():
+    """Test P1 meter connection"""
+    if not p1_reader:
+        return {"success": False, "error": "P1_METER_IP not configured"}
+    
+    try:
+        data = await p1_reader.read_data()
+        if data:
+            return {
+                "success": True,
+                "ip": P1_METER_IP,
+                "data": data,
+                "has_phase_data": "active_power_l1_w" in data
+            }
+        else:
+            return {
+                "success": False,
+                "ip": P1_METER_IP,
+                "error": "No data received - Is Local API enabled?"
+            }
+    except Exception as e:
+        return {"success": False, "ip": P1_METER_IP, "error": str(e)}
+
+@app.get("/api/myenergi/phases")
+async def get_phase_data():
+    """Get 3-phase power data from Zappi Grid CT or Harvi CT clamps.
+    Returns power per phase (L1, L2, L3) and total.
+    """
+    try:
+        async with myenergi_lock:
+            data = await myenergi.status_all()
+        
+        raw = data.get("raw", [])
+        phases = {
+            "l1_w": None,
+            "l2_w": None, 
+            "l3_w": None,
+            "total_w": 0,
+            "source": None
+        }
+        
+        # Priority 1: Check Zappi for grid CT clamps (ectp4/5/6)
+        for section in raw if isinstance(raw, list) else []:
+            if isinstance(section, dict) and "zappi" in section:
+                zappi_list = section.get("zappi") or []
+                for zappi in zappi_list:
+                    # ACTUAL MAPPING (verified with P1 meter):
+                    # ectp4 = Fase B, ectp5 = Fase A, ectp6 = Fase C
+                    ectp4 = zappi.get("ectp4")  # Fase B
+                    ectp5 = zappi.get("ectp5")  # Fase A
+                    ectp6 = zappi.get("ectp6")  # Fase C
+                    
+                    if ectp4 is not None or ectp5 is not None or ectp6 is not None:
+                        # Correct mapping: ectp4(B)→L1, ectp5(A)→L2, ectp6(C)→L3
+                        phases["l1_w"] = int(ectp4) if ectp4 is not None else 0  # Fase B
+                        phases["l2_w"] = int(ectp5) if ectp5 is not None else 0  # Fase A
+                        phases["l3_w"] = int(ectp6) if ectp6 is not None else 0  # Fase C
+                        phases["source"] = f"Zappi Grid CT"
+                        break
+        
+        # Priority 2: Find Harvi with CT clamps (fallback)
+        if phases["source"] is None:
+            for section in raw if isinstance(raw, list) else []:
+                if isinstance(section, dict) and "harvi" in section:
+                    harvi_list = section.get("harvi") or []
+                    for harvi in harvi_list:
+                        # Check which CT types are configured (Generation/Grid/etc)
+                        ct1_type = harvi.get("ectt1")  # CT type for clamp 1
+                        ct2_type = harvi.get("ectt2")
+                        ct3_type = harvi.get("ectt3")
+                        
+                        # Read power values (positive or negative depending on direction)
+                        ectp1 = harvi.get("ectp1")  # Phase L1
+                        ectp2 = harvi.get("ectp2")  # Phase L2  
+                        ectp3 = harvi.get("ectp3")  # Phase L3
+                        
+                        if ectp1 is not None:
+                            phases["l1_w"] = int(ectp1)
+                            phases["l1_type"] = ct1_type
+                        if ectp2 is not None:
+                            phases["l2_w"] = int(ectp2)
+                            phases["l2_type"] = ct2_type
+                        if ectp3 is not None:
+                            phases["l3_w"] = int(ectp3)
+                            phases["l3_type"] = ct3_type
+                        
+                        phases["source"] = f"Harvi SN: {harvi.get('sno', 'unknown')}"
+                        break
+        
+        # Calculate total (sum of all phases that have data)
+        total = 0
+        for phase in [phases.get("l1_w"), phases.get("l2_w"), phases.get("l3_w")]:
+            if phase is not None:
+                total += phase
+        phases["total_w"] = total
+        
+        # Calculate balance (how evenly distributed)
+        active_phases = [p for p in [phases.get("l1_w"), phases.get("l2_w"), phases.get("l3_w")] if p is not None]
+        if len(active_phases) > 1:
+            avg = sum(active_phases) / len(active_phases)
+            max_diff = max(abs(p - avg) for p in active_phases)
+            phases["balance_percent"] = round(100 - (max_diff / (abs(avg) + 1) * 100), 1) if avg != 0 else 100
+        else:
+            phases["balance_percent"] = None
+        
+        return {"success": True, "phases": phases}
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# =========================
+# Phase Monitor Endpoints (3x25A Check)
+# =========================
+
+@app.post("/api/phase_monitor/start")
+async def start_phase_monitor():
+    """Start de fase monitor"""
+    try:
+        await phase_monitor.start()
+        return {"success": True, "message": "Phase monitor gestart"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/stop")
+async def stop_phase_monitor():
+    """Stop de fase monitor"""
+    try:
+        await phase_monitor.stop()
+        return {"success": True, "message": "Phase monitor gestopt"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/status")
+async def get_phase_monitor_status():
+    """Haal huidige status en statistieken op"""
+    try:
+        stats = phase_monitor.get_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/violations")
+async def get_phase_violations(hours: int = Query(24)):
+    """Haal overschrijdingen op van laatste X uur"""
+    try:
+        violations = phase_monitor.get_violations(hours)
+        return {
+            "success": True,
+            "hours": hours,
+            "count": len(violations),
+            "violations": violations
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/violations/{timestamp}/dismiss")
+async def dismiss_phase_violation(timestamp: str, reason: str = Body(..., embed=True)):
+    """Markeer een violation als dismissed met reden
+    
+    Deze violation blijft zichtbaar maar telt NIET mee voor 3x25A analyse.
+    Gebruik voor: batterij laden, test situaties, bewuste overschrijdingen.
+    
+    Args:
+        timestamp: ISO timestamp van de violation
+        reason: Reden voor dismiss (bijv. "Batterij laden vanaf grid")
+    
+    Example:
+        POST /api/phase_monitor/violations/2025-10-12T22:00:00/dismiss
+        Body: {"reason": "Batterij laden vanaf grid"}
+    """
+    try:
+        result = phase_monitor.dismiss_violation(timestamp, reason)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/violations/{timestamp}/undismiss")
+async def undismiss_phase_violation(timestamp: str):
+    """Verwijder dismiss markering van een violation
+    
+    Args:
+        timestamp: ISO timestamp van de violation
+    
+    Example:
+        POST /api/phase_monitor/violations/2025-10-12T22:00:00/undismiss
+    """
+    try:
+        result = phase_monitor.undismiss_violation(timestamp)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/reset_peaks")
+async def reset_phase_monitor_peaks():
+    """Reset alleen de max waarden per fase (niet de metingen)
+    
+    Dit reset:
+    - Max Fase A/B/C waarden
+    - Peak history
+    
+    Behoudt:
+    - Alle metingen
+    - Violations log
+    
+    Example:
+        POST /api/phase_monitor/reset_peaks
+    """
+    try:
+        result = phase_monitor.reset_peak_values()
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/reset")
+async def reset_phase_monitor_stats(keep_violations: bool = True):
+    """Reset alle phase monitor statistieken
+    
+    Args:
+        keep_violations: Behoud violations_log (default True) of ook resetten
+    
+    Returns:
+        Aantal verwijderde entries
+    
+    Example:
+        POST /api/phase_monitor/reset
+        Body: {"keep_violations": true}
+        
+        Of zonder body (gebruikt default True):
+        POST /api/phase_monitor/reset
+    """
+    try:
+        result = phase_monitor.reset_stats(keep_violations=keep_violations)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/phase_monitor/violations/bulk_dismiss")
+async def bulk_dismiss_violations(
+    start_time: str = Body(None),
+    end_time: str = Body(None),
+    max_overshoot_w: int = Body(None),
+    phase: str = Body(None),
+    reason: str = Body("Bulk dismiss")
+):
+    """Dismiss meerdere violations in één keer
+    
+    Args:
+        start_time: ISO timestamp start (optioneel)
+        end_time: ISO timestamp einde (optioneel)
+        max_overshoot_w: Max overschrijding in Watt (bijv. 200 = <200W over limiet)
+        phase: Filter op fase (L1/L2/L3) of None voor alle
+        reason: Reden voor dismiss
+    
+    Examples:
+        # Dismiss alles tussen 22:12-22:14
+        POST /api/phase_monitor/violations/bulk_dismiss
+        Body: {"start_time": "2025-10-12T22:12:00", "end_time": "2025-10-12T22:14:00", "reason": "Batterij laden test"}
+        
+        # Dismiss alle kleine overschrijdingen (<200W)
+        POST /api/phase_monitor/violations/bulk_dismiss  
+        Body: {"max_overshoot_w": 200, "reason": "Kleine pieken, niet significant"}
+        
+        # Dismiss alle L3 violations vandaag
+        POST /api/phase_monitor/violations/bulk_dismiss
+        Body: {"phase": "L3", "start_time": "2025-10-12T00:00:00", "reason": "L3 balancering issue"}
+    """
+    try:
+        result = phase_monitor.bulk_dismiss_violations(
+            start_time=start_time,
+            end_time=end_time,
+            max_overshoot_w=max_overshoot_w,
+            phase=phase,
+            reason=reason
+        )
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/data")
+async def get_phase_data_history(count: int = Query(100)):
+    """Haal recente fase data op"""
+    try:
+        data = phase_monitor.get_recent_data(count)
+        return {
+            "success": True,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/analysis")
+async def get_feasibility_analysis():
+    """Analyseer of 3x25A haalbaar is"""
+    try:
+        analysis = phase_monitor.analyze_feasibility()
+        return {
+            "success": True,
+            **analysis
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/patterns")
+async def get_peak_patterns():
+    """Analyseer patronen in piekbelasting: uren, weekdagen, periodes
+    
+    BELANGRIJK: Gebruikt ALLEEN metingen ZONDER Zappi laden!
+    Reden: Zappi heeft load balancing en zou zich aanpassen aan 3x25A.
+    Dit geeft het échte huishoudelijke verbruik zonder vertekening.
+    
+    Returns:
+        - data_filter: Info over gefilterde data (hoeveel Zappi metingen uitgesloten)
+        - summary: Snelle overview met hoogste uren en dagen
+        - by_hour: Statistieken per uur van de dag (0-23)
+        - by_weekday: Statistieken per dag van de week
+        - by_period: Statistieken per dagdeel (nacht/ochtend/middag/avond)
+        - risky_hours: Uren waar gemiddeld >80% van limiet wordt gebruikt
+        - recommendations: Concrete aanbevelingen op basis van patronen
+    """
+    try:
+        patterns = phase_monitor.analyze_peak_patterns()
+        return {
+            "success": True,
+            **patterns
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/peak_history")
+async def get_peak_history(phase: str = Query(None)):
+    """Haal peak history op - alle keren dat een nieuwe max werd bereikt"""
+    try:
+        history = phase_monitor.get_peak_history(phase)
+        return {
+            "success": True,
+            "history": history
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/top_peaks")
+async def get_top_peaks(limit: int = Query(50), include_below_limit: bool = Query(True)):
+    """Haal TOP N hoogste pieken op (inclusief die ONDER de limiet blijven)
+    
+    Args:
+        limit: Aantal top pieken per fase (default 50, max 200)
+        include_below_limit: Ook metingen onder limiet tonen (default True)
+    
+    Returns:
+        - overall_top: Top pieken over alle fases
+        - l1_top, l2_top, l3_top: Top per specifieke fase
+        - near_misses: Hoge waarden die net onder limiet blijven (80-100%)
+        - Elk item: value, distance_to_limit, timestamp, zappi status, alle fase waarden
+    """
+    try:
+        # Limiteer tot max 200 voor performance
+        limit = min(limit, 200)
+        
+        top = phase_monitor.get_top_peaks(limit, include_below_limit)
+        return {
+            "success": True,
+            **top
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/phase_monitor/top_violations")
+async def get_top_violations(limit: int = Query(20)):
+    """Haal TOP N ergste fase overschrijdingen op met alle details
+    
+    Args:
+        limit: Aantal top violations per fase (default 20, max 100)
+    
+    Returns:
+        - overall_top: Top violations over alle fases
+        - l1_top, l2_top, l3_top: Top per specifieke fase
+        - Elk item bevat: value, overshoot, timestamp, zappi status, alle fase waarden
+    """
+    try:
+        # Limiteer tot max 100 voor performance
+        limit = min(limit, 100)
+        
+        top = phase_monitor.get_top_violations(limit)
+        return {
+            "success": True,
+            **top
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.get("/api/battery/read_many")
 async def modbus_read_many(addrs: str, fn: str = Query("holding"), unit: int = Query(1), delay_ms: int = Query(0)):
@@ -2372,7 +4101,10 @@ async def test_battery_connection():
         
         if connected:
             # Quick test read
-            test_data = venus_modbus.read_battery_data()
+            test_data = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, venus_modbus.read_battery_data),
+                timeout=5.0
+            )
             venus_modbus.disconnect()
             
             return {
@@ -2720,9 +4452,12 @@ class SimpleRulesEngine:
             
             # Apply to selected batteries
             batteries = rule.get("batteries", {})
+            allow = {"venus_e_78"}
             for battery_id, enabled in batteries.items():
-                if enabled:
+                if enabled and battery_id in allow:
                     await self.set_battery_power(battery_id, target_power)
+                elif enabled and battery_id not in allow:
+                    logger.info(f"🎯 RULE EXEC: Skipping non-allowed battery '{battery_id}'")
                     
         except Exception as e:
             logger.error(f"Eddi priority rule error: {e}")
@@ -3089,17 +4824,22 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
             logger.error(f"🎯 RULE EXEC ERROR: {e}")
     
     async def execute_eddi_priority_rule(self, rule, myenergi_data, battery_data, rule_params):
-        """Execute Eddi Priority rule with temperature checking."""
+        """Execute Eddi Priority rule with temperature checking and anti-feed mode."""
         try:
             # Get current system values
             grid_w = myenergi_data.get("grid_w", 0)
             eddi_w = myenergi_data.get("eddi_w", 0)
+            pv_w = myenergi_data.get("pv_generation_w", 0)
             
             # Get tank temperature (with override support)
             tank_temp = await get_tank_temperature_with_override(rule_params)
             target_temp = rule_params.get("tank_temp_target", 60)
             
-            logger.info(f"🔥 EDDI RULE: Grid={grid_w}W, Eddi={eddi_w}W, Tank={tank_temp}°C (target={target_temp}°C)")
+            # Anti-feed mode parameters
+            pv_threshold = rule_params.get("pv_threshold_w", 50)  # Min PV to consider "sun is shining"
+            import_threshold = rule_params.get("import_threshold_w", 100)  # Min grid import to trigger anti-feed
+            
+            logger.info(f"🔥 EDDI RULE: Grid={grid_w}W, Eddi={eddi_w}W, PV={pv_w}W, Tank={tank_temp}°C (target={target_temp}°C)")
             
             # Check if tank is warm enough
             if tank_temp < target_temp:
@@ -3108,19 +4848,25 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
                 await self.set_battery_minimal_power(rule)
                 return
             
-            # Tank is warm enough, apply normal Eddi priority logic
+            # Check for anti-feed mode condition: no PV + importing from grid
+            if pv_w < pv_threshold and grid_w > import_threshold:
+                logger.info(f"☀️ EDDI RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Activating ANTI-FEED mode")
+                await self.set_battery_anti_feed(rule)
+                return
+            
+            # Tank is warm enough and PV available, apply normal Eddi priority logic
             export_w = max(0, -grid_w)  # Negative grid = export
             buffer_w = rule_params.get("eddi_buffer_w", 200)
             threshold_w = rule_params.get("export_threshold_w", 100)
             
             available_for_battery = export_w - eddi_w - buffer_w
             
-            logger.info(f"�� EDDI RULE: Export={export_w}W, Available for battery={available_for_battery}W")
+            logger.info(f"🔥 EDDI RULE: Export={export_w}W, Available for battery={available_for_battery}W")
             
             if available_for_battery > threshold_w:
                 max_battery_w = rule_params.get("max_battery_power_w", 1500)
                 target_power = min(available_for_battery, max_battery_w)
-                logger.info(f"🔥 EDDI RULE: Setting battery to {target_power}W")
+                logger.info(f"🔥 EDDI RULE: Setting battery to {target_power}W (CHARGING)")
                 await self.set_battery_power(rule, target_power)
             else:
                 logger.info(f"🔥 EDDI RULE: Not enough surplus ({available_for_battery}W <= {threshold_w}W)")
@@ -3142,12 +4888,40 @@ class EnhancedSimpleRulesEngine(SimpleRulesEngine):
         except Exception as e:
             logger.error(f"🔋 Battery minimal power error: {e}")
     
-    async def set_battery_power(self, rule, power_w):
-        """Set battery to specific power."""
+    async def set_battery_anti_feed(self, rule):
+        """Set battery to anti-feed mode (discharge to supply house)."""
         try:
             batteries = rule.get("batteries", {})
             for battery_id, enabled in batteries.items():
                 if enabled and battery_id == "venus_e_78":
+                    logger.info(f"⚡ Setting {battery_id} to ANTI-FEED mode")
+                    # Get the VenusE client and set work mode to Anti-Feed (mode=1)
+                    venus_e_client = VenusEModbusClient(
+                        host=os.getenv("MARSTEK_MODBUS_HOST", "192.168.0.198"),
+                        port=int(os.getenv("MARSTEK_MODBUS_PORT", "502"))
+                    )
+                    result = venus_e_client.set_work_mode(1)  # 1 = Anti-Feed mode
+                    logger.info(f"⚡ Battery anti-feed result: {result}")
+        except Exception as e:
+            logger.error(f"⚡ Battery anti-feed error: {e}")
+    
+    async def set_battery_power(self, rule, power_w):
+        """Set battery to specific power (charge mode with Eddi priority)."""
+        try:
+            batteries = rule.get("batteries", {})
+            for battery_id, enabled in batteries.items():
+                if enabled and battery_id == "venus_e_78":
+                    # First, ensure we're back in Manual mode (mode=0) from Anti-Feed
+                    # This allows us to control charge/discharge manually
+                    logger.info(f"🔋 Setting {battery_id} to Manual mode for charging")
+                    venus_e_client = VenusEModbusClient(
+                        host=os.getenv("MARSTEK_MODBUS_HOST", "192.168.0.198"),
+                        port=int(os.getenv("MARSTEK_MODBUS_PORT", "502"))
+                    )
+                    mode_result = venus_e_client.set_work_mode(0)  # 0 = Manual mode
+                    logger.info(f"🔋 Mode switch result: {mode_result}")
+                    
+                    # Now set the charging power
                     logger.info(f"🔋 Setting {battery_id} to {power_w}W")
                     result = await set_battery_power("venus_e_78", power_w)
                     logger.info(f"🔋 Battery power result: {result}")

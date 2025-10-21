@@ -1,0 +1,10 @@
+{
+  "venus_ev2_92": {
+    "minimum_soc_percent": 30.0,
+    "maximum_soc_percent": 87.0
+  },
+  "venus_ev2_74": {
+    "minimum_soc_percent": 40.0,
+    "maximum_soc_percent": 87.0
+  }
+}
