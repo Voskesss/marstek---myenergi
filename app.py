@@ -2137,65 +2137,8 @@ async def _simple_rule_loop():
                 
                 # Check for anti-feed condition: no PV + importing from grid
                 if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
-                    # FIRST: Check if ANY battery has enough SOC to allow anti-feed discharge
-                    # If ALL batteries are below min SOC, skip anti-feed mode entirely
-                    battery_soc_ok = False
-                    try:
-                        items_check = (await list_batteries())['items']  # type: ignore[index]
-                        for it in items_check:
-                            bid = it['id']
-                            entry = _get_entry_for(bid)
-                            if entry:
-                                try:
-                                    battery_data = await asyncio.wait_for(
-                                        asyncio.get_event_loop().run_in_executor(None, entry['client'].read_battery_data),
-                                        timeout=3.0
-                                    )
-                                    if battery_data:
-                                        current_soc = battery_data.get("soc_percent", {}).get("value", 100)
-                                        min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
-                                        if current_soc > min_soc:
-                                            battery_soc_ok = True
-                                            break
-                                except:
-                                    pass
-                    except:
-                        pass
-                    
-                    if not battery_soc_ok:
-                        logger.warning(f"⚠️ SIMPLE RULE: Anti-feed blocked - ALL batteries below min SOC")
-                        # Set target to 0 and continue (stay in Manual mode, don't discharge)
-                        target_total = 0
-                        
-                        # Mark health as OK - this is normal operation, not an error
-                        try:
-                            h = simple_rule.last.get("health", {})
-                            h.update({
-                                "myenergi_ok": True, 
-                                "myenergi_fail_count": 0, 
-                                "last_myenergi_ok_ts": time.time(),
-                                "simple_rule_ok": True,
-                                "simple_rule_fail_count": 0,
-                                "last_simple_rule_ok_ts": time.time()
-                            })
-                            simple_rule.last["health"] = h
-                        except Exception:
-                            pass
-                        
-                        simple_rule.last.update({
-                            "grid_w": grid_w,
-                            "pv_w": pv_w,
-                            "overschot_w": 0,
-                            "mode": "manual_soc_protection",
-                            "batt_target_total_w": 0,
-                            "batt_set_total_w": 0,
-                            "ts": time.time(),
-                        })
-                        dt = time.time() - t0
-                        await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
-                        continue
-                    
-                    # At least one battery has enough SOC -> activate anti-feed mode
+                    # Anti-feed mode: discharge batteries to grid
+                    # Each battery is checked INDIVIDUALLY for min SOC
                     logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
                     try:
                         items = (await list_batteries())['items']  # type: ignore[index]
@@ -2221,7 +2164,7 @@ async def _simple_rule_loop():
                             client = entry['client']
                             lock = entry['lock']
                             
-                            # Check SOC before allowing discharge (anti-feed) - ALWAYS check, even if already active
+                            # Check SOC before allowing discharge (anti-feed) - INDIVIDUAL battery check
                             # Use async timeout to prevent blocking
                             try:
                                 battery_data = await asyncio.wait_for(
@@ -2232,7 +2175,7 @@ async def _simple_rule_loop():
                                 min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
                                 
                                 if current_soc <= min_soc:
-                                    logger.warning(f"🔋 Battery {bid} SOC too low ({current_soc}% <= {min_soc}%) - BLOCKING anti-feed!")
+                                    logger.warning(f"🔋 Battery {bid} SOC too low ({current_soc}% <= {min_soc}%) - SKIP this battery (others continue)")
                                     # Check ACTUAL mode from battery (work_mode register 42000)
                                     # Work mode: 0=Manual, 1=Anti-Feed, 2=Trade
                                     actual_mode = battery_data.get("work_mode", {}).get("value", -1) if battery_data else -1
@@ -2249,7 +2192,7 @@ async def _simple_rule_loop():
                                     else:
                                         logger.info(f"ℹ️ Battery {bid} not actively discharging (mode={actual_mode}, power={battery_power}W)")
                                     
-                                    per[bid] = {"mode": "blocked", "ok": False, "error": f"soc_too_low_{current_soc}%", "soc": current_soc}
+                                    per[bid] = {"mode": "blocked_min_soc", "ok": True, "soc": current_soc, "min_soc": min_soc}
                                     continue
                             except Exception as e:
                                 error_type = "timeout" if "timeout" in str(e).lower() else "connection" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor"]) else "unknown"
@@ -2371,9 +2314,32 @@ async def _simple_rule_loop():
                     bid = it['id']
                     sp = int(setpoints.get(bid, 0))
                     
-                    # If we're going to charge (sp > 0), ensure battery is in Manual mode
-                    # Only switch if not already in manual mode to prevent flipping
+                    # If we're going to charge (sp > 0), CHECK MAX SOC FIRST
                     if sp > 0:
+                        # Check if battery is already at max SOC - INDIVIDUAL check
+                        try:
+                            entry = _get_entry_for(bid)
+                            if entry:
+                                client = entry['client']
+                                lock = entry['lock']
+                                
+                                # Read current SOC
+                                battery_data = await asyncio.wait_for(
+                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                    timeout=3.0
+                                )
+                                current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                                max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
+                                
+                                if current_soc >= max_soc:
+                                    logger.info(f"🔋 Battery {bid} at max SOC ({current_soc}% >= {max_soc}%) - SKIP charging (others continue)")
+                                    per[bid] = {"set": 0, "ok": True, "mode": "blocked_max_soc", "soc": current_soc, "max_soc": max_soc}
+                                    continue
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not check SOC for {bid}: {e} - will try to charge anyway")
+                        
+                        # Ensure battery is in Manual mode for charging
+                        # Only switch if not already in manual mode to prevent flipping
                         current_mode = simple_rule.battery_modes.get(bid, "unknown")
                         if current_mode != "manual":
                             try:

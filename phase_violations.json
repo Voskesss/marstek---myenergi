@@ -9097,5 +9097,2667 @@
     ],
     "is_violation": true,
     "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-19T19:56:43.361308",
+    "l1_w": 458,
+    "l2_w": -236,
+    "l3_w": 5197,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 5197W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:54:51.189906",
+    "l1_w": 6196,
+    "l2_w": 1376,
+    "l3_w": 28,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6196W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:54:57.075226",
+    "l1_w": 6196,
+    "l2_w": 1376,
+    "l3_w": 28,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6196W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:55:10.729515",
+    "l1_w": 6825,
+    "l2_w": 1377,
+    "l3_w": 29,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6825W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:55:26.589619",
+    "l1_w": 6776,
+    "l2_w": 1379,
+    "l3_w": 28,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6776W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:55:32.860813",
+    "l1_w": 6776,
+    "l2_w": 1379,
+    "l3_w": 28,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6776W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:55:45.505929",
+    "l1_w": 6815,
+    "l2_w": 968,
+    "l3_w": 22,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6815W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:55:54.852323",
+    "l1_w": 6787,
+    "l2_w": 955,
+    "l3_w": 22,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6787W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:56:00.901399",
+    "l1_w": 6791,
+    "l2_w": 955,
+    "l3_w": 22,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6791W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:56:11.560004",
+    "l1_w": 6165,
+    "l2_w": 960,
+    "l3_w": 20,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6165W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:56:24.329929",
+    "l1_w": 6180,
+    "l2_w": 951,
+    "l3_w": 20,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6180W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:56:38.484443",
+    "l1_w": 6786,
+    "l2_w": 949,
+    "l3_w": 23,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6786W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T09:56:49.928268",
+    "l1_w": 6182,
+    "l2_w": 952,
+    "l3_w": 19,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 6182W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:19:53.313151",
+    "l1_w": 5649,
+    "l2_w": 1126,
+    "l3_w": -616,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5649W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:20:05.748240",
+    "l1_w": 5629,
+    "l2_w": 801,
+    "l3_w": -614,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5629W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:20:53.406603",
+    "l1_w": 5665,
+    "l2_w": 186,
+    "l3_w": -576,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5665W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:21:33.886109",
+    "l1_w": 5112,
+    "l2_w": 2476,
+    "l3_w": -544,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5112W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:21:42.935762",
+    "l1_w": 5802,
+    "l2_w": 1440,
+    "l3_w": -523,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5802W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:21:50.002989",
+    "l1_w": 5796,
+    "l2_w": 1443,
+    "l3_w": -508,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5796W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:22:10.244591",
+    "l1_w": 5194,
+    "l2_w": 2520,
+    "l3_w": -498,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5194W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:22:22.884386",
+    "l1_w": 5181,
+    "l2_w": 252,
+    "l3_w": -457,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5181W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:22:34.513515",
+    "l1_w": 5213,
+    "l2_w": 1447,
+    "l3_w": -464,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5213W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:22:41.501707",
+    "l1_w": 5192,
+    "l2_w": 152,
+    "l3_w": -453,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5192W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:22:48.153311",
+    "l1_w": 5192,
+    "l2_w": 152,
+    "l3_w": -453,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5192W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:23:05.240668",
+    "l1_w": 5215,
+    "l2_w": 2347,
+    "l3_w": -450,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5215W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:23:45.040339",
+    "l1_w": 5201,
+    "l2_w": 2703,
+    "l3_w": -474,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5201W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:00.943764",
+    "l1_w": 5179,
+    "l2_w": 2656,
+    "l3_w": -488,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5179W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:12.709593",
+    "l1_w": 5140,
+    "l2_w": 1558,
+    "l3_w": -521,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5140W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:18.813765",
+    "l1_w": 5120,
+    "l2_w": 326,
+    "l3_w": -537,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5120W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:25.280981",
+    "l1_w": 5113,
+    "l2_w": 316,
+    "l3_w": -541,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5113W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:31.265812",
+    "l1_w": 5116,
+    "l2_w": 2635,
+    "l3_w": -542,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5116W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-20T13:24:37.974971",
+    "l1_w": 5116,
+    "l2_w": 2635,
+    "l3_w": -542,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L1: 5116W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-21T10:22:51.822266",
+    "l1_w": 3708,
+    "l2_w": 3826,
+    "l3_w": 5480,
+    "zappi_w": 3482,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5480W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:22:57.698868",
+    "l1_w": 3744,
+    "l2_w": 3831,
+    "l3_w": 5475,
+    "zappi_w": 3510,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5475W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:23:10.292108",
+    "l1_w": 3755,
+    "l2_w": 3850,
+    "l3_w": 5482,
+    "zappi_w": 3514,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5482W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:23:22.121493",
+    "l1_w": 3732,
+    "l2_w": 3868,
+    "l3_w": 5499,
+    "zappi_w": 3479,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5499W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:23:35.451276",
+    "l1_w": 3742,
+    "l2_w": 3846,
+    "l3_w": 5546,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5546W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:23:46.375135",
+    "l1_w": 3798,
+    "l2_w": 3841,
+    "l3_w": 5524,
+    "zappi_w": 3506,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5524W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:23:57.559006",
+    "l1_w": 3779,
+    "l2_w": 3884,
+    "l3_w": 5530,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5530W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:03.445216",
+    "l1_w": 3770,
+    "l2_w": 3895,
+    "l3_w": 5537,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5537W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:09.917553",
+    "l1_w": 3767,
+    "l2_w": 3889,
+    "l3_w": 5572,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5572W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:19.578165",
+    "l1_w": 3762,
+    "l2_w": 3878,
+    "l3_w": 5549,
+    "zappi_w": 3479,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5549W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:25.556437",
+    "l1_w": 3762,
+    "l2_w": 3878,
+    "l3_w": 5549,
+    "zappi_w": 3479,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5549W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:31.441534",
+    "l1_w": 3752,
+    "l2_w": 3848,
+    "l3_w": 5551,
+    "zappi_w": 3501,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5551W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:43.645246",
+    "l1_w": 3744,
+    "l2_w": 3852,
+    "l3_w": 5539,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5539W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:24:56.049577",
+    "l1_w": 3751,
+    "l2_w": 3844,
+    "l3_w": 5503,
+    "zappi_w": 3499,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5503W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:25:06.640668",
+    "l1_w": 3720,
+    "l2_w": 3821,
+    "l3_w": 5524,
+    "zappi_w": 3501,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5524W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:25:18.321518",
+    "l1_w": 3654,
+    "l2_w": 3826,
+    "l3_w": 5526,
+    "zappi_w": 3481,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5526W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:25:24.157248",
+    "l1_w": 3654,
+    "l2_w": 3826,
+    "l3_w": 5526,
+    "zappi_w": 3481,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5526W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:25:30.513972",
+    "l1_w": 3652,
+    "l2_w": 3834,
+    "l3_w": 5537,
+    "zappi_w": 3480,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5537W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T10:25:39.831237",
+    "l1_w": 3647,
+    "l2_w": 3849,
+    "l3_w": 5538,
+    "zappi_w": 3462,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5538W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:54:32.339672",
+    "l1_w": 4749,
+    "l2_w": 5518,
+    "l3_w": 2824,
+    "zappi_w": 3467,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5518W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:54:46.977328",
+    "l1_w": 4773,
+    "l2_w": 5494,
+    "l3_w": 2856,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L2: 5494W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-21T12:55:15.952121",
+    "l1_w": 4730,
+    "l2_w": 5477,
+    "l3_w": 2803,
+    "zappi_w": 3476,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5477W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:55:33.225112",
+    "l1_w": 4723,
+    "l2_w": 5427,
+    "l3_w": 2798,
+    "zappi_w": 3476,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5427W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:56:03.891978",
+    "l1_w": 4693,
+    "l2_w": 5364,
+    "l3_w": 2724,
+    "zappi_w": 3474,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5364W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:56:09.848788",
+    "l1_w": 4755,
+    "l2_w": 5366,
+    "l3_w": 2735,
+    "zappi_w": 3508,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5366W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:56:17.456166",
+    "l1_w": 4768,
+    "l2_w": 5418,
+    "l3_w": 2757,
+    "zappi_w": 3488,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5418W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:56:32.533780",
+    "l1_w": 4768,
+    "l2_w": 5418,
+    "l3_w": 2757,
+    "zappi_w": 3477,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5418W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:56:54.653058",
+    "l1_w": 4811,
+    "l2_w": 5514,
+    "l3_w": 2835,
+    "zappi_w": 3491,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5514W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:57:00.961056",
+    "l1_w": 2987,
+    "l2_w": 5526,
+    "l3_w": 2843,
+    "zappi_w": 3512,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5526W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:57:36.949548",
+    "l1_w": 3011,
+    "l2_w": 5990,
+    "l3_w": 2876,
+    "zappi_w": 3507,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5990W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:57:44.697370",
+    "l1_w": 3009,
+    "l2_w": 5972,
+    "l3_w": 2849,
+    "zappi_w": 3526,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5972W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:57:56.659683",
+    "l1_w": 2980,
+    "l2_w": 5733,
+    "l3_w": 2842,
+    "zappi_w": 3505,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5733W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:58:20.622708",
+    "l1_w": 2871,
+    "l2_w": 5703,
+    "l3_w": 2739,
+    "zappi_w": 3509,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5703W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:58:26.448398",
+    "l1_w": 2891,
+    "l2_w": 5705,
+    "l3_w": 2731,
+    "zappi_w": 3508,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5705W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:58:35.299019",
+    "l1_w": 2890,
+    "l2_w": 5695,
+    "l3_w": 2739,
+    "zappi_w": 3514,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5695W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:58:41.265066",
+    "l1_w": 2884,
+    "l2_w": 5697,
+    "l3_w": 2752,
+    "zappi_w": 3514,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5697W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:59:15.850044",
+    "l1_w": 2966,
+    "l2_w": 5798,
+    "l3_w": 3964,
+    "zappi_w": 3505,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5798W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T12:59:57.757535",
+    "l1_w": 3063,
+    "l2_w": 3767,
+    "l3_w": 5114,
+    "zappi_w": 3517,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5114W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:04.445640",
+    "l1_w": 3097,
+    "l2_w": 5996,
+    "l3_w": 5150,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5996W (>5100W)",
+      "L3: 5150W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:10.321568",
+    "l1_w": 3108,
+    "l2_w": 6029,
+    "l3_w": 5152,
+    "zappi_w": 3529,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6029W (>5100W)",
+      "L3: 5152W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:22.017005",
+    "l1_w": 3105,
+    "l2_w": 4011,
+    "l3_w": 5166,
+    "zappi_w": 3518,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5166W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:35.937703",
+    "l1_w": 3134,
+    "l2_w": 3857,
+    "l3_w": 5173,
+    "zappi_w": 3530,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5173W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:41.772772",
+    "l1_w": 3273,
+    "l2_w": 3857,
+    "l3_w": 5200,
+    "zappi_w": 3517,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5200W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:50.065283",
+    "l1_w": 3264,
+    "l2_w": 3861,
+    "l3_w": 5204,
+    "zappi_w": 3511,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5204W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:00:59.772914",
+    "l1_w": 3262,
+    "l2_w": 6152,
+    "l3_w": 5218,
+    "zappi_w": 3503,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6152W (>5100W)",
+      "L3: 5218W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:08.154502",
+    "l1_w": 3256,
+    "l2_w": 3900,
+    "l3_w": 5211,
+    "zappi_w": 3497,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5211W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:14.828200",
+    "l1_w": 3256,
+    "l2_w": 3900,
+    "l3_w": 5211,
+    "zappi_w": 3496,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5211W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:22.683713",
+    "l1_w": 3249,
+    "l2_w": 3873,
+    "l3_w": 5218,
+    "zappi_w": 3498,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5218W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:36.206079",
+    "l1_w": 3243,
+    "l2_w": 3860,
+    "l3_w": 5214,
+    "zappi_w": 3496,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5214W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:43.637265",
+    "l1_w": 3252,
+    "l2_w": 3830,
+    "l3_w": 5204,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 5204W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:01:50.746125",
+    "l1_w": 3255,
+    "l2_w": 6056,
+    "l3_w": 5166,
+    "zappi_w": 3530,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6056W (>5100W)",
+      "L3: 5166W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:02:37.688425",
+    "l1_w": 3117,
+    "l2_w": 5908,
+    "l3_w": 2843,
+    "zappi_w": 3525,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5908W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:02:45.358788",
+    "l1_w": 3117,
+    "l2_w": 5908,
+    "l3_w": 2843,
+    "zappi_w": 3514,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5908W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:03:29.670928",
+    "l1_w": 2985,
+    "l2_w": 7177,
+    "l3_w": 2720,
+    "zappi_w": 3555,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 7177W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:04:25.899876",
+    "l1_w": 2821,
+    "l2_w": 6385,
+    "l3_w": 2554,
+    "zappi_w": 3561,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6385W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:05:04.708654",
+    "l1_w": 2849,
+    "l2_w": 6538,
+    "l3_w": 2572,
+    "zappi_w": 3533,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6538W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:05:56.224821",
+    "l1_w": 5069,
+    "l2_w": 6690,
+    "l3_w": 2651,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6690W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:07.176724",
+    "l1_w": 5139,
+    "l2_w": 4573,
+    "l3_w": 2735,
+    "zappi_w": 3495,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5139W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:17.678555",
+    "l1_w": 5123,
+    "l2_w": 4570,
+    "l3_w": 2906,
+    "zappi_w": 3516,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5123W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:23.539415",
+    "l1_w": 5175,
+    "l2_w": 4604,
+    "l3_w": 2926,
+    "zappi_w": 3516,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5175W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:33.970093",
+    "l1_w": 5157,
+    "l2_w": 4629,
+    "l3_w": 2945,
+    "zappi_w": 3494,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5157W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:48.184379",
+    "l1_w": 5234,
+    "l2_w": 6833,
+    "l3_w": 2949,
+    "zappi_w": 3495,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5234W (>5100W)",
+      "L2: 6833W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:06:55.970484",
+    "l1_w": 5238,
+    "l2_w": 3470,
+    "l3_w": 2840,
+    "zappi_w": 3495,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5238W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:01.915011",
+    "l1_w": 5250,
+    "l2_w": 4689,
+    "l3_w": 2863,
+    "zappi_w": 3494,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5250W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:11.604751",
+    "l1_w": 5254,
+    "l2_w": 4715,
+    "l3_w": 2840,
+    "zappi_w": 3497,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5254W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:17.678312",
+    "l1_w": 5265,
+    "l2_w": 6772,
+    "l3_w": 2832,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5265W (>5100W)",
+      "L2: 6772W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:23.555290",
+    "l1_w": 5265,
+    "l2_w": 6772,
+    "l3_w": 2832,
+    "zappi_w": 3524,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5265W (>5100W)",
+      "L2: 6772W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:31.048645",
+    "l1_w": 5258,
+    "l2_w": 7273,
+    "l3_w": 2843,
+    "zappi_w": 3499,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5258W (>5100W)",
+      "L2: 7273W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:40.660795",
+    "l1_w": 5241,
+    "l2_w": 5138,
+    "l3_w": 2815,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5241W (>5100W)",
+      "L2: 5138W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:07:46.667134",
+    "l1_w": 5241,
+    "l2_w": 5138,
+    "l3_w": 2815,
+    "zappi_w": 3528,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5241W (>5100W)",
+      "L2: 5138W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:08:15.738127",
+    "l1_w": 3003,
+    "l2_w": 6736,
+    "l3_w": 2700,
+    "zappi_w": 3560,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6736W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:08:21.596463",
+    "l1_w": 3003,
+    "l2_w": 6736,
+    "l3_w": 2700,
+    "zappi_w": 3539,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6736W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:08:59.691783",
+    "l1_w": 2843,
+    "l2_w": 6623,
+    "l3_w": 2593,
+    "zappi_w": 3532,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6623W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:11.778105",
+    "l1_w": 2840,
+    "l2_w": 6602,
+    "l3_w": 2632,
+    "zappi_w": 3544,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6602W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:18.522274",
+    "l1_w": 2872,
+    "l2_w": 5678,
+    "l3_w": 2715,
+    "zappi_w": 3547,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5678W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:24.451594",
+    "l1_w": 2872,
+    "l2_w": 5460,
+    "l3_w": 2686,
+    "zappi_w": 3547,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5460W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:35.283306",
+    "l1_w": 2871,
+    "l2_w": 6550,
+    "l3_w": 2668,
+    "zappi_w": 3560,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6550W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:41.142112",
+    "l1_w": 2833,
+    "l2_w": 6491,
+    "l3_w": 2654,
+    "zappi_w": 3565,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6491W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:09:47.049141",
+    "l1_w": 2813,
+    "l2_w": 6453,
+    "l3_w": 2598,
+    "zappi_w": 3563,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6453W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:10:15.338357",
+    "l1_w": 2748,
+    "l2_w": 5339,
+    "l3_w": 2597,
+    "zappi_w": 3545,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5339W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:10:28.438883",
+    "l1_w": 2728,
+    "l2_w": 6478,
+    "l3_w": 2531,
+    "zappi_w": 3558,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6478W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:10:34.353821",
+    "l1_w": 2722,
+    "l2_w": 6467,
+    "l3_w": 2530,
+    "zappi_w": 3558,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6467W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:10:51.158660",
+    "l1_w": 2736,
+    "l2_w": 5402,
+    "l3_w": 2561,
+    "zappi_w": 3531,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5402W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:10:57.037657",
+    "l1_w": 2724,
+    "l2_w": 5385,
+    "l3_w": 2573,
+    "zappi_w": 3538,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5385W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:03.883555",
+    "l1_w": 2737,
+    "l2_w": 6516,
+    "l3_w": 2572,
+    "zappi_w": 3538,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6516W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:10.291447",
+    "l1_w": 2730,
+    "l2_w": 6489,
+    "l3_w": 2462,
+    "zappi_w": 3555,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6489W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:17.367436",
+    "l1_w": 2732,
+    "l2_w": 6481,
+    "l3_w": 2452,
+    "zappi_w": 3558,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6481W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:24.399825",
+    "l1_w": 2730,
+    "l2_w": 6469,
+    "l3_w": 2447,
+    "zappi_w": 3559,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6469W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:32.664726",
+    "l1_w": 2692,
+    "l2_w": 6430,
+    "l3_w": 2410,
+    "zappi_w": 3559,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6430W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:50.077652",
+    "l1_w": 2405,
+    "l2_w": 6120,
+    "l3_w": 2210,
+    "zappi_w": 3592,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 6120W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:11:55.928009",
+    "l1_w": 2281,
+    "l2_w": 5988,
+    "l3_w": 2106,
+    "zappi_w": 3561,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5988W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:12:06.893392",
+    "l1_w": 2104,
+    "l2_w": 5836,
+    "l3_w": 1918,
+    "zappi_w": 3566,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5836W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:12:18.353606",
+    "l1_w": 1878,
+    "l2_w": 5597,
+    "l3_w": 1689,
+    "zappi_w": 3581,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5597W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:12:37.703644",
+    "l1_w": 2113,
+    "l2_w": 5840,
+    "l3_w": 1921,
+    "zappi_w": 3587,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5840W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:16:24.403178",
+    "l1_w": 2797,
+    "l2_w": 5388,
+    "l3_w": 2647,
+    "zappi_w": 3550,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5388W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:17:53.234340",
+    "l1_w": 2672,
+    "l2_w": 5270,
+    "l3_w": 2525,
+    "zappi_w": 3531,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5270W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:17:59.522547",
+    "l1_w": 2837,
+    "l2_w": 5425,
+    "l3_w": 2600,
+    "zappi_w": 3529,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5425W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:06.967246",
+    "l1_w": 2837,
+    "l2_w": 5425,
+    "l3_w": 2600,
+    "zappi_w": 3533,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5425W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:16.587372",
+    "l1_w": 2958,
+    "l2_w": 5546,
+    "l3_w": 2795,
+    "zappi_w": 3545,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5546W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:25.401719",
+    "l1_w": 2953,
+    "l2_w": 5521,
+    "l3_w": 2801,
+    "zappi_w": 3545,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5521W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:33.062678",
+    "l1_w": 2947,
+    "l2_w": 5537,
+    "l3_w": 2806,
+    "zappi_w": 3531,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5537W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:46.429818",
+    "l1_w": 2938,
+    "l2_w": 5529,
+    "l3_w": 2690,
+    "zappi_w": 3560,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5529W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:18:59.586672",
+    "l1_w": 2936,
+    "l2_w": 5517,
+    "l3_w": 2780,
+    "zappi_w": 3551,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5517W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:19:12.482042",
+    "l1_w": 2889,
+    "l2_w": 7348,
+    "l3_w": 2736,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L2: 7348W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-21T13:19:24.471116",
+    "l1_w": 2848,
+    "l2_w": 5690,
+    "l3_w": 2607,
+    "zappi_w": 3537,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5690W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:19:48.271203",
+    "l1_w": 2766,
+    "l2_w": 7022,
+    "l3_w": 3492,
+    "zappi_w": 3570,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 7022W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:19:54.117534",
+    "l1_w": 2766,
+    "l2_w": 7022,
+    "l3_w": 3492,
+    "zappi_w": 3555,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 7022W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:20:00.768947",
+    "l1_w": 2742,
+    "l2_w": 5306,
+    "l3_w": 3467,
+    "zappi_w": 3559,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5306W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:20:19.482595",
+    "l1_w": 2762,
+    "l2_w": 7142,
+    "l3_w": 3470,
+    "zappi_w": 3561,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 7142W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:22:17.700185",
+    "l1_w": 2870,
+    "l2_w": 5201,
+    "l3_w": 2604,
+    "zappi_w": 3569,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5201W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:22:30.522090",
+    "l1_w": 2879,
+    "l2_w": 5155,
+    "l3_w": 2653,
+    "zappi_w": 3555,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5155W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:37:46.180532",
+    "l1_w": 5139,
+    "l2_w": 3961,
+    "l3_w": 2877,
+    "zappi_w": 3490,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5139W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:38:14.949394",
+    "l1_w": 5252,
+    "l2_w": 4050,
+    "l3_w": 2954,
+    "zappi_w": 3489,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5252W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T13:38:20.929907",
+    "l1_w": 5252,
+    "l2_w": 4050,
+    "l3_w": 2954,
+    "zappi_w": 3489,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5252W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:03:41.833755",
+    "l1_w": 3064,
+    "l2_w": 2893,
+    "l3_w": 6296,
+    "zappi_w": 3473,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6296W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:03:47.691573",
+    "l1_w": 3091,
+    "l2_w": 2897,
+    "l3_w": 6602,
+    "zappi_w": 3474,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6602W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:03:53.589570",
+    "l1_w": 3091,
+    "l2_w": 2897,
+    "l3_w": 6602,
+    "zappi_w": 3489,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6602W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:04:07.252864",
+    "l1_w": 3125,
+    "l2_w": 2905,
+    "l3_w": 6574,
+    "zappi_w": 3489,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6574W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:04:20.534453",
+    "l1_w": 3092,
+    "l2_w": 2920,
+    "l3_w": 6629,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 6629W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-21T14:04:33.825959",
+    "l1_w": 3063,
+    "l2_w": 2942,
+    "l3_w": 6589,
+    "zappi_w": 3473,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6589W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:04:44.410511",
+    "l1_w": 2970,
+    "l2_w": 2775,
+    "l3_w": 6505,
+    "zappi_w": 3473,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6505W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:04:55.770967",
+    "l1_w": 2938,
+    "l2_w": 2739,
+    "l3_w": 6479,
+    "zappi_w": 3503,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6479W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:30:07.470588",
+    "l1_w": 5975,
+    "l2_w": 3361,
+    "l3_w": 3090,
+    "zappi_w": 3416,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5975W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:30:18.723875",
+    "l1_w": 5917,
+    "l2_w": 3346,
+    "l3_w": 3067,
+    "zappi_w": 3420,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5917W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:30:30.269785",
+    "l1_w": 5959,
+    "l2_w": 3325,
+    "l3_w": 3054,
+    "zappi_w": 3436,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5959W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:30:42.980808",
+    "l1_w": 5910,
+    "l2_w": 3301,
+    "l3_w": 3028,
+    "zappi_w": 3428,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5910W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:30:54.225493",
+    "l1_w": 5922,
+    "l2_w": 3324,
+    "l3_w": 3019,
+    "zappi_w": 3438,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5922W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:31:22.463591",
+    "l1_w": 5849,
+    "l2_w": 3306,
+    "l3_w": 3014,
+    "zappi_w": 3435,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5849W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:31:29.159538",
+    "l1_w": 5870,
+    "l2_w": 3288,
+    "l3_w": 3029,
+    "zappi_w": 3430,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5870W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:31:37.759942",
+    "l1_w": 5784,
+    "l2_w": 3274,
+    "l3_w": 3000,
+    "zappi_w": 3416,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5784W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:31:44.299715",
+    "l1_w": 5784,
+    "l2_w": 3274,
+    "l3_w": 3000,
+    "zappi_w": 3416,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5784W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:31:56.072453",
+    "l1_w": 5828,
+    "l2_w": 3285,
+    "l3_w": 2982,
+    "zappi_w": 3412,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5828W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T14:32:07.583466",
+    "l1_w": 5770,
+    "l2_w": 3260,
+    "l3_w": 2972,
+    "zappi_w": 3418,
+    "zappi_charging": true,
+    "violations": [
+      "L1: 5770W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T15:58:25.387423",
+    "l1_w": 3793,
+    "l2_w": 5105,
+    "l3_w": 4091,
+    "zappi_w": 3486,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5105W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T15:58:31.327546",
+    "l1_w": 3819,
+    "l2_w": 5140,
+    "l3_w": 4085,
+    "zappi_w": 3486,
+    "zappi_charging": true,
+    "violations": [
+      "L2: 5140W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:01:45.179403",
+    "l1_w": 3946,
+    "l2_w": 4364,
+    "l3_w": 6378,
+    "zappi_w": 3522,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6378W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:01:52.967565",
+    "l1_w": 3946,
+    "l2_w": 4364,
+    "l3_w": 6378,
+    "zappi_w": 3522,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6378W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:02:00.654655",
+    "l1_w": 3969,
+    "l2_w": 4321,
+    "l3_w": 6370,
+    "zappi_w": 3490,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6370W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:02:14.336001",
+    "l1_w": 3967,
+    "l2_w": 4366,
+    "l3_w": 6345,
+    "zappi_w": 3512,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6345W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:02:25.991250",
+    "l1_w": 4001,
+    "l2_w": 4308,
+    "l3_w": 6347,
+    "zappi_w": 3516,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6347W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:02:39.300990",
+    "l1_w": 3987,
+    "l2_w": 4314,
+    "l3_w": 6339,
+    "zappi_w": 3486,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6339W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:02:49.456115",
+    "l1_w": 3941,
+    "l2_w": 4298,
+    "l3_w": 6343,
+    "zappi_w": 3494,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6343W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:03:01.824496",
+    "l1_w": 3953,
+    "l2_w": 4290,
+    "l3_w": 6332,
+    "zappi_w": 3510,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6332W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:03:13.530498",
+    "l1_w": 4008,
+    "l2_w": 4311,
+    "l3_w": 6340,
+    "zappi_w": 3506,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6340W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:03:26.795912",
+    "l1_w": 4010,
+    "l2_w": 3953,
+    "l3_w": 6356,
+    "zappi_w": 3512,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6356W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:03:39.697620",
+    "l1_w": 4021,
+    "l2_w": 3966,
+    "l3_w": 6381,
+    "zappi_w": 3510,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6381W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:03:53.044908",
+    "l1_w": 4006,
+    "l2_w": 3966,
+    "l3_w": 6383,
+    "zappi_w": 3503,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6383W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:04:03.890287",
+    "l1_w": 4026,
+    "l2_w": 3971,
+    "l3_w": 6391,
+    "zappi_w": 3502,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6391W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:04:15.768478",
+    "l1_w": 4129,
+    "l2_w": 3971,
+    "l3_w": 6382,
+    "zappi_w": 3487,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6382W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:04:28.481473",
+    "l1_w": 4155,
+    "l2_w": 3992,
+    "l3_w": 6394,
+    "zappi_w": 3506,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6394W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:04:40.943772",
+    "l1_w": 4149,
+    "l2_w": 3968,
+    "l3_w": 6405,
+    "zappi_w": 3488,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6405W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:04:57.262501",
+    "l1_w": 4148,
+    "l2_w": 3976,
+    "l3_w": 6377,
+    "zappi_w": 3490,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6377W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:05:09.096070",
+    "l1_w": 4135,
+    "l2_w": 3968,
+    "l3_w": 6367,
+    "zappi_w": 3491,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6367W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:05:16.198220",
+    "l1_w": 4133,
+    "l2_w": 3978,
+    "l3_w": 6370,
+    "zappi_w": 3515,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6370W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:05:22.395348",
+    "l1_w": 4150,
+    "l2_w": 3967,
+    "l3_w": 6371,
+    "zappi_w": 3515,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6371W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:05:34.016779",
+    "l1_w": 4137,
+    "l2_w": 3970,
+    "l3_w": 6381,
+    "zappi_w": 3503,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6381W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:34:02.891810",
+    "l1_w": 4260,
+    "l2_w": 4164,
+    "l3_w": 6390,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [
+      "L3: 6390W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": true
+  },
+  {
+    "timestamp": "2025-10-21T16:34:15.509433",
+    "l1_w": 4257,
+    "l2_w": 4136,
+    "l3_w": 6401,
+    "zappi_w": 3510,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6401W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:34:22.152335",
+    "l1_w": 4224,
+    "l2_w": 4190,
+    "l3_w": 6392,
+    "zappi_w": 3516,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6392W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:34:28.057012",
+    "l1_w": 4262,
+    "l2_w": 4293,
+    "l3_w": 6347,
+    "zappi_w": 3524,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6347W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:34:42.049062",
+    "l1_w": 4215,
+    "l2_w": 4390,
+    "l3_w": 6376,
+    "zappi_w": 3534,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6376W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:34:53.987065",
+    "l1_w": 4214,
+    "l2_w": 4467,
+    "l3_w": 6351,
+    "zappi_w": 3520,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6351W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:00.008130",
+    "l1_w": 4272,
+    "l2_w": 4577,
+    "l3_w": 6321,
+    "zappi_w": 3534,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6321W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:05.932272",
+    "l1_w": 4270,
+    "l2_w": 4607,
+    "l3_w": 6319,
+    "zappi_w": 3534,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6319W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:12.420406",
+    "l1_w": 4248,
+    "l2_w": 4624,
+    "l3_w": 6333,
+    "zappi_w": 3534,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6333W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:19.473195",
+    "l1_w": 4244,
+    "l2_w": 4599,
+    "l3_w": 6328,
+    "zappi_w": 3549,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6328W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:27.316563",
+    "l1_w": 4247,
+    "l2_w": 4577,
+    "l3_w": 6361,
+    "zappi_w": 3535,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6361W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:35:56.606034",
+    "l1_w": 4219,
+    "l2_w": 4573,
+    "l3_w": 6349,
+    "zappi_w": 3534,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6349W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:36:07.406065",
+    "l1_w": 4228,
+    "l2_w": 4583,
+    "l3_w": 6353,
+    "zappi_w": 3535,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6353W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:36:19.060037",
+    "l1_w": 4275,
+    "l2_w": 4554,
+    "l3_w": 6345,
+    "zappi_w": 3536,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6345W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:36:31.134510",
+    "l1_w": 4272,
+    "l2_w": 4560,
+    "l3_w": 6352,
+    "zappi_w": 3537,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6352W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2025-10-21T16:36:42.349548",
+    "l1_w": 4217,
+    "l2_w": 4545,
+    "l3_w": 6361,
+    "zappi_w": 3500,
+    "zappi_charging": true,
+    "violations": [
+      "L3: 6361W (>5100W)"
+    ],
+    "is_violation": true,
+    "is_real_violation": false
   }
 ]
