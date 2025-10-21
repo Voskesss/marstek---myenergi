@@ -24,3 +24,9 @@ external/
 *.tmp
 *.log
 logs/
+
+# Runtime data (changes constantly)
+battery_config.json
+phase_monitor.json
+phase_peaks.json
+phase_violations.json
