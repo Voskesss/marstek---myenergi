@@ -1,0 +1,12 @@
+{
+  "2026-02-07": {
+    "pv_wh": 161.8,
+    "export_wh": 61.6,
+    "import_wh": 0.0,
+    "house_wh": 48.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 51.8,
+    "zappi_wh": 0.0
+  }
+}

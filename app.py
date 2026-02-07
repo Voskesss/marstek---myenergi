@@ -57,6 +57,7 @@ import time
 import asyncio
 import json
 import logging
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -226,11 +227,59 @@ class VenusEModbusClient:
                             time.sleep(0.1)
                             continue
                     
-                    result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
+                    # Special handling for SOC register - read multiple times due to firmware timing bug
+                    if reg_addr == 32104:  # SOC register
+                        # Read 5 times and use most common valid value
+                        soc_readings = []
+                        for attempt in range(5):
+                            try:
+                                res = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
+                                if hasattr(res, 'registers') and not res.isError():
+                                    val = res.registers[0]
+                                    if 0 <= val <= 100:  # Valid SOC range
+                                        soc_readings.append(val)
+                                time.sleep(0.05)  # Small delay between reads
+                            except:
+                                pass
+                        
+                        if soc_readings:
+                            # Use most common value (majority vote)
+                            from collections import Counter
+                            most_common = Counter(soc_readings).most_common(1)[0][0]
+                            raw_value = most_common
+                            # Create mock result object
+                            class MockResult:
+                                def __init__(self, val):
+                                    self.registers = [val]
+                                def isError(self):
+                                    return False
+                            result = MockResult(raw_value)
+                        else:
+                            # No valid readings - use cached if available
+                            if self.last_valid_soc:
+                                battery_data[param_name] = self.last_valid_soc.copy()
+                                battery_data[param_name]["timestamp"] = datetime.now().isoformat()
+                                battery_data[param_name]["cached"] = True
+                                logging.warning(f"⚠️ SOC: No valid reads after 5 attempts - using cache")
+                            break
+                    else:
+                        # Normal single read for other registers
+                        result = self.client.read_holding_registers(address=reg_addr, count=1, slave=1)
                     
                     if hasattr(result, 'registers') and not result.isError():
                         raw_value = result.registers[0]
                         formatted = format_value(reg_addr, raw_value)
+                        
+                        # format_value returns None for invalid SOC readings (Modbus race condition)
+                        if formatted is None:
+                            if param_name == "soc_percent" and self.last_valid_soc:
+                                # Use cached SOC value for display
+                                battery_data[param_name] = self.last_valid_soc.copy()
+                                battery_data[param_name]["timestamp"] = datetime.now().isoformat()
+                                battery_data[param_name]["cached"] = True
+                                logging.debug(f"Using cached SOC value due to invalid read")
+                            # Skip this register - invalid data
+                            break
                         
                         battery_data[param_name] = {
                             "value": formatted.get("value", raw_value),
@@ -1944,6 +1993,170 @@ async def ble_connect():
         return {"success": False, "error": str(e)}
 
 # =========================
+# Daily Energy Tracker (kWh per dag)
+# =========================
+ENERGY_DAILY_FILE = "energy_daily.json"
+
+class EnergyTracker:
+    def __init__(self):
+        self.today = datetime.now().strftime("%Y-%m-%d")
+        self.pv_wh = 0.0
+        self.export_wh = 0.0      # naar net
+        self.import_wh = 0.0      # van net
+        self.house_wh = 0.0       # eigen verbruik
+        self.batt_charge_wh = 0.0
+        self.batt_discharge_wh = 0.0
+        self.eddi_wh = 0.0
+        self.zappi_wh = 0.0
+        self.last_ts = None
+        self._load()
+
+    def _load(self):
+        try:
+            with open(ENERGY_DAILY_FILE, "r") as f:
+                data = json.load(f)
+            today_data = data.get(self.today)
+            if today_data:
+                self.pv_wh = today_data.get("pv_wh", 0.0)
+                self.export_wh = today_data.get("export_wh", 0.0)
+                self.import_wh = today_data.get("import_wh", 0.0)
+                self.house_wh = today_data.get("house_wh", 0.0)
+                self.batt_charge_wh = today_data.get("batt_charge_wh", 0.0)
+                self.batt_discharge_wh = today_data.get("batt_discharge_wh", 0.0)
+                self.eddi_wh = today_data.get("eddi_wh", 0.0)
+                self.zappi_wh = today_data.get("zappi_wh", 0.0)
+                logging.info(f"📊 Energy tracker loaded for {self.today}: PV={self.pv_wh/1000:.1f}kWh")
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    def _save(self):
+        try:
+            try:
+                with open(ENERGY_DAILY_FILE, "r") as f:
+                    data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                data = {}
+            data[self.today] = self._today_dict()
+            # Keep max 90 days
+            keys = sorted(data.keys())
+            if len(keys) > 90:
+                for k in keys[:-90]:
+                    del data[k]
+            with open(ENERGY_DAILY_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logging.error(f"❌ Energy tracker save error: {e}")
+
+    def _today_dict(self):
+        return {
+            "pv_wh": round(self.pv_wh, 1),
+            "export_wh": round(self.export_wh, 1),
+            "import_wh": round(self.import_wh, 1),
+            "house_wh": round(self.house_wh, 1),
+            "batt_charge_wh": round(self.batt_charge_wh, 1),
+            "batt_discharge_wh": round(self.batt_discharge_wh, 1),
+            "eddi_wh": round(self.eddi_wh, 1),
+            "zappi_wh": round(self.zappi_wh, 1),
+        }
+
+    def tick(self, pv_w, grid_w, house_w, eddi_w, zappi_w, batt_w):
+        """Call every loop tick with current power values (watts).
+        grid_w: negative = export, positive = import (myenergi raw convention)
+        batt_w: positive = charging, negative = discharging
+        """
+        now = time.time()
+        # Check day rollover
+        today = datetime.now().strftime("%Y-%m-%d")
+        if today != self.today:
+            self._save()  # save yesterday
+            self.today = today
+            self.pv_wh = 0.0
+            self.export_wh = 0.0
+            self.import_wh = 0.0
+            self.house_wh = 0.0
+            self.batt_charge_wh = 0.0
+            self.batt_discharge_wh = 0.0
+            self.eddi_wh = 0.0
+            self.zappi_wh = 0.0
+            self.last_ts = now
+            logging.info(f"📊 Energy tracker: new day {today}")
+            return
+
+        if self.last_ts is None:
+            self.last_ts = now
+            return
+
+        dt_h = (now - self.last_ts) / 3600.0  # hours
+        self.last_ts = now
+
+        if dt_h > 0.05:  # skip if gap > 3 min (service restart etc)
+            return
+
+        # Accumulate Wh
+        self.pv_wh += max(0, pv_w or 0) * dt_h
+        if grid_w is not None:
+            if grid_w < 0:  # export (myenergi: negative = export)
+                self.export_wh += abs(grid_w) * dt_h
+            else:
+                self.import_wh += grid_w * dt_h
+        self.house_wh += max(0, house_w or 0) * dt_h
+        self.eddi_wh += max(0, eddi_w or 0) * dt_h
+        self.zappi_wh += max(0, zappi_w or 0) * dt_h
+        if batt_w is not None:
+            if batt_w > 0:
+                self.batt_charge_wh += batt_w * dt_h
+            else:
+                self.batt_discharge_wh += abs(batt_w) * dt_h
+
+        # Save every ~60 ticks (~3 min)
+        if int(now) % 180 < 4:
+            self._save()
+
+    def get_today(self):
+        return {
+            "date": self.today,
+            "pv_kwh": round(self.pv_wh / 1000, 2),
+            "export_kwh": round(self.export_wh / 1000, 2),
+            "import_kwh": round(self.import_wh / 1000, 2),
+            "house_kwh": round(self.house_wh / 1000, 2),
+            "batt_charge_kwh": round(self.batt_charge_wh / 1000, 2),
+            "batt_discharge_kwh": round(self.batt_discharge_wh / 1000, 2),
+            "eddi_kwh": round(self.eddi_wh / 1000, 2),
+            "zappi_kwh": round(self.zappi_wh / 1000, 2),
+            "self_consumption_pct": round(
+                ((self.pv_wh - self.export_wh) / self.pv_wh * 100) if self.pv_wh > 100 else 0, 1
+            ),
+        }
+
+    def get_history(self, days=7):
+        try:
+            with open(ENERGY_DAILY_FILE, "r") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {}
+        # Add today's live data
+        data[self.today] = self._today_dict()
+        # Return last N days
+        keys = sorted(data.keys())[-days:]
+        result = []
+        for k in keys:
+            d = data[k]
+            pv = d.get("pv_wh", 0)
+            exp = d.get("export_wh", 0)
+            result.append({
+                "date": k,
+                "pv_kwh": round(pv / 1000, 2),
+                "export_kwh": round(exp / 1000, 2),
+                "import_kwh": round(d.get("import_wh", 0) / 1000, 2),
+                "house_kwh": round(d.get("house_wh", 0) / 1000, 2),
+                "eddi_kwh": round(d.get("eddi_wh", 0) / 1000, 2),
+                "self_consumption_pct": round(((pv - exp) / pv * 100) if pv > 100 else 0, 1),
+            })
+        return result
+
+energy_tracker = EnergyTracker()
+
+# =========================
 # Simple Battery Rule Engine (export-driven, manual setpoints)
 # =========================
 class SimpleRuleState:
@@ -1956,8 +2169,8 @@ class SimpleRuleState:
             "export_margin_w": 100,
             "threshold_start_w": 150,
             "threshold_stop_w": 100,
-            "ramp_step_w": 150,        # per tick
-            "loop_interval_s": 5.0,    # 5 seconds (was 0.5s)
+            "ramp_step_w": 500,        # per tick (was 150, te traag)
+            "loop_interval_s": 3.0,    # 3 seconds (was 5s)
             "cooldown_s": 8,
             "max_batt_total_w": 5000,  # total across all batteries
             "per_battery_max_w": 2500, # hard cap per battery
@@ -2095,6 +2308,11 @@ async def _simple_rule_loop():
                     await asyncio.sleep(0.2 * (attempt + 1))
             grid_w = _extract_grid_from_raw(data) if data is not None else None
             pv_w = _extract_pv_from_raw(data) if data is not None else None
+            eddi_w_raw = extract_eddi_power_w(data) if data is not None else 0
+            zappi_w_raw = extract_zappi_power_w(data) if data is not None else 0
+            house_w_raw = extract_house_consumption_w(data) if data is not None else 0
+            # Energy tracker tick (accumulate Wh)
+            energy_tracker.tick(pv_w or 0, grid_w, house_w_raw or 0, eddi_w_raw or 0, zappi_w_raw or 0, 0)
             if grid_w is None:
                 # no data -> safe stop
                 target_total = 0
@@ -2271,38 +2489,62 @@ async def _simple_rule_loop():
                     simple_rule.cooldown_until = now + cfg["cooldown_s"]
                 else:
                     if error > cfg["threshold_start_w"] and not in_cooldown:
-                        # ramp up proportionally but bounded
-                        step = min(cfg["ramp_step_w"], int(error))
+                        # Aggressive ramp: jump to 70% of error immediately, then fine-tune
+                        jump = int(error * 0.7)
+                        step = max(cfg["ramp_step_w"], jump)
                         target_total = min(cfg["max_batt_total_w"], simple_rule.prev_set_total + step)
                     elif error < -cfg["threshold_stop_w"]:
                         # ramp down quickly
-                        step = cfg["ramp_step_w"]
+                        step = max(cfg["ramp_step_w"], int(abs(error) * 0.7))
                         target_total = max(0, simple_rule.prev_set_total - step)
                         if target_total == 0:
                             simple_rule.cooldown_until = now + cfg["cooldown_s"]
                     # else hold
 
-                # distribute across batteries with per-battery cap and leftover redistribution
+                # distribute across batteries - first check which ones are available
                 per: Dict[str, Any] = {}
                 items = (await list_batteries())['items']  # type: ignore[index]
-                n = max(1, len(items))
+                cap = int(simple_rule.cfg.get("per_battery_max_w", 2500))
+                blocked_bids = set()
+                
+                # Pre-check: which batteries are blocked (max SOC)?
+                for it in items:
+                    bid = it['id']
+                    try:
+                        entry = _get_entry_for(bid)
+                        if entry:
+                            client = entry['client']
+                            battery_data = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                timeout=3.0
+                            )
+                            current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                            max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
+                            if current_soc >= max_soc:
+                                logger.info(f"🔋 Battery {bid} at max SOC ({current_soc}% >= {max_soc}%) - SKIP")
+                                per[bid] = {"set": 0, "ok": True, "mode": "blocked_max_soc", "soc": current_soc, "max_soc": max_soc}
+                                blocked_bids.add(bid)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not check SOC for {bid}: {e}")
+                
+                # Only distribute to available (non-blocked) batteries
+                available = [it for it in items if it['id'] not in blocked_bids]
+                n_avail = max(1, len(available))
                 setpoints: Dict[str, int] = {}
                 remaining = int(target_total)
-                base_share = int(target_total / n) if n > 0 else 0
-                base_share = min(base_share, int(simple_rule.cfg.get("per_battery_max_w", 2500)))
-                # first pass: assign base share
-                for it in items:
+                base_share = int(target_total / n_avail) if n_avail > 0 else 0
+                base_share = min(base_share, cap)
+                for it in available:
                     bid = it['id']
                     sp = max(0, min(base_share, remaining))
                     setpoints[bid] = sp
                     remaining -= sp
-                # second pass: distribute leftover up to per-battery max
-                if remaining > 0 and items:
-                    cap = int(simple_rule.cfg.get("per_battery_max_w", 2500))
+                # Redistribute leftover
+                if remaining > 0 and available:
                     idx = 0
-                    L = len(items)
-                    while remaining > 0 and idx < L * 2:  # limited cycles
-                        bid = items[idx % L]['id']
+                    L = len(available)
+                    while remaining > 0 and idx < L * 2:
+                        bid = available[idx % L]['id']
                         space = max(0, cap - setpoints.get(bid, 0))
                         if space > 0:
                             give = min(space, remaining)
@@ -2313,45 +2555,22 @@ async def _simple_rule_loop():
                 set_total = 0
                 for it in items:
                     bid = it['id']
+                    if bid in blocked_bids:
+                        continue
                     sp = int(setpoints.get(bid, 0))
                     
-                    # If we're going to charge (sp > 0), CHECK MAX SOC FIRST
                     if sp > 0:
-                        # Check if battery is already at max SOC - INDIVIDUAL check
-                        try:
-                            entry = _get_entry_for(bid)
-                            if entry:
-                                client = entry['client']
-                                lock = entry['lock']
-                                
-                                # Read current SOC
-                                battery_data = await asyncio.wait_for(
-                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
-                                    timeout=3.0
-                                )
-                                current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
-                                max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
-                                
-                                if current_soc >= max_soc:
-                                    logger.info(f"🔋 Battery {bid} at max SOC ({current_soc}% >= {max_soc}%) - SKIP charging (others continue)")
-                                    per[bid] = {"set": 0, "ok": True, "mode": "blocked_max_soc", "soc": current_soc, "max_soc": max_soc}
-                                    continue
-                        except Exception as e:
-                            logger.warning(f"⚠️ Could not check SOC for {bid}: {e} - will try to charge anyway")
-                        
                         # Ensure battery is in Manual mode for charging
-                        # Only switch if not already in manual mode to prevent flipping
                         current_mode = simple_rule.battery_modes.get(bid, "unknown")
                         if current_mode != "manual":
                             try:
                                 logger.info(f"🔋 SIMPLE RULE: Setting {bid} to Manual mode for charging {sp}W")
-                                # Get the existing battery client from registry
                                 entry = _get_entry_for(bid)
                                 if entry:
                                     client = entry['client']
                                     lock = entry['lock']
                                     async with lock:
-                                        mode_result = client.set_work_mode(0)  # 0 = Manual mode
+                                        mode_result = client.set_work_mode(0)
                                     if mode_result.get("ok"):
                                         simple_rule.battery_modes[bid] = "manual"
                                     logger.info(f"🔋 Mode switch result: {mode_result}")
@@ -2498,6 +2717,98 @@ async def _soc_safety_monitor():
             await asyncio.sleep(5)
 
 # ---------------------------------
+# Battery Offline Monitor + WhatsApp Alert
+# ---------------------------------
+battery_offline_task = None
+_battery_offline_since = {}  # bid -> datetime when first detected offline
+_battery_offline_alerted = {}  # bid -> True if alert already sent
+
+async def _battery_offline_monitor():
+    """Monitor battery connectivity and send WhatsApp alert if offline > 10 minutes."""
+    global _battery_offline_since, _battery_offline_alerted
+    
+    try:
+        from whatsapp_notifier import whatsapp
+    except ImportError:
+        logger.error("❌ whatsapp_notifier.py not found, offline monitor disabled")
+        return
+    
+    logger.info("🔌 Battery Offline Monitor started (alert after 10 min)")
+    OFFLINE_THRESHOLD_SECONDS = 600  # 10 minutes
+    
+    while True:
+        try:
+            await asyncio.sleep(30)  # Check every 30 seconds
+            
+            for bid in manager.registry:
+                entry = _get_entry_for(bid)
+                if not entry:
+                    continue
+                
+                client = entry['client']
+                lock = entry['lock']
+                
+                try:
+                    async with lock:
+                        battery_data = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                            timeout=8.0
+                        )
+                    
+                    if battery_data and battery_data.get("soc_percent"):
+                        # Battery is online - reset tracking
+                        was_offline = bid in _battery_offline_since
+                        _battery_offline_since.pop(bid, None)
+                        _battery_offline_alerted.pop(bid, None)
+                        if was_offline:
+                            soc = battery_data.get("soc_percent", {}).get("value", "?")
+                            logger.info(f"✅ Battery {bid} is back ONLINE (SOC: {soc}%)")
+                            await whatsapp.send_message("jos", 
+                                f"✅ *Batterij {bid} is weer online!*\n\nSOC: {soc}%\n\n_myEnergy systeem_")
+                    else:
+                        # Battery offline
+                        if bid not in _battery_offline_since:
+                            _battery_offline_since[bid] = datetime.now()
+                            logger.warning(f"⚠️ Battery {bid} offline detected")
+                        
+                        offline_seconds = (datetime.now() - _battery_offline_since[bid]).total_seconds()
+                        
+                        if offline_seconds >= OFFLINE_THRESHOLD_SECONDS and not _battery_offline_alerted.get(bid):
+                            minutes = int(offline_seconds / 60)
+                            logger.error(f"🚨 Battery {bid} offline for {minutes} minutes - sending alert!")
+                            await whatsapp.send_message("jos",
+                                f"🚨 *Batterij {bid} is offline!*\n\n"
+                                f"⏱️ Al {minutes} minuten niet bereikbaar\n"
+                                f"🔌 Host: {client.host}:{client.port}\n\n"
+                                f"Controleer WiFi verbinding of herstart de batterij.\n\n"
+                                f"_myEnergy systeem_")
+                            _battery_offline_alerted[bid] = True
+                
+                except (asyncio.TimeoutError, Exception) as e:
+                    # Timeout or error = offline
+                    if bid not in _battery_offline_since:
+                        _battery_offline_since[bid] = datetime.now()
+                        logger.warning(f"⚠️ Battery {bid} offline (error: {e})")
+                    
+                    offline_seconds = (datetime.now() - _battery_offline_since[bid]).total_seconds()
+                    
+                    if offline_seconds >= OFFLINE_THRESHOLD_SECONDS and not _battery_offline_alerted.get(bid):
+                        minutes = int(offline_seconds / 60)
+                        logger.error(f"🚨 Battery {bid} offline for {minutes} minutes - sending alert!")
+                        await whatsapp.send_message("jos",
+                            f"🚨 *Batterij {bid} is offline!*\n\n"
+                            f"⏱️ Al {minutes} minuten niet bereikbaar\n"
+                            f"🔌 Host: {client.host}:{client.port}\n"
+                            f"❌ Error: {str(e)[:100]}\n\n"
+                            f"Controleer WiFi verbinding of herstart de batterij.\n\n"
+                            f"_myEnergy systeem_")
+                        _battery_offline_alerted[bid] = True
+        
+        except Exception as e:
+            logger.error(f"❌ Battery Offline Monitor error: {e}")
+            await asyncio.sleep(30)
+
+# ---------------------------------
 # WhatsApp Energy Tips Scheduler
 # ---------------------------------
 whatsapp_tips_task = None
@@ -2624,7 +2935,7 @@ async def _startup_simple_rule():
     """Auto-start the simple export-driven rule on app boot.
     Keeps behavior resilient after crashes/restarts.
     """
-    global soc_safety_task, whatsapp_tips_task
+    global soc_safety_task, whatsapp_tips_task, battery_offline_task
     
     try:
         # Start SOC Safety Monitor (always running!)
@@ -2634,6 +2945,10 @@ async def _startup_simple_rule():
         # Start WhatsApp tips scheduler
         whatsapp_tips_task = asyncio.create_task(_whatsapp_tips_scheduler())
         logger.info("📱 WhatsApp tips scheduler started")
+        
+        # Start Battery Offline Monitor
+        battery_offline_task = asyncio.create_task(_battery_offline_monitor())
+        logger.info("🔌 Battery Offline Monitor started")
         
         # Start Phase Monitor (3x25A check)
         await phase_monitor.start()
@@ -2841,6 +3156,16 @@ async def api_logs_tail(n: int = 200):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/api/energy/today")
+async def energy_today():
+    """Get today's energy totals (kWh)."""
+    return energy_tracker.get_today()
+
+@app.get("/api/energy/history")
+async def energy_history(days: int = 7):
+    """Get energy history for last N days."""
+    return energy_tracker.get_history(min(days, 90))
+
 @app.get("/flow.html")
 async def flow_visualization_page():
     """Serve the energy flow visualization page."""
@@ -2850,6 +3175,16 @@ async def flow_visualization_page():
         return HTMLResponse(html)
     except Exception as e:
         return HTMLResponse(f"Flow page not available: {e}", status_code=500)
+
+@app.get("/flow2.html")
+async def flow2_visualization_page():
+    """Serve the new energy flow visualization page."""
+    try:
+        with open("flow2.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"Flow2 page not available: {e}", status_code=500)
 
 # ----------------------
 # Helpers for per-battery config/control

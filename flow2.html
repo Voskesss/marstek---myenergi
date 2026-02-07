@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energie Flow</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg: #050a18;
+      --surface: rgba(15,23,42,0.85);
+      --border: rgba(51,65,85,0.5);
+      --text: #e2e8f0;
+      --dim: #64748b;
+      --solar: #fbbf24;
+      --solar-bg: rgba(251,191,36,0.12);
+      --grid-exp: #34d399;
+      --grid-exp-bg: rgba(52,211,153,0.12);
+      --grid-imp: #f87171;
+      --grid-imp-bg: rgba(248,113,113,0.12);
+      --house: #a78bfa;
+      --house-bg: rgba(167,139,250,0.12);
+      --eddi: #fb923c;
+      --eddi-bg: rgba(251,146,60,0.12);
+      --zappi: #60a5fa;
+      --zappi-bg: rgba(96,165,250,0.12);
+      --batt: #22d3ee;
+      --batt-bg: rgba(34,211,238,0.12);
+      --batt-low: #f87171;
+      --hint-bg: rgba(16,185,129,0.15);
+      --hint-border: #10b981;
+    }
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.04) 0%, transparent 60%);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== Canvas ===== */
+    .canvas {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .canvas svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== Nodes ===== */
+    .node {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.3s ease;
+    }
+    .node-circle {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      transition: all 0.5s ease;
+      position: relative;
+    }
+    .node.active .node-circle {
+      border-color: var(--node-color);
+      box-shadow: 0 0 24px var(--node-glow);
+    }
+    /* Pulsing ring for active nodes */
+    .node.active .node-circle::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid var(--node-color);
+      opacity: 0;
+      animation: ring-pulse 2.5s ease-out infinite;
+    }
+    @keyframes ring-pulse {
+      0% { transform: scale(0.95); opacity: 0.6; }
+      100% { transform: scale(1.15); opacity: 0; }
+    }
+    .node-info {
+      text-align: center;
+      min-width: 100px;
+    }
+    .node-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .node-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+      min-height: 26px;
+    }
+    .node-sub {
+      font-size: 11px;
+      color: var(--dim);
+      min-height: 16px;
+    }
+
+    /* House node (center) - bigger */
+    .node-house .node-circle {
+      width: 100px;
+      height: 100px;
+      font-size: 42px;
+    }
+
+    /* SOC mini bar inside battery nodes */
+    .soc-wrap {
+      width: 60px;
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .soc-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1s ease, background 0.5s ease;
+    }
+
+    /* ===== Positions (% based) ===== */
+    .node-solar { top: 8%; left: 50%; transform: translateX(-50%); }
+    .node-house { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    .node-grid  { top: 50%; right: 6%; transform: translateY(-50%); }
+    .node-batt1 { top: 32%; left: 6%; transform: translateY(-50%); }
+    .node-batt2 { top: 68%; left: 6%; transform: translateY(-50%); }
+    .node-eddi  { bottom: 8%; left: 35%; transform: translateX(-50%); }
+    .node-zappi { bottom: 8%; right: 35%; transform: translateX(50%); }
+
+    /* ===== Flow lines ===== */
+    .flow-path {
+      fill: none;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      opacity: 0.06;
+      transition: opacity 0.6s ease;
+    }
+    .flow-path.active {
+      opacity: 1;
+      stroke-dasharray: 10 6;
+      animation: dash 0.8s linear infinite;
+    }
+    @keyframes dash { to { stroke-dashoffset: -16; } }
+
+    .flow-watt {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      fill: var(--text);
+      text-anchor: middle;
+      dominant-baseline: middle;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .flow-watt.active { opacity: 0.9; }
+
+    /* ===== Bottom bar ===== */
+    .bottom {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .kpi { text-align: center; }
+    .kpi-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi-pos { color: var(--grid-exp); }
+    .kpi-neg { color: var(--grid-imp); }
+    .kpi-neu { color: var(--text); }
+
+    /* ===== Top bar ===== */
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .top-left { display: flex; align-items: center; gap: 10px; }
+    .top-title { font-size: 16px; font-weight: 600; }
+    .top-clock { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .top-right { display: flex; align-items: center; gap: 8px; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--grid-exp); animation: blink 2s infinite; }
+    .live-dot.off { background: var(--grid-imp); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .live-text { font-size: 11px; color: var(--dim); }
+    .btn-fs { background: none; border: 1px solid var(--border); color: var(--dim); padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .btn-fs:hover { color: var(--text); border-color: var(--text); }
+
+    /* ===== Appliance hint ===== */
+    .hint {
+      position: absolute;
+      bottom: 14%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--hint-bg);
+      border: 1.5px solid var(--hint-border);
+      border-radius: 16px;
+      padding: 14px 28px;
+      text-align: center;
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      animation: hint-glow 2s ease-in-out infinite;
+    }
+    @keyframes hint-glow {
+      0%,100% { box-shadow: 0 0 16px rgba(16,185,129,0.2); }
+      50% { box-shadow: 0 0 40px rgba(16,185,129,0.45); }
+    }
+    .hint-icons { font-size: 40px; }
+    .hint-msg { font-size: 15px; font-weight: 600; color: #d1fae5; }
+    .hint-sub { font-size: 12px; color: #6ee7b7; }
+  </style>
+</head>
+<body>
+
+<div class="top">
+  <div class="top-left">
+    <span class="top-title">⚡ Energie Flow</span>
+    <span class="top-clock" id="clock">--:--</span>
+  </div>
+  <div class="top-right">
+    <span class="live-dot" id="liveDot"></span>
+    <span class="live-text" id="liveText">Verbinden...</span>
+    <button class="btn-fs" onclick="document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()">⛶</button>
+  </div>
+</div>
+
+<div class="canvas" id="canvas">
+  <svg id="svg"></svg>
+
+  <!-- Solar -->
+  <div class="node node-solar" id="nSolar" style="--node-color:var(--solar);--node-glow:var(--solar-bg);">
+    <div class="node-circle">☀️</div>
+    <div class="node-info">
+      <div class="node-label">Zonnepanelen</div>
+      <div class="node-value" id="vSolar">--</div>
+    </div>
+  </div>
+
+  <!-- House -->
+  <div class="node node-house" id="nHouse" style="--node-color:var(--house);--node-glow:var(--house-bg);">
+    <div class="node-circle">🏠</div>
+    <div class="node-info">
+      <div class="node-label">Huis</div>
+      <div class="node-value" id="vHouse">--</div>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="node node-grid" id="nGrid" style="--node-color:var(--grid-exp);--node-glow:var(--grid-exp-bg);">
+    <div class="node-circle">🔌</div>
+    <div class="node-info">
+      <div class="node-label">Net</div>
+      <div class="node-value" id="vGrid">--</div>
+      <div class="node-sub" id="vGridDir"></div>
+    </div>
+  </div>
+
+  <!-- Battery 1 -->
+  <div class="node node-batt1" id="nBatt1" style="--node-color:var(--batt);--node-glow:var(--batt-bg);">
+    <div class="node-circle">🔋</div>
+    <div class="node-info">
+      <div class="node-label">Batterij 92</div>
+      <div class="node-value" id="vBatt1">--</div>
+      <div class="node-sub" id="vBatt1Soc">--</div>
+      <div class="soc-wrap"><div class="soc-fill" id="soc1" style="width:0"></div></div>
+    </div>
+  </div>
+
+  <!-- Battery 2 -->
+  <div class="node node-batt2" id="nBatt2" style="--node-color:var(--batt);--node-glow:var(--batt-bg);">
+    <div class="node-circle">🔋</div>
+    <div class="node-info">
+      <div class="node-label">Batterij 74</div>
+      <div class="node-value" id="vBatt2">--</div>
+      <div class="node-sub" id="vBatt2Soc">--</div>
+      <div class="soc-wrap"><div class="soc-fill" id="soc2" style="width:0"></div></div>
+    </div>
+  </div>
+
+  <!-- Eddi -->
+  <div class="node node-eddi" id="nEddi" style="--node-color:var(--eddi);--node-glow:var(--eddi-bg);">
+    <div class="node-circle">🔥</div>
+    <div class="node-info">
+      <div class="node-label">Boiler</div>
+      <div class="node-value" id="vEddi">--</div>
+      <div class="node-sub" id="vEddiT"></div>
+    </div>
+  </div>
+
+  <!-- Zappi -->
+  <div class="node node-zappi" id="nZappi" style="--node-color:var(--zappi);--node-glow:var(--zappi-bg);">
+    <div class="node-circle">🚗</div>
+    <div class="node-info">
+      <div class="node-label">Auto</div>
+      <div class="node-value" id="vZappi">--</div>
+    </div>
+  </div>
+
+  <!-- Appliance hint -->
+  <div class="hint" id="hint">
+    <div class="hint-icons">🫧 👕</div>
+    <div class="hint-msg">Zet de wasmachine of vaatwasser aan!</div>
+    <div class="hint-sub" id="hintSub">-- kW overschot</div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="kpi"><div class="kpi-label">Zelfverbruik</div><div class="kpi-val kpi-neu" id="kSelf">--%</div></div>
+  <div class="kpi"><div class="kpi-label">Netto</div><div class="kpi-val" id="kNet">--</div></div>
+  <div class="kpi"><div class="kpi-label">Batterij gem.</div><div class="kpi-val kpi-neu" id="kBatt">--%</div></div>
+  <div class="kpi"><div class="kpi-label">Boiler</div><div class="kpi-val kpi-neu" id="kEddiT">--°C</div></div>
+</div>
+
+<script>
+// ===== Config =====
+const T = 50, BT = 300;
+let fails = 0, interval = 2000;
+let exportSince = null;
+const HINT_SEC = 300;
+
+// ===== Clock =====
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+// ===== SVG flow lines =====
+const svgEl = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+const lines = {};
+
+function center(id) {
+  const el = document.getElementById(id);
+  const c = document.getElementById('canvas');
+  if (!el || !c) return {x:0,y:0};
+  const r = el.querySelector('.node-circle').getBoundingClientRect();
+  const p = c.getBoundingClientRect();
+  return { x: r.left - p.left + r.width/2, y: r.top - p.top + r.height/2 };
+}
+
+function mkLine(id, color) {
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('class', 'flow-path');
+  path.style.stroke = color;
+  svgEl.appendChild(path);
+  const txt = document.createElementNS(NS, 'text');
+  txt.setAttribute('class', 'flow-watt');
+  svgEl.appendChild(txt);
+  lines[id] = { path, txt };
+}
+
+function setLine(id, fromId, toId, watts, color) {
+  const l = lines[id]; if (!l) return;
+  const f = center(fromId), t = center(toId);
+  const mx = (f.x+t.x)/2, my = (f.y+t.y)/2;
+  const dx = t.x-f.x, dy = t.y-f.y, d = Math.hypot(dx,dy) || 1;
+  const off = d * 0.06;
+  const cx = mx + (-dy/d)*off, cy = my + (dx/d)*off;
+  l.path.setAttribute('d', `M${f.x},${f.y} Q${cx},${cy} ${t.x},${t.y}`);
+  const on = Math.abs(watts) >= T;
+  l.path.setAttribute('class', on ? 'flow-path active' : 'flow-path');
+  if (on) {
+    l.path.style.stroke = color;
+    const w = Math.min(6000, Math.abs(watts));
+    l.path.style.animationDuration = `${(1.2 - w/6000*0.7).toFixed(2)}s`;
+    l.path.style.strokeWidth = `${(2 + w/6000*3).toFixed(1)}`;
+  }
+  l.txt.setAttribute('x', cx); l.txt.setAttribute('y', cy - 8);
+  if (on) {
+    const kw = Math.abs(watts)/1000;
+    l.txt.textContent = kw >= 1 ? `${kw.toFixed(1)} kW` : `${Math.round(Math.abs(watts))} W`;
+    l.txt.setAttribute('class', 'flow-watt active');
+    l.txt.style.fill = color;
+  } else {
+    l.txt.textContent = '';
+    l.txt.setAttribute('class', 'flow-watt');
+  }
+}
+
+function initLines() {
+  mkLine('sol', 'var(--solar)');
+  mkLine('g_in', 'var(--grid-imp)');
+  mkLine('g_out', 'var(--grid-exp)');
+  mkLine('eddi', 'var(--eddi)');
+  mkLine('zappi', 'var(--zappi)');
+  mkLine('b1_in', 'var(--batt)');
+  mkLine('b1_out', 'var(--batt)');
+  mkLine('b2_in', 'var(--batt)');
+  mkLine('b2_out', 'var(--batt)');
+}
+
+// ===== Helpers =====
+function v(n) { return n == null ? 0 : Number(n) || 0; }
+function fmt(w) { const a = Math.abs(w); return a >= 1000 ? `${(a/1000).toFixed(1)} kW` : `${Math.round(a)} W`; }
+function socCol(s) { return s > 60 ? 'var(--batt)' : s > 30 ? '#f59e0b' : 'var(--batt-low)'; }
+function act(id, on) { document.getElementById(id)?.classList.toggle('active', on); }
+
+// ===== Fetch =====
+async function getData() {
+  const ts = Date.now();
+  const [s, b1, b2] = await Promise.all([
+    fetch(`/api/status?ts=${ts}`).then(r=>r.json()),
+    fetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).then(r=>r.json()),
+    fetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).then(r=>r.json())
+  ]);
+  return {s, b1, b2};
+}
+
+// ===== Render =====
+function render({s, b1, b2}) {
+  const pv = v(s.pv_generation_w);
+  const grid = v(s.grid_w);  // >0 = export, <0 = import
+  const house = v(s.house_consumption_w);
+  const eddi = v(s.eddi_power_w);
+  const zappi = v(s.zappi_power_w);
+  const d1 = b1.derived||{}, d2 = b2.derived||{};
+  const bp1 = Math.round(v(d1.power_w)), bp2 = Math.round(v(d2.power_w));
+  const s1 = d1.soc_percent, s2 = d2.soc_percent;
+  const m1 = d1.mode||'Offline', m2 = d2.mode||'Offline';
+
+  // Values
+  document.getElementById('vSolar').textContent = fmt(pv);
+  document.getElementById('vHouse').textContent = fmt(house);
+  document.getElementById('vGrid').textContent = fmt(grid);
+  document.getElementById('vEddi').textContent = fmt(eddi);
+  document.getElementById('vZappi').textContent = fmt(zappi);
+  document.getElementById('vBatt1').textContent = fmt(bp1);
+  document.getElementById('vBatt2').textContent = fmt(bp2);
+
+  // Grid direction
+  const gd = document.getElementById('vGridDir');
+  const gn = document.getElementById('nGrid');
+  if (grid > T) {
+    gd.textContent = '⬆ Export'; gd.style.color = 'var(--grid-exp)';
+    gn.style.setProperty('--node-color','var(--grid-exp)');
+    gn.style.setProperty('--node-glow','var(--grid-exp-bg)');
+  } else if (grid < -T) {
+    gd.textContent = '⬇ Import'; gd.style.color = 'var(--grid-imp)';
+    gn.style.setProperty('--node-color','var(--grid-imp)');
+    gn.style.setProperty('--node-glow','var(--grid-imp-bg)');
+  } else {
+    gd.textContent = '— Neutraal'; gd.style.color = 'var(--dim)';
+  }
+
+  // Battery SOC
+  if (s1 != null) {
+    document.getElementById('vBatt1Soc').textContent = `${s1}% · ${m1}`;
+    document.getElementById('soc1').style.width = `${s1}%`;
+    document.getElementById('soc1').style.background = socCol(s1);
+  } else {
+    document.getElementById('vBatt1Soc').textContent = 'Offline';
+    document.getElementById('vBatt1Soc').style.color = 'var(--batt-low)';
+  }
+  if (s2 != null) {
+    document.getElementById('vBatt2Soc').textContent = `${s2}% · ${m2}`;
+    document.getElementById('soc2').style.width = `${s2}%`;
+    document.getElementById('soc2').style.background = socCol(s2);
+  } else {
+    document.getElementById('vBatt2Soc').textContent = 'Offline';
+    document.getElementById('vBatt2Soc').style.color = 'var(--batt-low)';
+  }
+
+  // Eddi temp
+  const tp = s.eddi_temperatures?.tp1;
+  if (tp != null) {
+    document.getElementById('vEddiT').textContent = `${tp}°C`;
+    document.getElementById('kEddiT').textContent = `${tp}°C`;
+  }
+
+  // Active states
+  act('nSolar', pv > T);
+  act('nHouse', house > T);
+  act('nGrid', Math.abs(grid) > T);
+  act('nEddi', eddi > T);
+  act('nZappi', zappi > T);
+  act('nBatt1', Math.abs(bp1) > T || s1 != null);
+  act('nBatt2', Math.abs(bp2) > T || s2 != null);
+
+  // Flow lines
+  setLine('sol', 'nSolar', 'nHouse', pv, 'var(--solar)');
+  setLine('g_in', 'nGrid', 'nHouse', grid < -T ? -grid : 0, 'var(--grid-imp)');
+  setLine('g_out', 'nHouse', 'nGrid', grid > T ? grid : 0, 'var(--grid-exp)');
+  setLine('eddi', 'nHouse', 'nEddi', eddi, 'var(--eddi)');
+  setLine('zappi', 'nHouse', 'nZappi', zappi, 'var(--zappi)');
+  setLine('b1_in', 'nHouse', 'nBatt1', bp1 > BT ? bp1 : 0, 'var(--batt)');
+  setLine('b1_out', 'nBatt1', 'nHouse', bp1 < -BT ? -bp1 : 0, 'var(--batt)');
+  setLine('b2_in', 'nHouse', 'nBatt2', bp2 > BT ? bp2 : 0, 'var(--batt)');
+  setLine('b2_out', 'nBatt2', 'nHouse', bp2 < -BT ? -bp2 : 0, 'var(--batt)');
+
+  // Appliance hint
+  const exp = grid > 0 ? grid : 0;
+  const hint = document.getElementById('hint');
+  if (exp >= 2000) {
+    if (!exportSince) exportSince = Date.now();
+    if ((Date.now() - exportSince)/1000 >= HINT_SEC) {
+      hint.style.display = 'flex';
+      document.getElementById('hintSub').textContent = `${(exp/1000).toFixed(1)} kW overschot`;
+    } else hint.style.display = 'none';
+  } else { exportSince = null; hint.style.display = 'none'; }
+
+  // KPIs
+  const selfPct = pv > 100 ? Math.round(((pv - exp) / pv) * 100) : 0;
+  document.getElementById('kSelf').textContent = `${selfPct}%`;
+
+  const kn = document.getElementById('kNet');
+  kn.textContent = grid > T ? `⬆ ${fmt(grid)}` : grid < -T ? `⬇ ${fmt(-grid)}` : '0 W';
+  kn.className = `kpi-val ${grid > T ? 'kpi-pos' : grid < -T ? 'kpi-neg' : 'kpi-neu'}`;
+
+  const socs = [s1,s2].filter(x=>x!=null);
+  if (socs.length) document.getElementById('kBatt').textContent = `${Math.round(socs.reduce((a,b)=>a+b,0)/socs.length)}%`;
+
+  // Status
+  document.getElementById('liveDot').className = 'live-dot';
+  document.getElementById('liveText').textContent = 'Live';
+  document.title = 'Energie Flow';
+}
+
+// ===== Loop =====
+async function tick() {
+  try {
+    render(await getData());
+    fails = 0; interval = 2000;
+  } catch(e) {
+    fails++;
+    interval = Math.min(interval*1.5, 15000);
+    document.getElementById('liveDot').className = 'live-dot off';
+    document.getElementById('liveText').textContent = `Verbinden... (${fails})`;
+  }
+  setTimeout(tick, interval);
+}
+
+// ===== Resize =====
+function resize() {
+  const c = document.getElementById('canvas');
+  const s = document.getElementById('svg');
+  s.setAttribute('viewBox', `0 0 ${c.clientWidth} ${c.clientHeight}`);
+  s.setAttribute('width', c.clientWidth);
+  s.setAttribute('height', c.clientHeight);
+}
+
+window.addEventListener('resize', resize);
+window.addEventListener('DOMContentLoaded', () => { resize(); initLines(); tick(); });
+</script>
+</body>
+</html>

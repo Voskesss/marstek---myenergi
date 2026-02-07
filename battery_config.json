@@ -4,7 +4,7 @@
     "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false,
-    "last_updated": "2025-10-21T17:36:56.290011"
+    "last_updated": "2026-02-07T12:24:06.931284"
   },
   "wifi_converter": {
     "minimum_soc_percent": 20,
@@ -17,13 +17,13 @@
     "modbus_unit_id": 1
   },
   "venus_ev2_92": {
-    "minimum_soc_percent": 30.0,
+    "minimum_soc_percent": 55.0,
     "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false
   },
   "venus_ev2_74": {
-    "minimum_soc_percent": 30.0,
+    "minimum_soc_percent": 58.0,
     "auto_charge_enabled": true,
     "original_work_mode": null,
     "emergency_charge_active": false

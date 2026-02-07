@@ -1,0 +1,19 @@
+[Unit]
+Description=MyEnergi Marstek Battery Control Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=josklijnhout
+Group=josklijnhout
+WorkingDirectory=/home/josklijnhout/marstekbatterijen
+Environment="PATH=/home/josklijnhout/marstekbatterijen/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/josklijnhout/marstekbatterijen/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

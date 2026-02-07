@@ -227,20 +227,15 @@ def format_value(address: int, raw_value: int) -> dict:
     scaled_value = raw_value * reg_info["scale"]
     
     # SANITY CHECK: SoC percentage should be 0-100%
-    # Some batteries intermittently return incorrect values due to Modbus errors
+    # Some batteries intermittently return incorrect values due to Modbus race conditions
     if address == 32104:  # SoC register
-        if scaled_value > 100:
-            # Try dividing by 100 first (0.01% units like 1300 = 13%)
-            corrected = scaled_value / 100.0
-            if 0 <= corrected <= 100:
-                import logging
-                logging.warning(f"⚠️ SoC sanity fix: raw={raw_value} -> {scaled_value}% -> {corrected:.1f}%")
-                scaled_value = corrected
-            else:
-                # Still invalid, clamp to 0-100
-                import logging
-                logging.error(f"❌ Invalid SoC value: raw={raw_value}, scaled={scaled_value}% - CLAMPING to valid range")
-                scaled_value = max(0, min(100, scaled_value))
+        # Valid range: 0-100 raw value (Venus E returns SOC directly in %)
+        if not (0 <= raw_value <= 100):
+            import logging
+            logging.warning(f"⚠️ Invalid SOC register value detected: raw={raw_value} (0x{raw_value:04X}) - REJECTING (likely Modbus timing issue)")
+            # Return None to indicate invalid reading - caller should use cached value
+            return None
+        scaled_value = raw_value * reg_info["scale"]
     
     # Format with max 1 decimal place
     if "values" in reg_info and raw_value in reg_info["values"]:

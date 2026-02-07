@@ -43,7 +43,7 @@ class VenusEModbusClient:
                 return None
         
         try:
-            result = self.client.read_holding_registers(address, count, unit=unit)
+            result = self.client.read_holding_registers(address=address, count=count, slave=unit)
             if result.isError():
                 return None
             return result.registers
@@ -56,7 +56,7 @@ class VenusEModbusClient:
                 # Try to reconnect once
                 if self.connect():
                     try:
-                        result = self.client.read_holding_registers(address, count, unit=unit)
+                        result = self.client.read_holding_registers(address=address, count=count, slave=unit)
                         if not result.isError():
                             return result.registers
                     except:
@@ -72,14 +72,14 @@ class VenusEModbusClient:
                 return False
         
         try:
-            result = self.client.write_register(address, value, unit=unit)
+            result = self.client.write_register(address=address, value=value, slave=unit)
             if not result.isError():
                 return True
             # If error, try reconnect
             print(f"⚠️ Write error at {address}, attempting reconnect")
             self.disconnect()
             if self.connect():
-                result = self.client.write_register(address, value, unit=unit)
+                result = self.client.write_register(address=address, value=value, slave=unit)
                 return not result.isError()
             return False
         except Exception as e:
@@ -90,7 +90,7 @@ class VenusEModbusClient:
                 # Try to reconnect once
                 if self.connect():
                     try:
-                        result = self.client.write_register(address, value, unit=unit)
+                        result = self.client.write_register(address=address, value=value, slave=unit)
                         if not result.isError():
                             return True
                     except:

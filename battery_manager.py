@@ -39,10 +39,8 @@ class BatteryManager:
         # Serialize access per device
         async with lock:
             data = client.read_battery_data()
-            try:
-                client.disconnect()
-            except Exception:
-                pass
+            # Keep connection alive for better performance
+            # Only disconnect on actual connection errors (handled in client)
 
         if not data:
             return {"success": False, "error": "no data"}

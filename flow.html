@@ -3,283 +3,728 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Energie Flow Visualisatie</title>
+  <title>Energie Flow</title>
   <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --grid: #f59e0b;   /* orange */
-      --pv: #22c55e;     /* green */
-      --eddi: #38bdf8;   /* sky */
-      --zappi: #60a5fa;  /* blue */
-      --batt_charge: #a78bfa; /* violet */
-      --batt_discharge: #fde047; /* yellow */
-      --house: #e879f9;  /* fuchsia */
+      --bg: #0a0e1a;
+      --card: #141b2d;
+      --card-border: #1e2a42;
+      --solar: #fbbf24;
+      --solar-glow: rgba(251,191,36,0.3);
+      --grid-import: #ef4444;
+      --grid-export: #22c55e;
+      --grid-glow-imp: rgba(239,68,68,0.3);
+      --grid-glow-exp: rgba(34,197,94,0.3);
+      --house: #8b5cf6;
+      --house-glow: rgba(139,92,246,0.3);
+      --eddi: #f97316;
+      --eddi-glow: rgba(249,115,22,0.3);
+      --zappi: #3b82f6;
+      --zappi-glow: rgba(59,130,246,0.3);
+      --batt: #06b6d4;
+      --batt-glow: rgba(6,182,212,0.3);
+      --batt-low: #ef4444;
       --text: #e2e8f0;
-      --muted: #94a3b8;
-      --border: #334155;
+      --text-dim: #64748b;
+      --text-bright: #ffffff;
     }
-    body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
-    header .title { font-weight:700; }
-    header .controls { display:flex; gap:8px; align-items:center; }
-    .btn { padding:8px 12px; background:var(--border); color:var(--text); border:none; border-radius:8px; cursor:pointer; }
-    .wrap { display:flex; flex-direction:column; align-items:center; padding:10px; }
-    .legend { margin-top:10px; color:var(--muted); font-size:12px; display:flex; gap:12px; flex-wrap:wrap; }
-    .legend span { display:flex; align-items:center; gap:6px; }
-    .badge { padding:2px 8px; border-radius:999px; background:var(--card); border:1px solid var(--border); }
-    svg { max-width: 920px; width: 95vw; height: auto; }
-    .node { fill: var(--card); stroke: var(--border); stroke-width: 2; }
-    .node-label { fill: var(--text); font-weight:600; font-size: 12px; text-anchor: middle; dominant-baseline: middle; }
-    .power-label { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
-    .arrow { fill: none; stroke-width: 3.5; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.4)); }
-    .flow-head { marker-end: url(#arrowhead); }
-    /* dash animation */
-    .dash { stroke-dasharray: 8 12; animation: flow 1.2s linear infinite; }
-    @keyframes flow { to { stroke-dashoffset: -20; } }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--card);
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
+    .topbar-left { display:flex; align-items:center; gap:12px; }
+    .topbar-title { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
+    .topbar-time { color:var(--text-dim); font-size:13px; font-variant-numeric:tabular-nums; }
+    .topbar-status { display:flex; gap:6px; align-items:center; }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation: pulse-dot 2s infinite; }
+    .status-dot.offline { background:#ef4444; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Main flow area */
+    .flow-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* Energy cards */
+    .energy-card {
+      position: absolute;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      min-width: 140px;
+      text-align: center;
+      transition: all 0.5s ease;
+      z-index: 2;
+    }
+    .energy-card.active {
+      box-shadow: 0 0 20px var(--glow-color, rgba(255,255,255,0.1));
+      border-color: var(--accent-color, var(--card-border));
+    }
+    .energy-card .icon {
+      font-size: 28px;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .energy-card .label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .energy-card .power {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px;
+    }
+    .energy-card .unit {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-left: 2px;
+    }
+    .energy-card .sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Card positions - centered layout */
+    .card-solar    { top: 6%;  left: 50%; transform: translateX(-50%); }
+    .card-grid     { top: 50%; right: 4%; transform: translateY(-50%); }
+    .card-house    { top: 50%; left: 50%; transform: translate(-50%,-50%); min-width:160px; }
+    .card-eddi     { bottom: 6%; left: 22%; transform: translateX(-50%); }
+    .card-zappi    { bottom: 6%; right: 22%; transform: translateX(50%); }
+    .card-batt1    { top: 50%; left: 4%; transform: translateY(-50%); }
+    .card-batt2    { top: 50%; left: 16%; transform: translateY(-50%); }
+
+    /* Responsive: stack batteries vertically on left */
+    .card-batt1    { top: 35%; left: 4%; transform: translateY(-50%); }
+    .card-batt2    { top: 65%; left: 4%; transform: translateY(-50%); }
+
+    /* SOC bar */
+    .soc-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .soc-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s ease, background 1s ease;
+    }
+
+    /* Flow lines - SVG overlay */
+    .flow-svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .flow-line {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .flow-line.active {
+      opacity: 1;
+      stroke-dasharray: 12 8;
+      animation: dash-flow 1s linear infinite;
+    }
+    .flow-line.dim {
+      opacity: 0.08;
+    }
+    @keyframes dash-flow { to { stroke-dashoffset: -20; } }
+
+    /* Flow label on line */
+    .flow-label {
+      font-size: 12px;
+      font-weight: 600;
+      fill: var(--text);
+      text-anchor: middle;
+      dominant-baseline: middle;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .flow-label.active { opacity: 1; }
+
+    /* Bottom stats bar */
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      padding: 10px 24px;
+      background: var(--card);
+      border-top: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-item .stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-item .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-positive { color: #22c55e; }
+    .stat-negative { color: #ef4444; }
+    .stat-neutral { color: var(--text); }
+
+    /* Fullscreen button */
+    .btn-fs {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-dim);
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-fs:hover { background: var(--card-border); color: var(--text); }
+    .stat-sep { width:1px; background:var(--card-border); margin:0 4px; }
+
+    /* Appliance hint overlay */
+    .appliance-hint {
+      position: absolute;
+      bottom: 12%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #065f46, #047857);
+      border: 2px solid #10b981;
+      border-radius: 20px;
+      padding: 16px 32px;
+      text-align: center;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 0 40px rgba(16,185,129,0.4);
+      animation: hint-pulse 2s ease-in-out infinite;
+    }
+    @keyframes hint-pulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(16,185,129,0.3); }
+      50% { box-shadow: 0 0 50px rgba(16,185,129,0.6); }
+    }
+    .hint-icons { font-size: 48px; }
+    .hint-text { font-size: 18px; font-weight: 700; color: #ecfdf5; }
+    .hint-power { font-size: 14px; color: #a7f3d0; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="title">⚡ Energie Flow Visualisatie</div>
-    <div class="controls">
-      <span id="tsBadge" class="badge">—</span>
-      <button class="btn" onclick="window.location.href='/'">Terug naar dashboard</button>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">⚡ Energie Flow</span>
+      <span class="topbar-time" id="clock">--:--:--</span>
     </div>
-  </header>
-  <div class="wrap">
-    <svg viewBox="0 0 900 600" id="flowSvg">
-      <defs>
-        <marker id="arrowhead" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
-          <polygon points="0 0, 7 2.5, 0 5" fill="currentColor" />
-        </marker>
-      </defs>
-      <!-- Positions -->
-      <script>
-        // Positions are computed in JS for clarity
-      </script>
-    </svg>
-    <div class="legend">
-      <span><span style="width:10px;height:10px;background:var(--pv);display:inline-block;border-radius:2px;"></span> PV</span>
-      <span><span style="width:10px;height:10px;background:var(--grid);display:inline-block;border-radius:2px;"></span> Grid import</span>
-      <span><span style="width:10px;height:10px;background:var(--eddi);display:inline-block;border-radius:2px;"></span> Eddi</span>
-      <span><span style="width:10px;height:10px;background:var(--zappi);display:inline-block;border-radius:2px;"></span> Zappi</span>
-      <span><span style="width:10px;height:10px;background:var(--batt_charge);display:inline-block;border-radius:2px;"></span> Battery charge</span>
-      <span><span style="width:10px;height:10px;background:var(--batt_discharge);display:inline-block;border-radius:2px;"></span> Battery discharge</span>
+    <div class="topbar-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="topbar-time" id="statusText">Verbinden...</span>
+      <button class="btn-fs" onclick="toggleFullscreen()" title="Volledig scherm">⛶</button>
+    </div>
+  </div>
+
+  <div class="flow-container" id="flowContainer">
+    <!-- SVG flow lines -->
+    <svg class="flow-svg" id="flowSvg"></svg>
+
+    <!-- Solar -->
+    <div class="energy-card card-solar" id="cardSolar" style="--accent-color:var(--solar);--glow-color:var(--solar-glow);">
+      <span class="icon">☀️</span>
+      <div class="label">Zonnepanelen</div>
+      <div class="power"><span id="pvPower">--</span><span class="unit">W</span></div>
+    </div>
+
+    <!-- Grid -->
+    <div class="energy-card card-grid" id="cardGrid" style="--accent-color:var(--grid-import);--glow-color:var(--grid-glow-imp);">
+      <span class="icon">🔌</span>
+      <div class="label">Elektriciteitsnet</div>
+      <div class="power"><span id="gridPower">--</span><span class="unit">W</span></div>
+      <div class="sub" id="gridSub"></div>
+    </div>
+
+    <!-- House (center) -->
+    <div class="energy-card card-house" id="cardHouse" style="--accent-color:var(--house);--glow-color:var(--house-glow);">
+      <span class="icon">🏠</span>
+      <div class="label">Huisverbruik</div>
+      <div class="power"><span id="housePower">--</span><span class="unit">W</span></div>
+    </div>
+
+    <!-- Eddi (boiler) -->
+    <div class="energy-card card-eddi" id="cardEddi" style="--accent-color:var(--eddi);--glow-color:var(--eddi-glow);">
+      <span class="icon">🔥</span>
+      <div class="label">Eddi (Boiler)</div>
+      <div class="power"><span id="eddiPower">--</span><span class="unit">W</span></div>
+      <div class="sub" id="eddiSub"></div>
+    </div>
+
+    <!-- Zappi (auto) -->
+    <div class="energy-card card-zappi" id="cardZappi" style="--accent-color:var(--zappi);--glow-color:var(--zappi-glow);">
+      <span class="icon">🚗</span>
+      <div class="label">Zappi (Auto)</div>
+      <div class="power"><span id="zappiPower">--</span><span class="unit">W</span></div>
+    </div>
+
+    <!-- Battery 1 (92) -->
+    <div class="energy-card card-batt1" id="cardBatt1" style="--accent-color:var(--batt);--glow-color:var(--batt-glow);">
+      <span class="icon">🔋</span>
+      <div class="label">Batterij 92</div>
+      <div class="power"><span id="batt1Power">--</span><span class="unit">W</span></div>
+      <div class="sub" id="batt1Soc">--</div>
+      <div class="soc-bar-wrap"><div class="soc-bar" id="batt1Bar" style="width:0%;background:var(--batt);"></div></div>
+    </div>
+
+    <!-- Battery 2 (74) -->
+    <div class="energy-card card-batt2" id="cardBatt2" style="--accent-color:var(--batt);--glow-color:var(--batt-glow);">
+      <span class="icon">🔋</span>
+      <div class="label">Batterij 74</div>
+      <div class="power"><span id="batt2Power">--</span><span class="unit">W</span></div>
+      <div class="sub" id="batt2Soc">--</div>
+      <div class="soc-bar-wrap"><div class="soc-bar" id="batt2Bar" style="width:0%;background:var(--batt);"></div></div>
+    </div>
+
+    <!-- Appliance hint overlay -->
+    <div id="applianceHint" class="appliance-hint" style="display:none;">
+      <div class="hint-icons">🫧 👕</div>
+      <div class="hint-text">Zet de wasmachine of vaatwasser aan!</div>
+      <div class="hint-power">-- kW overschot</div>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-label">Zelfverbruik</div>
+      <div class="stat-value stat-neutral" id="statSelf">--%</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Netto</div>
+      <div class="stat-value" id="statNet">-- W</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Batterij Totaal</div>
+      <div class="stat-value stat-neutral" id="statBattTotal">--%</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Eddi Temp</div>
+      <div class="stat-value stat-neutral" id="statEddiTemp">--°C</div>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+      <div class="stat-label">☀️ PV vandaag</div>
+      <div class="stat-value stat-neutral" id="statDayPv">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">🏠 Verbruik</div>
+      <div class="stat-value stat-neutral" id="statDayHouse">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">⬆ Export</div>
+      <div class="stat-value stat-positive" id="statDayExport">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">⬇ Import</div>
+      <div class="stat-value stat-negative" id="statDayImport">--</div>
     </div>
   </div>
 
 <script>
-// ----- Layout geometry -----
-const THRESH = 100; // minimum watts to animate/label/highlight
-const cx = 460, cy = 310; // center aggregator
-const R = 230; // more spacing between nodes
-const nodes = {
-  core:  { x: cx, y: cy, r: 44, color: 'var(--house)', label: 'Flow' },
-  house: { x: cx, y: cy - R, r: 36, color: 'var(--house)', label: 'Huis' },
-  grid:  { x: cx + R, y: cy - 10, r: 36, color: 'var(--grid)',  label: 'Grid' },
-  pv:    { x: cx - R, y: cy + 10, r: 36, color: 'var(--pv)',    label: 'PV' },
-  eddi:  { x: cx - 60, y: cy - R, r: 32, color: 'var(--eddi)',  label: 'Eddi' },
-  zappi: { x: cx + 60, y: cy + R, r: 32, color: 'var(--zappi)', label: 'Zappi' },
-  b1:    { x: cx - R + 30, y: cy - 90, r: 30, color: 'var(--batt_charge)', label: 'Batt 1' },
-  b2:    { x: cx + R - 30, y: cy + 90, r: 30, color: 'var(--batt_charge)', label: 'Batt 2' },
-};
-
-// ----- SVG helpers -----
-const svg = document.getElementById('flowSvg');
-function el(tag, attrs) {
-  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  for (const k in attrs) e.setAttribute(k, attrs[k]);
-  return e;
-}
-function node(id, n) {
-  const g = el('g', { id: id });
-  const c = el('circle', { cx: n.x, cy: n.y, r: n.r, class: 'node' });
-  const t = el('text', { x: n.x, y: n.y, class: 'node-label' });
-  t.textContent = n.label;
-  const p = el('text', { x: n.x, y: n.y + n.r + 16, class: 'power-label', id: id + '-pwr' });
-  p.textContent = '--';
-  g.appendChild(c); g.appendChild(t); g.appendChild(p); svg.appendChild(g);
-}
-function arrow(id, from, to, color) {
-  // Straight line with margin from/to node edges
-  const dx = to.x - from.x, dy = to.y - from.y;
-  const L = Math.hypot(dx, dy);
-  const ux = dx / L, uy = dy / L;
-  const sx = from.x + ux * (from.r + 4);
-  const sy = from.y + uy * (from.r + 4);
-  const ex = to.x - ux * (to.r + 8);
-  const ey = to.y - uy * (to.r + 8);
-  const p = el('path', { id: id, d: `M ${sx} ${sy} L ${ex} ${ey}`, class: 'arrow flow-head' });
-  p.style.stroke = color;
-  p.style.color = color;
-  svg.appendChild(p);
-  // label at midpoint
-  const label = el('text', { id: id+"_lbl", class: 'power-label' });
-  const midx = (sx+ex)/2, midy = (sy+ey)/2;
-  label.setAttribute('x', midx);
-  label.setAttribute('y', midy - 10);
-  label.textContent = '';
-  svg.appendChild(label);
-}
-
-// Build static scene
-for (const k of Object.keys(nodes)) node(k, nodes[k]);
-// PV -> Core
-arrow('pv_to_core', nodes.pv, nodes.core, 'var(--pv)');
-// Grid <-> Core
-arrow('grid_to_core', nodes.grid, nodes.core, 'var(--grid)');
-arrow('core_to_grid', nodes.core, nodes.grid, 'var(--grid)');
-// Core -> Loads
-arrow('core_to_house', nodes.core, nodes.house, 'var(--house)');
-arrow('core_to_eddi', nodes.core, nodes.eddi, 'var(--eddi)');
-arrow('core_to_zappi', nodes.core, nodes.zappi, 'var(--zappi)');
-// Core <-> Batteries
-arrow('core_to_b1', nodes.core, nodes.b1, 'var(--batt_charge)');
-arrow('b1_to_core', nodes.b1, nodes.core, 'var(--batt_discharge)');
-arrow('core_to_b2', nodes.core, nodes.b2, 'var(--batt_charge)');
-arrow('b2_to_core', nodes.b2, nodes.core, 'var(--batt_discharge)');
-
-function setText(id, text){ const e = document.getElementById(id); if(e) e.textContent = text; }
-function showPath(id, show){ const p = document.getElementById(id); if(!p) return; p.style.opacity = show ? 1 : 0.08; }
-function setActive(id, watts){
-  const p = document.getElementById(id); if(!p) return;
-  // When no flow, remove dash animation
-  if (!watts || Math.abs(watts) < THRESH) {
-    p.classList.remove('dash');
-    return;
-  }
-  p.classList.add('dash');
-  // map 0..6000 W -> 0.6s..2.0s duration (faster for higher power)
-  const w = Math.max(0, Math.min(6000, watts||0));
-  const dur = 2.0 - (w/6000)*1.4; // 2.0 .. 0.6
-  p.style.animationDuration = `${dur.toFixed(2)}s`;
-}
-function setArrowLabel(id, watts){
-  const t = document.getElementById(id+"_lbl"); if(!t) return;
-  if (!watts || Math.abs(watts) < THRESH) { t.textContent=''; return; }
-  t.textContent = `${(Math.abs(watts)/1000).toFixed(1)} kW`;
-}
-// Color node when active (fill changes to node color, else neutral)
-function setNodeActive(nodeId, watts){
-  const g = document.getElementById(nodeId); if(!g) return;
-  const circle = g.querySelector('circle'); if(!circle) return;
-  const active = watts && Math.abs(watts) >= THRESH;
-  if (active) {
-    circle.setAttribute('fill', nodes[nodeId]?.color || 'var(--card)');
-    circle.setAttribute('stroke-width', '2.5');
-  } else {
-    circle.setAttribute('fill', 'var(--card)');
-    circle.setAttribute('stroke-width', '2');
-  }
-}
-
-// ----- Data mapping from /api/status -----
+// ===== Configuration =====
+const THRESH = 50;
+const BATT_THRESH = 300;  // Battery flow only visible above 300W
 let failureCount = 0;
-let pollInterval = 1200;
-const maxPollInterval = 10000;
+let pollInterval = 2000;
 
-async function fetchStatus(){
-  try {
-    const r = await fetch('/api/status', { cache: 'no-store' });
-    if (!r.ok) {
-      throw new Error(`HTTP ${r.status}`);
+// ===== Overschot tracker (appliance hint) =====
+let exportAbove2kw_since = null;  // timestamp when export > 2kW started
+const EXPORT_HINT_SECONDS = 300;  // 5 minutes
+
+// ===== Clock =====
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('nl-NL');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== Fullscreen =====
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// ===== Flow line drawing =====
+const flowSvg = document.getElementById('flowSvg');
+const flowLines = {};
+
+function getCardCenter(id) {
+  const card = document.getElementById(id);
+  const container = document.getElementById('flowContainer');
+  if (!card || !container) return { x: 0, y: 0 };
+  const cr = card.getBoundingClientRect();
+  const pr = container.getBoundingClientRect();
+  return {
+    x: cr.left - pr.left + cr.width / 2,
+    y: cr.top - pr.top + cr.height / 2
+  };
+}
+
+function createFlowLine(id, color) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('class', 'flow-line dim');
+  line.style.stroke = color;
+  flowSvg.appendChild(line);
+
+  const label = document.createElementNS(ns, 'text');
+  label.setAttribute('class', 'flow-label');
+  flowSvg.appendChild(label);
+
+  flowLines[id] = { line, label };
+}
+
+function updateFlowLine(id, from, to, watts, color) {
+  const fl = flowLines[id];
+  if (!fl) return;
+
+  const f = getCardCenter(from);
+  const t = getCardCenter(to);
+
+  // Curved path
+  const mx = (f.x + t.x) / 2;
+  const my = (f.y + t.y) / 2;
+  const dx = t.x - f.x;
+  const dy = t.y - f.y;
+  const dist = Math.hypot(dx, dy);
+  // Slight curve perpendicular to line
+  const nx = -dy / dist * dist * 0.08;
+  const ny = dx / dist * dist * 0.08;
+  const cx = mx + nx;
+  const cy = my + ny;
+
+  fl.line.setAttribute('d', `M ${f.x} ${f.y} Q ${cx} ${cy} ${t.x} ${t.y}`);
+
+  const active = Math.abs(watts) >= THRESH;
+  fl.line.setAttribute('class', active ? 'flow-line active' : 'flow-line dim');
+  if (active) {
+    fl.line.style.stroke = color;
+    const w = Math.min(6000, Math.abs(watts));
+    const dur = 1.5 - (w / 6000) * 1.0;
+    fl.line.style.animationDuration = `${dur.toFixed(2)}s`;
+    const sw = 2 + (w / 6000) * 3;
+    fl.line.style.strokeWidth = `${sw.toFixed(1)}`;
+  }
+
+  // Label at midpoint
+  fl.label.setAttribute('x', cx);
+  fl.label.setAttribute('y', cy - 10);
+  if (active) {
+    const kw = Math.abs(watts) / 1000;
+    fl.label.textContent = kw >= 1 ? `${kw.toFixed(1)} kW` : `${Math.abs(watts)} W`;
+    fl.label.setAttribute('class', 'flow-label active');
+    fl.label.style.fill = color;
+  } else {
+    fl.label.textContent = '';
+    fl.label.setAttribute('class', 'flow-label');
+  }
+}
+
+// Create flow lines
+function initFlowLines() {
+  createFlowLine('solar_house', 'var(--solar)');
+  createFlowLine('grid_house', 'var(--grid-import)');
+  createFlowLine('house_grid', 'var(--grid-export)');
+  createFlowLine('house_eddi', 'var(--eddi)');
+  createFlowLine('house_zappi', 'var(--zappi)');
+  createFlowLine('house_batt1', 'var(--batt)');
+  createFlowLine('batt1_house', 'var(--batt)');
+  createFlowLine('house_batt2', 'var(--batt)');
+  createFlowLine('batt2_house', 'var(--batt)');
+}
+
+// ===== Card activation =====
+function setCardActive(id, active) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  if (active) {
+    card.classList.add('active');
+  } else {
+    card.classList.remove('active');
+  }
+}
+
+// ===== SOC bar color =====
+function socColor(soc) {
+  if (soc > 60) return 'var(--batt)';
+  if (soc > 30) return '#f59e0b';
+  return 'var(--batt-low)';
+}
+
+// ===== Data fetching =====
+async function fetchData() {
+  const ts = Date.now();
+  const [statusRes, b1Res, b2Res, energyRes] = await Promise.all([
+    fetch(`/api/status?ts=${ts}`, { cache: 'no-store' }),
+    fetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`, { cache: 'no-store' }),
+    fetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`, { cache: 'no-store' }),
+    fetch(`/api/energy/today?ts=${ts}`, { cache: 'no-store' })
+  ]);
+
+  const status = await statusRes.json();
+  const b1 = await b1Res.json();
+  const b2 = await b2Res.json();
+  const energy = await energyRes.json();
+
+  return { status, b1, b2, energy };
+}
+
+// ===== Update display =====
+function w(n) { return (n == null) ? 0 : Number(n) || 0; }
+
+function fmtW(watts) {
+  const abs = Math.abs(watts);
+  if (abs >= 1000) return (abs / 1000).toFixed(1);
+  return Math.round(abs).toString();
+}
+
+function fmtUnit(watts) {
+  return Math.abs(watts) >= 1000 ? 'kW' : 'W';
+}
+
+function updateDisplay(data) {
+  const { status, b1, b2, energy } = data;
+
+  // Extract values
+  const pv = w(status.pv_generation_w);
+  const grid = w(status.grid_w);
+  const house = w(status.house_consumption_w);
+  const eddi = w(status.eddi_power_w);
+  const zappi = w(status.zappi_power_w);
+
+  const b1Der = b1.derived || {};
+  const b2Der = b2.derived || {};
+  const b1Power = Math.round(w(b1Der.power_w));
+  const b2Power = Math.round(w(b2Der.power_w));
+  const b1Soc = b1Der.soc_percent != null ? b1Der.soc_percent : null;
+  const b2Soc = b2Der.soc_percent != null ? b2Der.soc_percent : null;
+  const b1Mode = b1Der.mode || 'Offline';
+  const b2Mode = b2Der.mode || 'Offline';
+
+  // Update cards
+  document.getElementById('pvPower').textContent = fmtW(pv);
+  document.querySelector('#cardSolar .unit').textContent = fmtUnit(pv);
+  setCardActive('cardSolar', pv > THRESH);
+
+  document.getElementById('gridPower').textContent = fmtW(grid);
+  document.querySelector('#cardGrid .unit').textContent = fmtUnit(grid);
+  // grid_w > 0 = EXPORT naar net, grid_w < 0 = IMPORT van net
+  const gridCard = document.getElementById('cardGrid');
+  if (grid < -THRESH) {
+    gridCard.style.setProperty('--accent-color', 'var(--grid-import)');
+    gridCard.style.setProperty('--glow-color', 'var(--grid-glow-imp)');
+  } else if (grid > THRESH) {
+    gridCard.style.setProperty('--accent-color', 'var(--grid-export)');
+    gridCard.style.setProperty('--glow-color', 'var(--grid-glow-exp)');
+  }
+  setCardActive('cardGrid', Math.abs(grid) > THRESH);
+
+  document.getElementById('housePower').textContent = fmtW(house);
+  document.querySelector('#cardHouse .unit').textContent = fmtUnit(house);
+  setCardActive('cardHouse', house > THRESH);
+
+  document.getElementById('eddiPower').textContent = fmtW(eddi);
+  document.querySelector('#cardEddi .unit').textContent = fmtUnit(eddi);
+  setCardActive('cardEddi', eddi > THRESH);
+  // Eddi temperature
+  const tp1 = status.eddi_temperatures?.tp1;
+  if (tp1 != null) {
+    document.getElementById('eddiSub').textContent = `${tp1}°C`;
+    document.getElementById('statEddiTemp').textContent = `${tp1}°C`;
+  }
+
+  document.getElementById('zappiPower').textContent = fmtW(zappi);
+  document.querySelector('#cardZappi .unit').textContent = fmtUnit(zappi);
+  setCardActive('cardZappi', zappi > THRESH);
+
+  // Batteries
+  document.getElementById('batt1Power').textContent = fmtW(b1Power);
+  document.querySelector('#cardBatt1 .unit').textContent = fmtUnit(b1Power);
+  if (b1Soc != null) {
+    document.getElementById('batt1Soc').textContent = `${b1Soc}% · ${b1Mode}`;
+    document.getElementById('batt1Bar').style.width = `${b1Soc}%`;
+    document.getElementById('batt1Bar').style.background = socColor(b1Soc);
+  } else {
+    document.getElementById('batt1Soc').textContent = 'Offline';
+    document.getElementById('batt1Soc').style.color = 'var(--batt-low)';
+  }
+  setCardActive('cardBatt1', Math.abs(b1Power) > THRESH || (b1Soc != null));
+
+  document.getElementById('batt2Power').textContent = fmtW(b2Power);
+  document.querySelector('#cardBatt2 .unit').textContent = fmtUnit(b2Power);
+  if (b2Soc != null) {
+    document.getElementById('batt2Soc').textContent = `${b2Soc}% · ${b2Mode}`;
+    document.getElementById('batt2Bar').style.width = `${b2Soc}%`;
+    document.getElementById('batt2Bar').style.background = socColor(b2Soc);
+  } else {
+    document.getElementById('batt2Soc').textContent = 'Offline';
+    document.getElementById('batt2Soc').style.color = 'var(--batt-low)';
+  }
+  setCardActive('cardBatt2', Math.abs(b2Power) > THRESH || (b2Soc != null));
+
+  // Flow lines
+  // Solar -> Huis (altijd richting huis)
+  updateFlowLine('solar_house', 'cardSolar', 'cardHouse', pv, 'var(--solar)');
+  // grid_w > 0 = EXPORT (huis -> grid), grid_w < 0 = IMPORT (grid -> huis)
+  updateFlowLine('grid_house', 'cardGrid', 'cardHouse', grid < -THRESH ? -grid : 0, 'var(--grid-import)');
+  updateFlowLine('house_grid', 'cardHouse', 'cardGrid', grid > THRESH ? grid : 0, 'var(--grid-export)');
+  // Loads
+  updateFlowLine('house_eddi', 'cardHouse', 'cardEddi', eddi, 'var(--eddi)');
+  updateFlowLine('house_zappi', 'cardHouse', 'cardZappi', zappi, 'var(--zappi)');
+
+  // Battery flows: positive = charging (house->batt), negative = discharging (batt->house)
+  // Use higher threshold (300W) to avoid showing tiny idle flows
+  updateFlowLine('house_batt1', 'cardHouse', 'cardBatt1', b1Power > BATT_THRESH ? b1Power : 0, 'var(--batt)');
+  updateFlowLine('batt1_house', 'cardBatt1', 'cardHouse', b1Power < -BATT_THRESH ? -b1Power : 0, 'var(--batt)');
+  updateFlowLine('house_batt2', 'cardHouse', 'cardBatt2', b2Power > BATT_THRESH ? b2Power : 0, 'var(--batt)');
+  updateFlowLine('batt2_house', 'cardBatt2', 'cardHouse', b2Power < -BATT_THRESH ? -b2Power : 0, 'var(--batt)');
+
+  // ===== Appliance hint: show washer/dishwasher when exporting >2kW for >5 min =====
+  // grid_w > 0 = export
+  const exportW = grid > 0 ? grid : 0;
+  const hintEl = document.getElementById('applianceHint');
+  if (exportW >= 2000) {
+    if (!exportAbove2kw_since) exportAbove2kw_since = Date.now();
+    const elapsed = (Date.now() - exportAbove2kw_since) / 1000;
+    if (elapsed >= EXPORT_HINT_SECONDS) {
+      hintEl.style.display = 'flex';
+      hintEl.querySelector('.hint-power').textContent = `${(exportW/1000).toFixed(1)} kW overschot`;
+    } else {
+      hintEl.style.display = 'none';
     }
-    const j = await r.json();
-    if(!j || j.error) throw new Error(j && j.error || 'status error');
-    
-    // Success: reset failure tracking
+  } else {
+    exportAbove2kw_since = null;
+    hintEl.style.display = 'none';
+  }
+
+  // Bottom stats
+  // Self-consumption: (pv - export) / pv * 100
+  const selfConsumption = pv > 100 ? Math.round(((pv - exportW) / pv) * 100) : 0;
+  document.getElementById('statSelf').textContent = `${selfConsumption}%`;
+
+  // Net: positive = importing, negative = exporting
+  const statNet = document.getElementById('statNet');
+  // grid > 0 = export (goed), grid < 0 = import (kost geld)
+  const absGrid = Math.abs(grid);
+  statNet.textContent = grid > THRESH ? `⬆ ${Math.round(absGrid)} W` : grid < -THRESH ? `⬇ ${Math.round(absGrid)} W` : `0 W`;
+  statNet.className = `stat-value ${grid > THRESH ? 'stat-positive' : grid < -THRESH ? 'stat-negative' : 'stat-neutral'}`;
+
+  // Battery total SOC
+  const socs = [b1Soc, b2Soc].filter(s => s != null);
+  if (socs.length > 0) {
+    const avgSoc = Math.round(socs.reduce((a, b) => a + b, 0) / socs.length);
+    document.getElementById('statBattTotal').textContent = `${avgSoc}%`;
+  }
+
+  // Status indicator
+  document.getElementById('statusDot').className = 'status-dot';
+  document.getElementById('statusText').textContent = 'Live';
+
+  // Grid direction label on card
+  const gridLabel = document.getElementById('gridSub');
+  if (grid > THRESH) {
+    gridLabel.textContent = `⬆ Export naar net`;
+    gridLabel.style.color = 'var(--grid-export)';
+  } else if (grid < -THRESH) {
+    gridLabel.textContent = `⬇ Import van net`;
+    gridLabel.style.color = 'var(--grid-import)';
+  } else {
+    gridLabel.textContent = '— Neutraal';
+    gridLabel.style.color = 'var(--text-dim)';
+  }
+
+  // Daily energy stats
+  if (energy) {
+    document.getElementById('statDayPv').textContent = `${energy.pv_kwh || 0} kWh`;
+    document.getElementById('statDayHouse').textContent = `${energy.house_kwh || 0} kWh`;
+    document.getElementById('statDayExport').textContent = `${energy.export_kwh || 0} kWh`;
+    document.getElementById('statDayImport').textContent = `${energy.import_kwh || 0} kWh`;
+  }
+}
+
+// ===== Main loop =====
+async function tick() {
+  try {
+    const data = await fetchData();
+    updateDisplay(data);
     failureCount = 0;
-    pollInterval = 1200;
-    
-    return j;
+    pollInterval = 2000;
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'Live';
+    document.title = 'Energie Flow';
   } catch (e) {
     failureCount++;
-    // Exponential backoff on failures
-    pollInterval = Math.min(pollInterval * 1.5, maxPollInterval);
-    console.warn(`API fetch failed (${failureCount}x): ${e.message}. Retrying in ${pollInterval}ms`);
-    throw e;
+    pollInterval = Math.min(pollInterval * 1.5, 15000);
+    console.warn(`Fetch failed (${failureCount}x):`, e);
+    document.getElementById('statusDot').className = 'status-dot offline';
+    document.getElementById('statusText').textContent = `Verbinden... (${failureCount})`;
+    document.title = '⚠️ Verbinden...';
   }
-}
-
-function watts(n){ return (n==null) ? 0 : Number(n) || 0; }
-
-function updateScene(data){
-  const tsBadge = document.getElementById('tsBadge');
-  tsBadge.textContent = new Date().toLocaleTimeString();
-  const pv = watts(data.pv_generation_w || data.pv_w);
-  // Robust grid: prefer signed import(+) export(-) value
-  const grid = watts(
-    (data.grid_import_w != null ? data.grid_import_w : undefined) ??
-    (data.grid_export_w != null ? data.grid_export_w : undefined) ??
-    (data.grid_w != null ? data.grid_w : 0)
-  );
-  const eddi = watts(data.eddi_power_w || data.eddi_w);
-  const zappi = watts(data.zappi_power_w || data.zappi_w);
-  const b1 = watts((data.simple_rule?.last?.per_battery?.venus_ev2_92?.set));
-  const b2 = watts((data.simple_rule?.last?.per_battery?.venus_ev2_74?.set));
-  const house = watts(data.house_consumption_w || data.house_w);
-
-  // Node labels
-  setText('pv-pwr', pv ? `${(pv/1000).toFixed(1)} kW` : '--');
-  setText('grid-pwr', (grid>0) ? `${(grid/1000).toFixed(1)} kW import` : (grid<0) ? `${(-grid/1000).toFixed(1)} kW export` : '--');
-  setText('eddi-pwr', eddi ? `${(eddi/1000).toFixed(1)} kW` : '--');
-  setText('zappi-pwr', zappi ? `${(zappi/1000).toFixed(1)} kW` : '--');
-  setText('b1-pwr', b1 ? `${(b1/1000).toFixed(1)} kW set` : '--');
-  setText('b2-pwr', b2 ? `${(b2/1000).toFixed(1)} kW set` : '--');
-  setText('core-pwr', ''); // keep center clean like original app
-
-  // Flows
-  // PV -> Core
-  showPath('pv_to_core', pv>THRESH); setActive('pv_to_core', pv); setArrowLabel('pv_to_core', pv);
-
-  // Grid <-> Core
-  const imp = grid>THRESH; const exp = grid<-THRESH;
-  showPath('grid_to_core', imp); setActive('grid_to_core', grid); setArrowLabel('grid_to_core', grid);
-  showPath('core_to_grid', exp); setActive('core_to_grid', -grid); setArrowLabel('core_to_grid', -grid);
-
-  // Core -> Loads
-  showPath('core_to_house', house>THRESH); setActive('core_to_house', house); setArrowLabel('core_to_house', house);
-  showPath('core_to_eddi', eddi>THRESH); setActive('core_to_eddi', eddi); setArrowLabel('core_to_eddi', eddi);
-  showPath('core_to_zappi', zappi>THRESH); setActive('core_to_zappi', zappi); setArrowLabel('core_to_zappi', zappi);
-
-  // Core <-> Batteries (using setpoints as proxy)
-  const b1Charge = b1>THRESH, b1Dis = b1< -THRESH;
-  showPath('core_to_b1', b1Charge); setActive('core_to_b1', Math.abs(b1)); setArrowLabel('core_to_b1', b1Charge?b1:0);
-  showPath('b1_to_core', b1Dis); setActive('b1_to_core', Math.abs(b1)); setArrowLabel('b1_to_core', b1Dis?(-b1):0);
-
-  const b2Charge = b2>THRESH, b2Dis = b2< -THRESH;
-  showPath('core_to_b2', b2Charge); setActive('core_to_b2', Math.abs(b2)); setArrowLabel('core_to_b2', b2Charge?b2:0);
-  showPath('b2_to_core', b2Dis); setActive('b2_to_core', Math.abs(b2)); setArrowLabel('b2_to_core', b2Dis?(-b2):0);
-
-  // Node color highlights
-  setNodeActive('pv', pv);
-  setNodeActive('grid', grid);
-  setNodeActive('eddi', eddi);
-  setNodeActive('zappi', zappi);
-  setNodeActive('b1', b1);
-  setNodeActive('b2', b2);
-  setNodeActive('house', house);
-}
-
-async function tick(){
-  try{ 
-    const d = await fetchStatus(); 
-    updateScene(d); 
-  }
-  catch(e){ 
-    console.error('Fetch error:', e);
-    // Show reconnecting indicator after 3 failures
-    if (failureCount >= 3) {
-      // Could add visual reconnecting indicator here
-      document.title = '⚠️ Reconnecting...';
-    }
-  }
-  // Schedule next tick with adaptive interval
   setTimeout(tick, pollInterval);
 }
-// Start first tick on load
-window.addEventListener('DOMContentLoaded', tick);
+
+// ===== Resize handler =====
+function onResize() {
+  const svg = document.getElementById('flowSvg');
+  const container = document.getElementById('flowContainer');
+  svg.setAttribute('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`);
+  svg.setAttribute('width', container.clientWidth);
+  svg.setAttribute('height', container.clientHeight);
+}
+
+window.addEventListener('resize', onResize);
+window.addEventListener('DOMContentLoaded', () => {
+  onResize();
+  initFlowLines();
+  tick();
+});
 </script>
 </body>
 </html>
