@@ -245,6 +245,149 @@
     .hint-icons { font-size: 48px; }
     .hint-text { font-size: 18px; font-weight: 700; color: #ecfdf5; }
     .hint-power { font-size: 14px; color: #a7f3d0; }
+
+    /* ===== Slide-up Energy Panel ===== */
+    .panel-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .energy-panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      max-height: 85vh;
+      background: var(--card);
+      border-top: 1px solid var(--card-border);
+      border-radius: 20px 20px 0 0;
+      z-index: 51;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+      overflow-y: auto;
+      padding: 0 20px 20px;
+    }
+    .energy-panel.open { transform: translateY(0); }
+
+    .panel-handle {
+      display: flex;
+      justify-content: center;
+      padding: 10px 0 6px;
+      cursor: pointer;
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 2;
+    }
+    .panel-handle-bar {
+      width: 40px; height: 4px;
+      background: var(--card-border);
+      border-radius: 2px;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      position: sticky;
+      top: 30px;
+      background: var(--card);
+      padding: 8px 0;
+      z-index: 2;
+    }
+    .panel-title { font-size: 18px; font-weight: 700; }
+    .panel-close {
+      background: none; border: 1px solid var(--card-border);
+      color: var(--text-dim); width: 32px; height: 32px;
+      border-radius: 50%; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .panel-close:hover { color: var(--text); border-color: var(--text); }
+
+    /* Self-consumption donut */
+    .self-consumption-ring {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 16px;
+    }
+    .donut-wrap { position: relative; width: 120px; height: 120px; }
+    .donut-wrap svg { transform: rotate(-90deg); }
+    .donut-label {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .donut-pct { font-size: 28px; font-weight: 700; }
+    .donut-sub { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
+    .self-stats { display: flex; flex-direction: column; gap: 8px; }
+    .self-stat { display: flex; align-items: center; gap: 8px; }
+    .self-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .self-stat-label { font-size: 12px; color: var(--text-dim); min-width: 80px; }
+    .self-stat-value { font-size: 14px; font-weight: 600; }
+
+    /* Energy summary cards */
+    .energy-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .e-card {
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .e-card-icon { font-size: 20px; margin-bottom: 4px; }
+    .e-card-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .e-card-unit { font-size: 11px; color: var(--text-dim); }
+    .e-card-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+
+    /* History bars */
+    .history-section { margin-top: 8px; }
+    .history-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-dim); }
+    .history-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .history-date { width: 36px; color: var(--text-dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .history-bars { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .history-bar-row { display: flex; align-items: center; gap: 4px; height: 14px; }
+    .history-bar {
+      height: 100%;
+      border-radius: 3px;
+      min-width: 2px;
+      transition: width 0.5s ease;
+    }
+    .history-vals { width: 120px; display: flex; gap: 6px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .history-val { font-size: 11px; }
+    .hv-pv { color: var(--solar); }
+    .hv-exp { color: #22c55e; }
+    .hv-imp { color: #ef4444; }
+    .hv-self { color: var(--text); }
+
+    /* Bottom bar clickable */
+    .stats-bar { cursor: pointer; }
+    .stats-bar:hover { background: rgba(255,255,255,0.03); }
+    .stats-bar-hint {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 2px 0 0;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -328,7 +471,7 @@
     </div>
   </div>
 
-  <div class="stats-bar">
+  <div class="stats-bar" onclick="openPanel()">
     <div class="stat-item">
       <div class="stat-label">Zelfverbruik</div>
       <div class="stat-value stat-neutral" id="statSelf">--%</div>
@@ -363,6 +506,99 @@
       <div class="stat-value stat-negative" id="statDayImport">--</div>
     </div>
   </div>
+  <div class="stats-bar-hint">▲ Tik voor energie overzicht</div>
+
+  <!-- Slide-up Energy Panel -->
+  <div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+  <div class="energy-panel" id="energyPanel">
+    <div class="panel-handle" onclick="closePanel()"><div class="panel-handle-bar"></div></div>
+    <div class="panel-header">
+      <span class="panel-title">📊 Energie Overzicht</span>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+
+    <!-- Self-consumption donut -->
+    <div class="self-consumption-ring">
+      <div class="donut-wrap">
+        <svg viewBox="0 0 120 120" width="120" height="120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+          <circle id="donutRing" cx="60" cy="60" r="50" fill="none" stroke="#22c55e" stroke-width="10"
+            stroke-dasharray="314 314" stroke-dashoffset="314" stroke-linecap="round"
+            style="transition: stroke-dashoffset 1s ease, stroke 0.5s ease;"/>
+        </svg>
+        <div class="donut-label">
+          <span class="donut-pct" id="donutPct">--%</span>
+          <span class="donut-sub">Zelfverbruik</span>
+        </div>
+      </div>
+      <div class="self-stats">
+        <div class="self-stat">
+          <div class="self-dot" style="background:var(--solar)"></div>
+          <span class="self-stat-label">Opgewekt</span>
+          <span class="self-stat-value" id="panelPv">-- kWh</span>
+        </div>
+        <div class="self-stat">
+          <div class="self-dot" style="background:var(--house)"></div>
+          <span class="self-stat-label">Verbruikt</span>
+          <span class="self-stat-value" id="panelHouse">-- kWh</span>
+        </div>
+        <div class="self-stat">
+          <div class="self-dot" style="background:#22c55e"></div>
+          <span class="self-stat-label">Export</span>
+          <span class="self-stat-value" id="panelExport">-- kWh</span>
+        </div>
+        <div class="self-stat">
+          <div class="self-dot" style="background:#ef4444"></div>
+          <span class="self-stat-label">Import</span>
+          <span class="self-stat-value" id="panelImport">-- kWh</span>
+        </div>
+        <div class="self-stat">
+          <div class="self-dot" style="background:var(--eddi)"></div>
+          <span class="self-stat-label">Boiler</span>
+          <span class="self-stat-value" id="panelEddi">-- kWh</span>
+        </div>
+        <div class="self-stat">
+          <div class="self-dot" style="background:var(--batt)"></div>
+          <span class="self-stat-label">Batterij ↑</span>
+          <span class="self-stat-value" id="panelBattC">-- kWh</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy summary cards -->
+    <div class="energy-cards">
+      <div class="e-card">
+        <div class="e-card-icon">☀️</div>
+        <div class="e-card-value" id="ecPv">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Opgewekt</div>
+      </div>
+      <div class="e-card">
+        <div class="e-card-icon">🏠</div>
+        <div class="e-card-value" id="ecHouse">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Verbruikt</div>
+      </div>
+      <div class="e-card">
+        <div class="e-card-icon">⬆️</div>
+        <div class="e-card-value" id="ecExport" style="color:#22c55e">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Export</div>
+      </div>
+      <div class="e-card">
+        <div class="e-card-icon">⬇️</div>
+        <div class="e-card-value" id="ecImport" style="color:#ef4444">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Import</div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="history-section">
+      <div class="history-title">Laatste 7 dagen</div>
+      <div id="historyRows"></div>
+    </div>
+  </div>
 
 <script>
 // ===== Configuration =====
@@ -374,6 +610,90 @@ let pollInterval = 2000;
 // ===== Overschot tracker (appliance hint) =====
 let exportAbove2kw_since = null;  // timestamp when export > 2kW started
 const EXPORT_HINT_SECONDS = 300;  // 5 minutes
+
+// ===== Energy Panel =====
+function openPanel() {
+  document.getElementById('panelOverlay').classList.add('open');
+  document.getElementById('energyPanel').classList.add('open');
+  loadPanelData();
+}
+function closePanel() {
+  document.getElementById('panelOverlay').classList.remove('open');
+  document.getElementById('energyPanel').classList.remove('open');
+}
+
+async function loadPanelData() {
+  try {
+    const ts = Date.now();
+    const [todayRes, histRes] = await Promise.all([
+      fetch(`/api/energy/today?ts=${ts}`).then(r => r.json()),
+      fetch(`/api/energy/history?days=7&ts=${ts}`).then(r => r.json())
+    ]);
+
+    // Donut
+    const selfPct = todayRes.self_consumption_pct || 0;
+    const circ = 2 * Math.PI * 50; // 314
+    const offset = circ - (selfPct / 100) * circ;
+    const ring = document.getElementById('donutRing');
+    ring.setAttribute('stroke-dashoffset', offset);
+    ring.setAttribute('stroke', selfPct > 60 ? '#22c55e' : selfPct > 30 ? '#f59e0b' : '#ef4444');
+    document.getElementById('donutPct').textContent = `${selfPct}%`;
+
+    // Panel stats
+    document.getElementById('panelPv').textContent = `${todayRes.pv_kwh} kWh`;
+    document.getElementById('panelHouse').textContent = `${todayRes.house_kwh} kWh`;
+    document.getElementById('panelExport').textContent = `${todayRes.export_kwh} kWh`;
+    document.getElementById('panelImport').textContent = `${todayRes.import_kwh} kWh`;
+    document.getElementById('panelEddi').textContent = `${todayRes.eddi_kwh} kWh`;
+    document.getElementById('panelBattC').textContent = `${todayRes.batt_charge_kwh} kWh`;
+
+    // Summary cards
+    document.getElementById('ecPv').textContent = todayRes.pv_kwh;
+    document.getElementById('ecHouse').textContent = todayRes.house_kwh;
+    document.getElementById('ecExport').textContent = todayRes.export_kwh;
+    document.getElementById('ecImport').textContent = todayRes.import_kwh;
+
+    // History bars
+    const container = document.getElementById('historyRows');
+    if (!histRes || !histRes.length) {
+      container.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">Nog geen historische data beschikbaar</div>';
+      return;
+    }
+    const maxPv = Math.max(...histRes.map(d => d.pv_kwh), 1);
+    const days = ['zo','ma','di','wo','do','vr','za'];
+    let html = '';
+    for (const day of histRes) {
+      const dt = new Date(day.date + 'T12:00:00');
+      const dayName = days[dt.getDay()];
+      const pvW = Math.round((day.pv_kwh / maxPv) * 100);
+      const expW = Math.round((day.export_kwh / maxPv) * 100);
+      const impW = Math.max(2, Math.round((day.import_kwh / maxPv) * 100));
+      const isToday = day.date === todayRes.date;
+      html += `
+        <div class="history-row" style="${isToday ? 'opacity:1' : 'opacity:0.7'}">
+          <span class="history-date">${isToday ? 'Nu' : dayName}</span>
+          <div class="history-bars">
+            <div class="history-bar-row">
+              <div class="history-bar" style="width:${pvW}%;background:var(--solar);"></div>
+              <div class="history-bar" style="width:${expW}%;background:#22c55e;"></div>
+            </div>
+            <div class="history-bar-row">
+              <div class="history-bar" style="width:${impW}%;background:#ef4444;opacity:0.7;"></div>
+            </div>
+          </div>
+          <div class="history-vals">
+            <span class="history-val hv-pv">${day.pv_kwh}</span>
+            <span class="history-val hv-exp">↑${day.export_kwh}</span>
+            <span class="history-val hv-imp">↓${day.import_kwh}</span>
+            <span class="history-val hv-self">${day.self_consumption_pct}%</span>
+          </div>
+        </div>`;
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    console.warn('Panel data error:', e);
+  }
+}
 
 // ===== Clock =====
 function updateClock() {
