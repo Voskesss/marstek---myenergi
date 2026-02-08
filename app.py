@@ -2137,7 +2137,8 @@ class EnergyTracker:
             "eddi_kwh": round(self.eddi_wh / 1000, 2),
             "zappi_kwh": round(self.zappi_wh / 1000, 2),
             "self_consumption_pct": round(
-                ((self.pv_wh - self.export_wh) / self.pv_wh * 100) if self.pv_wh > 100 else 0, 1
+                (((self.pv_wh + self.batt_discharge_wh) - self.export_wh) / (self.pv_wh + self.batt_discharge_wh) * 100)
+                if (self.pv_wh + self.batt_discharge_wh) > 100 else 0, 1
             ),
         }
 
@@ -2166,7 +2167,10 @@ class EnergyTracker:
                 "zappi_kwh": round(d.get("zappi_wh", 0) / 1000, 2),
                 "batt_charge_kwh": round(d.get("batt_charge_wh", 0) / 1000, 2),
                 "batt_discharge_kwh": round(d.get("batt_discharge_wh", 0) / 1000, 2),
-                "self_consumption_pct": round(((pv - exp) / pv * 100) if pv > 100 else 0, 1),
+                "self_consumption_pct": round(
+                    (((pv + d.get("batt_discharge_wh", 0)) - exp) / (pv + d.get("batt_discharge_wh", 0)) * 100)
+                    if (pv + d.get("batt_discharge_wh", 0)) > 100 else 0, 1
+                ),
             })
         return result
 
@@ -3180,7 +3184,48 @@ async def energy_today():
 @app.get("/api/energy/history")
 async def energy_history(days: int = 7):
     """Get energy history for last N days."""
-    return energy_tracker.get_history(min(days, 90))
+    return energy_tracker.get_history(min(days, 365))
+
+@app.get("/api/energy/csv")
+async def energy_csv(days: int = 90):
+    """Export energy history as CSV."""
+    from starlette.responses import Response
+    history = energy_tracker.get_history(min(days, 365))
+    lines = ["Datum,PV kWh,Export kWh,Import kWh,Huis kWh,Eddi kWh,Zappi kWh,Batt Laden kWh,Batt Ontladen kWh,Zelfverbruik %,Eigen Opwek kWh,Kosten EUR,Bespaard EUR"]
+    for d in history:
+        gen = (d.get("pv_kwh", 0) or 0) + (d.get("batt_discharge_kwh", 0) or 0)
+        imp = d.get("import_kwh", 0) or 0
+        lines.append(",".join([
+            d["date"],
+            str(d.get("pv_kwh", 0)),
+            str(d.get("export_kwh", 0)),
+            str(d.get("import_kwh", 0)),
+            str(d.get("house_kwh", 0)),
+            str(d.get("eddi_kwh", 0)),
+            str(d.get("zappi_kwh", 0)),
+            str(d.get("batt_charge_kwh", 0)),
+            str(d.get("batt_discharge_kwh", 0)),
+            str(d.get("self_consumption_pct", 0)),
+            str(round(gen, 2)),
+            str(round(imp * 0.23, 2)),
+            str(round(gen * 0.23, 2)),
+        ]))
+    csv_text = "\n".join(lines)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=energie_overzicht_{days}d.csv"}
+    )
+
+@app.get("/rapport")
+async def energy_report_page():
+    """Serve the energy report page."""
+    try:
+        with open("rapport.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error: {e}</h1>", status_code=500)
 
 @app.get("/app")
 async def app_wrapper_page():

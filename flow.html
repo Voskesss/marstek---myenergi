@@ -203,12 +203,35 @@
     .flow-line.active {
       opacity: 1;
       stroke-dasharray: 12 8;
-      animation: dash-flow 1s linear infinite;
+      animation: dash-flow var(--dash-speed, 1s) linear infinite;
+      filter: drop-shadow(0 0 2px currentColor);
     }
     .flow-line.dim {
       opacity: 0.08;
     }
     @keyframes dash-flow { to { stroke-dashoffset: -20; } }
+
+    /* Bright energy pulse overlay - flashes intermittently */
+    .flow-pulse {
+      fill: none;
+      stroke-width: 3;
+      opacity: 0;
+      stroke-linecap: round;
+      stroke-dasharray: 16 300;
+      filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 14px currentColor);
+      pointer-events: none;
+    }
+    .flow-pulse.active {
+      animation: pulse-flash var(--pulse-speed, 3s) ease-in-out infinite;
+    }
+    @keyframes pulse-flash {
+      0%   { opacity: 0; stroke-dashoffset: 0; }
+      10%  { opacity: 0; }
+      15%  { opacity: 1; }
+      50%  { opacity: 1; stroke-dashoffset: -316; }
+      55%  { opacity: 0; stroke-dashoffset: -316; }
+      100% { opacity: 0; stroke-dashoffset: -316; }
+    }
 
     /* Flow label on line */
     .flow-label {
@@ -549,6 +572,8 @@
 
   <div class="topbar">
     <div class="topbar-left">
+      <a href="/dashboard" style="background:rgba(255,255,255,0.1);color:#e2e8f0;text-decoration:none;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">🎛️ Dashboard</a>
+      <a href="/rapport" style="background:rgba(255,255,255,0.1);color:#e2e8f0;text-decoration:none;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">📊 Rapport</a>
       <span class="topbar-title">⚡ Energie Flow</span>
       <span class="topbar-time" id="clock">--:--:--</span>
     </div>
@@ -556,6 +581,29 @@
       <span class="status-dot" id="statusDot"></span>
       <span class="topbar-time" id="statusText">Verbinden...</span>
       <button class="btn-fs" onclick="toggleFullscreen()" title="Volledig scherm">⛶</button>
+    </div>
+  </div>
+
+  <!-- Day meters: bespaard / gekost -->
+  <div style="position:fixed;top:52px;left:80px;z-index:5;">
+    <div style="background:rgba(10,14,26,0.75);backdrop-filter:blur(10px);border:1px solid rgba(34,197,94,0.25);border-radius:12px;padding:6px 14px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">💰</span>
+      <div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Bespaard vandaag</div>
+        <div style="font-size:18px;font-weight:700;color:#22c55e;" id="daySaved">€ 0,00</div>
+        <div style="font-size:10px;color:#64748b;" id="daySavedKwh">0.0 kWh eigen opwek</div>
+      </div>
+    </div>
+  </div>
+  <div style="position:fixed;top:52px;right:80px;z-index:5;">
+    <div style="background:rgba(10,14,26,0.75);backdrop-filter:blur(10px);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:6px 14px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">🔌</span>
+      <div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Gekost vandaag</div>
+        <div style="font-size:18px;font-weight:700;color:#ef4444;" id="dayCost">€ 0,00</div>
+        <div style="font-size:10px;color:#64748b;" id="dayCostKwh">0.0 kWh uit net</div>
+        <div style="font-size:10px;color:#f59e0b;margin-top:2px;" id="dayCostZappi"></div>
+      </div>
     </div>
   </div>
 
@@ -829,6 +877,26 @@
       </div>
     </div>
 
+    <!-- Kosten overzicht -->
+    <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">� Kosten & Besparing</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:12px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Bespaard vandaag</div>
+        <div style="font-size:22px;font-weight:700;color:#22c55e;" id="panelSavedToday">--</div>
+        <div style="font-size:10px;color:#64748b;" id="panelSavedKwh">eigen opwek</div>
+      </div>
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Gekost vandaag</div>
+        <div style="font-size:22px;font-weight:700;color:#ef4444;" id="panelCostToday">--</div>
+        <div style="font-size:10px;color:#64748b;" id="panelCostKwh">uit net</div>
+      </div>
+      <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:12px;padding:12px;text-align:center;grid-column:span 2;">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Totaal bespaard (alle dagen)</div>
+        <div style="font-size:26px;font-weight:700;color:#22c55e;" id="panelSavedTotal">--</div>
+        <div style="font-size:10px;color:#64748b;" id="panelSavedTotalKwh">eigen opwek totaal</div>
+      </div>
+    </div>
+
     <!-- History -->
     <div class="history-section">
       <div class="history-title">Laatste 7 dagen</div>
@@ -892,6 +960,23 @@ async function loadPanelData() {
     document.getElementById('ecBattC').textContent = todayRes.batt_charge_kwh || 0;
     document.getElementById('ecBattD').textContent = todayRes.batt_discharge_kwh || 0;
 
+    // Kosten & Besparing panel cards
+    const PRICE = 0.23;
+    const genToday = (todayRes.pv_kwh || 0) + (todayRes.batt_discharge_kwh || 0);
+    const impToday = todayRes.import_kwh || 0;
+    document.getElementById('panelSavedToday').textContent = `€ ${(genToday * PRICE).toFixed(2).replace('.', ',')}`;
+    document.getElementById('panelSavedKwh').textContent = `${genToday.toFixed(1)} kWh eigen opwek`;
+    document.getElementById('panelCostToday').textContent = `€ ${(impToday * PRICE).toFixed(2).replace('.', ',')}`;
+    document.getElementById('panelCostKwh').textContent = `${impToday.toFixed(1)} kWh uit net`;
+
+    // Totaal bespaard over alle dagen
+    let totalGen = 0;
+    for (const day of (histRes || [])) {
+      totalGen += (day.pv_kwh || 0) + (day.batt_discharge_kwh || 0);
+    }
+    document.getElementById('panelSavedTotal').textContent = `€ ${(totalGen * PRICE).toFixed(2).replace('.', ',')}`;
+    document.getElementById('panelSavedTotalKwh').textContent = `${totalGen.toFixed(1)} kWh eigen opwek totaal`;
+
     // History rows - clear table with all values
     const container = document.getElementById('historyRows');
     if (!histRes || !histRes.length) {
@@ -940,13 +1025,10 @@ updateClock();
 
 // ===== Fullscreen =====
 function toggleFullscreen() {
-  // If inside iframe (wrapper), request fullscreen on parent
-  const doc = window.parent !== window ? window.parent.document : document;
-  const el = window.parent !== window ? window.parent.document.documentElement : document.documentElement;
-  if (!doc.fullscreenElement) {
-    el.requestFullscreen();
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
   } else {
-    doc.exitFullscreen();
+    document.exitFullscreen();
   }
 }
 
@@ -983,11 +1065,17 @@ function createFlowLine(id, color) {
   bg.style.transition = 'opacity 0.5s ease';
   flowSvg.appendChild(bg);
 
+  // Glowing energy pulse (travels along the same path)
+  const pulse = document.createElementNS(ns, 'path');
+  pulse.setAttribute('class', 'flow-pulse');
+  pulse.style.stroke = color;
+  flowSvg.appendChild(pulse);
+
   const label = document.createElementNS(ns, 'text');
   label.setAttribute('class', 'flow-label');
   flowSvg.appendChild(label);
 
-  flowLines[id] = { line, label, bg };
+  flowLines[id] = { line, label, bg, pulse };
 }
 
 function updateFlowLine(id, from, to, watts, color) {
@@ -1009,17 +1097,29 @@ function updateFlowLine(id, from, to, watts, color) {
   const cx = mx + nx;
   const cy = my + ny;
 
-  fl.line.setAttribute('d', `M ${f.x} ${f.y} Q ${cx} ${cy} ${t.x} ${t.y}`);
+  const pathD = `M ${f.x} ${f.y} Q ${cx} ${cy} ${t.x} ${t.y}`;
+  fl.line.setAttribute('d', pathD);
+  fl.pulse.setAttribute('d', pathD);
 
   const active = Math.abs(watts) >= THRESH;
   fl.line.setAttribute('class', active ? 'flow-line active' : 'flow-line dim');
   if (active) {
     fl.line.style.stroke = color;
+    fl.pulse.style.stroke = color;
     const w = Math.min(6000, Math.abs(watts));
-    const dur = 1.5 - (w / 6000) * 1.0;
-    fl.line.style.animationDuration = `${dur.toFixed(2)}s`;
+    // Line thickness scales with power
     const sw = 2 + (w / 6000) * 3;
     fl.line.style.strokeWidth = `${sw.toFixed(1)}`;
+    fl.pulse.style.strokeWidth = `${(sw + 2).toFixed(1)}`;
+    // Dash speed: faster at higher power
+    const dashSpeed = 1.5 - (w / 6000) * 1.0;
+    fl.line.style.setProperty('--dash-speed', `${dashSpeed.toFixed(2)}s`);
+    // Pulse flash cycle: 4s at low power → 2s at high power
+    const pulseSpeed = 4.0 - (w / 6000) * 2.0;
+    fl.pulse.style.setProperty('--pulse-speed', `${pulseSpeed.toFixed(1)}s`);
+    fl.pulse.setAttribute('class', 'flow-pulse active');
+  } else {
+    fl.pulse.setAttribute('class', 'flow-pulse');
   }
 
   // Label at midpoint with background pill
@@ -1349,6 +1449,28 @@ function updateDisplay(data) {
   const b2Soc = b2Der.soc_percent != null ? b2Der.soc_percent : null;
   const b1Mode = b1Der.mode || 'Offline';
   const b2Mode = b2Der.mode || 'Offline';
+
+  // Update day meters (bespaard / gekost in €)
+  const KWH_PRICE = 0.23;
+  if (energy) {
+    const genKwh = (energy.pv_kwh || 0) + (energy.batt_discharge_kwh || 0);
+    const impKwh = energy.import_kwh || 0;
+    const saved = (genKwh * KWH_PRICE).toFixed(2).replace('.', ',');
+    const cost = (impKwh * KWH_PRICE).toFixed(2).replace('.', ',');
+    const zappiKwh = energy.zappi_kwh || 0;
+    const zappiCost = (zappiKwh * KWH_PRICE).toFixed(2).replace('.', ',');
+    const costMinZappi = ((impKwh - zappiKwh) * KWH_PRICE);
+    document.getElementById('daySaved').textContent = `€ ${saved}`;
+    document.getElementById('daySavedKwh').textContent = `${genKwh.toFixed(1)} kWh eigen opwek`;
+    document.getElementById('dayCost').textContent = `€ ${cost}`;
+    document.getElementById('dayCostKwh').textContent = `${impKwh.toFixed(1)} kWh uit net`;
+    const zappiEl = document.getElementById('dayCostZappi');
+    if (zappiKwh > 0.01) {
+      zappiEl.textContent = `🚗 Zappi € ${zappiCost} · zonder: € ${costMinZappi.toFixed(2).replace('.', ',')}`;
+    } else {
+      zappiEl.textContent = '';
+    }
+  }
 
   // Update center ring (self-consumption %)
   if (energy && energy.self_consumption_pct != null) {

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energie Rapport</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    h1 { font-size: 22px; }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    select, button {
+      background: rgba(30,40,60,0.8);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(59,130,246,0.4); }
+    .btn-csv { background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.3); }
+    .btn-csv:hover { background: rgba(34,197,94,0.4); }
+    .btn-back { background: rgba(255,255,255,0.05); }
+
+    /* Summary cards */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .s-card {
+      background: rgba(20,27,45,0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+    }
+    .s-card .s-label {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .s-card .s-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .s-card .s-sub {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .green { color: #22c55e; }
+    .red { color: #ef4444; }
+    .blue { color: #3b82f6; }
+    .yellow { color: #f59e0b; }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th {
+      background: rgba(30,40,60,0.9);
+      padding: 10px 8px;
+      text-align: right;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+      position: sticky;
+      top: 0;
+    }
+    th:first-child { text-align: left; }
+    td {
+      padding: 8px;
+      text-align: right;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    td:first-child { text-align: left; color: #94a3b8; }
+    tr:hover td { background: rgba(255,255,255,0.03); }
+    tr.today td { background: rgba(59,130,246,0.08); font-weight: 600; }
+    .tot-row td {
+      background: rgba(30,40,60,0.6);
+      font-weight: 700;
+      border-top: 2px solid rgba(255,255,255,0.1);
+      font-size: 13px;
+    }
+    .loading { text-align: center; padding: 40px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Energie Rapport</h1>
+    <div class="controls">
+      <select id="period" onchange="loadData()">
+        <option value="7">Laatste 7 dagen</option>
+        <option value="14">Laatste 14 dagen</option>
+        <option value="30" selected>Laatste 30 dagen</option>
+        <option value="90">Laatste 90 dagen</option>
+        <option value="365">Laatste jaar</option>
+      </select>
+      <button class="btn-csv" onclick="downloadCSV()">📥 CSV Export</button>
+      <button class="btn-back" onclick="history.back()">← Terug</button>
+    </div>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="loading">Laden...</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>☀️ PV</th>
+          <th>🔋 Batt ↓</th>
+          <th>🏠 Huis</th>
+          <th>🔥 Eddi</th>
+          <th>🚗 Zappi</th>
+          <th style="color:#22c55e">⬆ Export</th>
+          <th style="color:#ef4444">⬇ Import</th>
+          <th>🍃 Zelfverbr.</th>
+          <th style="color:#22c55e">💰 Bespaard</th>
+          <th style="color:#ef4444">🔌 Gekost</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="11" class="loading">Laden...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const PRICE = 0.23;
+    const days = ['zo','ma','di','wo','do','vr','za'];
+    const today = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) { return (n || 0).toFixed(1); }
+    function eur(n) { return '€ ' + n.toFixed(2).replace('.', ','); }
+
+    async function loadData() {
+      const period = document.getElementById('period').value;
+      const res = await fetch(`/api/energy/history?days=${period}`);
+      const data = await res.json();
+
+      // Totals
+      let totPv = 0, totBattD = 0, totHouse = 0, totEddi = 0, totZappi = 0;
+      let totExp = 0, totImp = 0, totGen = 0;
+
+      for (const d of data) {
+        totPv += d.pv_kwh || 0;
+        totBattD += d.batt_discharge_kwh || 0;
+        totHouse += d.house_kwh || 0;
+        totEddi += d.eddi_kwh || 0;
+        totZappi += d.zappi_kwh || 0;
+        totExp += d.export_kwh || 0;
+        totImp += d.import_kwh || 0;
+      }
+      totGen = totPv + totBattD;
+
+      // Summary cards
+      const totVerbruik = totHouse + totEddi + totZappi;
+      const costMinZappi = (totImp - totZappi) * PRICE;
+      const zappiPct = totVerbruik > 0 ? (totZappi / totVerbruik * 100).toFixed(0) : 0;
+
+      document.getElementById('summary').innerHTML = `
+        <div class="s-card">
+          <div class="s-label">Totaal verbruik</div>
+          <div class="s-value">${fmt(totVerbruik)} kWh</div>
+          <div class="s-sub">Huis ${fmt(totHouse)} · Eddi ${fmt(totEddi)} · Zappi ${fmt(totZappi)}</div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">Eigen opwek</div>
+          <div class="s-value green">${fmt(totGen)} kWh</div>
+          <div class="s-sub">PV ${fmt(totPv)} + Batt ${fmt(totBattD)}</div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">Totaal bespaard</div>
+          <div class="s-value green">${eur(totGen * PRICE)}</div>
+          <div class="s-sub">${fmt(totGen)} kWh niet uit net gehaald</div>
+        </div>
+        <div class="s-card" style="border-color:rgba(239,68,68,0.3);">
+          <div class="s-label">Totaal gekost</div>
+          <div class="s-value red">${eur(totImp * PRICE)}</div>
+          <div class="s-sub">${fmt(totImp)} kWh uit net</div>
+        </div>
+        <div class="s-card" style="border-color:rgba(245,158,11,0.3);">
+          <div class="s-label">🚗 Waarvan Zappi</div>
+          <div class="s-value yellow">${eur(totZappi * PRICE)}</div>
+          <div class="s-sub">${fmt(totZappi)} kWh · ${zappiPct}% van totaal verbruik</div>
+        </div>
+        <div class="s-card" style="border-color:rgba(59,130,246,0.3);">
+          <div class="s-label">Gekost zonder Zappi</div>
+          <div class="s-value blue">${eur(costMinZappi)}</div>
+          <div class="s-sub">${fmt(totImp - totZappi)} kWh · alleen huis + eddi</div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">Teruggeleverd</div>
+          <div class="s-value blue">${fmt(totExp)} kWh</div>
+          <div class="s-sub">${eur(totExp * PRICE)}</div>
+        </div>
+        <div class="s-card" style="border-color:rgba(34,197,94,0.3);">
+          <div class="s-label">Netto kosten</div>
+          <div class="s-value ${(totImp - totGen) > 0 ? 'red' : 'green'}">${eur(Math.abs(totImp - totGen) * PRICE)}</div>
+          <div class="s-sub">${(totImp - totGen) > 0 ? 'meer uit net dan eigen' : 'meer eigen dan uit net'}</div>
+        </div>
+      `;
+
+      // Table rows
+      let html = '';
+      for (const d of data) {
+        const gen = (d.pv_kwh || 0) + (d.batt_discharge_kwh || 0);
+        const imp = d.import_kwh || 0;
+        const dt = new Date(d.date + 'T12:00:00');
+        const dayName = days[dt.getDay()];
+        const isToday = d.date === today;
+        const label = isToday ? `<b>Vandaag</b>` : `${dayName} ${d.date.slice(8)}/${d.date.slice(5,7)}`;
+        html += `<tr class="${isToday ? 'today' : ''}">
+          <td>${label}</td>
+          <td>${fmt(d.pv_kwh)}</td>
+          <td>${fmt(d.batt_discharge_kwh)}</td>
+          <td>${fmt(d.house_kwh)}</td>
+          <td>${fmt(d.eddi_kwh)}</td>
+          <td>${fmt(d.zappi_kwh)}</td>
+          <td style="color:#22c55e">${fmt(d.export_kwh)}</td>
+          <td style="color:#ef4444">${fmt(imp)}</td>
+          <td>${d.self_consumption_pct || 0}%</td>
+          <td style="color:#22c55e">${eur(gen * PRICE)}</td>
+          <td style="color:#ef4444">${eur(imp * PRICE)}</td>
+        </tr>`;
+      }
+      // Totaal row
+      html += `<tr class="tot-row">
+        <td>Totaal</td>
+        <td>${fmt(totPv)}</td>
+        <td>${fmt(totBattD)}</td>
+        <td>${fmt(totHouse)}</td>
+        <td>${fmt(totEddi)}</td>
+        <td>${fmt(totZappi)}</td>
+        <td style="color:#22c55e">${fmt(totExp)}</td>
+        <td style="color:#ef4444">${fmt(totImp)}</td>
+        <td></td>
+        <td style="color:#22c55e">${eur(totGen * PRICE)}</td>
+        <td style="color:#ef4444">${eur(totImp * PRICE)}</td>
+      </tr>`;
+      document.getElementById('tbody').innerHTML = html;
+    }
+
+    function downloadCSV() {
+      const period = document.getElementById('period').value;
+      window.open(`/api/energy/csv?days=${period}`, '_blank');
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
