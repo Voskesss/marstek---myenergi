@@ -839,7 +839,7 @@
 <script>
 // ===== Configuration =====
 const THRESH = 50;
-const BATT_THRESH = 300;  // Battery flow only visible above 300W
+const BATT_THRESH = 50;  // Battery flow visible above 50W
 let failureCount = 0;
 let pollInterval = 2000;
 
@@ -1338,10 +1338,13 @@ function updateDisplay(data) {
   const b1Power = Math.round(w(b1Der.power_w));
   const b2Power = Math.round(w(b2Der.power_w));
 
-  // Backend fallback already subtracts eddi & zappi, but NOT battery (marstek timeout).
-  // Only subtract battery charging power to avoid double counting.
-  const battCharging = Math.max(0, b1Power) + Math.max(0, b2Power); // only charging (positive)
-  const house = Math.max(0, rawHouse - battCharging);
+  // Backend fallback: house = pv + grid - eddi - zappi - battery
+  // But battery=0 (marstek timeout), so we must correct in frontend.
+  // battPower: positive = charging (consuming from grid), negative = discharging (providing to house)
+  const battCharging = Math.max(0, b1Power) + Math.max(0, b2Power);
+  const battDischarging = Math.abs(Math.min(0, b1Power)) + Math.abs(Math.min(0, b2Power));
+  // Subtract charging (already in rawHouse via grid), add discharging (provides to house but backend doesn't know)
+  const house = Math.max(0, rawHouse - battCharging + battDischarging);
   const b1Soc = b1Der.soc_percent != null ? b1Der.soc_percent : null;
   const b2Soc = b2Der.soc_percent != null ? b2Der.soc_percent : null;
   const b1Mode = b1Der.mode || 'Offline';
