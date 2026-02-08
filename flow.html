@@ -388,6 +388,111 @@
       padding: 2px 0 0;
       letter-spacing: 0.5px;
     }
+
+    /* ===== Mobile: vertical flow list ===== */
+    .mobile-flow {
+      display: none;
+      flex-direction: column;
+      padding: 8px 16px;
+      gap: 0;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .mf-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      gap: 12px;
+      transition: all 0.4s ease;
+      position: relative;
+    }
+    .mf-row.active {
+      border-color: var(--mf-color, var(--card-border));
+      box-shadow: 0 0 12px var(--mf-glow, transparent);
+    }
+    .mf-icon { font-size: 24px; flex-shrink: 0; width: 32px; text-align: center; }
+    .mf-info { flex: 1; min-width: 0; }
+    .mf-name { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .mf-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .mf-sub { font-size: 11px; color: var(--text-dim); }
+    .mf-soc-wrap { width: 50px; height: 5px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .mf-soc { height: 100%; border-radius: 3px; transition: width 1s ease; }
+    .mf-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+
+    /* Flow connector between rows */
+    .mf-connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mf-connector.hidden { visibility: hidden; }
+    .mf-line {
+      width: 3px;
+      height: 100%;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mf-line.active {
+      animation: mf-pulse 1.2s ease-in-out infinite;
+    }
+    .mf-line.active::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 8px;
+      border-radius: 2px;
+      background: inherit;
+      filter: brightness(1.8);
+    }
+    .mf-line.active.flow-down::after {
+      animation: mf-dot-down 0.8s linear infinite;
+    }
+    .mf-line.active.flow-up::after {
+      animation: mf-dot-up 0.8s linear infinite;
+    }
+    @keyframes mf-dot-down {
+      0% { top: -8px; }
+      100% { top: 100%; }
+    }
+    @keyframes mf-dot-up {
+      0% { top: 100%; }
+      100% { top: -8px; }
+    }
+    @keyframes mf-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .mf-watt-label {
+      position: absolute;
+      left: 16px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-dim);
+    }
+    .mf-dir {
+      position: absolute;
+      right: 16px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    @media (max-width: 768px) {
+      .flow-container { display: none !important; }
+      .mobile-flow { display: flex !important; }
+      .stats-bar { gap: 12px; padding: 8px 12px; flex-wrap: wrap; }
+      .stat-item .stat-value { font-size: 13px; }
+      .stat-item .stat-label { font-size: 9px; }
+      .stats-bar-hint { font-size: 8px; }
+      .topbar { padding: 6px 12px; }
+      .energy-cards { grid-template-columns: repeat(2, 1fr); }
+    }
   </style>
 </head>
 <body>
@@ -468,6 +573,61 @@
       <div class="hint-icons">🫧 👕</div>
       <div class="hint-text">Zet de wasmachine of vaatwasser aan!</div>
       <div class="hint-power">-- kW overschot</div>
+    </div>
+  </div>
+
+  <!-- ===== Mobile vertical flow ===== -->
+  <div class="mobile-flow" id="mobileFlow">
+    <div class="mf-row" id="mfSolar" style="--mf-color:var(--solar);--mf-glow:var(--solar-glow);">
+      <span class="mf-icon">☀️</span>
+      <div class="mf-info"><div class="mf-name">Zonnepanelen</div><div class="mf-val" id="mfPvVal">--</div></div>
+    </div>
+    <div class="mf-connector" id="mcSolarHouse"><div class="mf-line flow-down" style="background:var(--solar)"></div><span class="mf-watt-label" id="mcSolarLbl"></span><span class="mf-dir">▼ naar huis</span></div>
+
+    <div class="mf-row" id="mfHouse" style="--mf-color:var(--house);--mf-glow:var(--house-glow);">
+      <span class="mf-icon">🏠</span>
+      <div class="mf-info"><div class="mf-name">Huis</div><div class="mf-val" id="mfHouseVal">--</div></div>
+    </div>
+    <div class="mf-connector" id="mcHouseGrid"><div class="mf-line" id="mcGridLine" style="background:var(--grid-export)"></div><span class="mf-watt-label" id="mcGridLbl"></span><span class="mf-dir" id="mcGridDir"></span></div>
+
+    <div class="mf-row" id="mfGrid" style="--mf-color:var(--grid-export);--mf-glow:var(--grid-glow-exp);">
+      <span class="mf-icon">🔌</span>
+      <div class="mf-info"><div class="mf-name">Net</div><div class="mf-val" id="mfGridVal">--</div></div>
+      <div class="mf-right"><span class="mf-sub" id="mfGridSub"></span></div>
+    </div>
+    <div class="mf-connector" id="mcGridEddi"><div class="mf-line flow-down" style="background:var(--eddi)"></div><span class="mf-watt-label" id="mcEddiLbl"></span><span class="mf-dir">▼ boiler</span></div>
+
+    <div class="mf-row" id="mfEddi" style="--mf-color:var(--eddi);--mf-glow:var(--eddi-glow);">
+      <span class="mf-icon">🔥</span>
+      <div class="mf-info"><div class="mf-name">Boiler</div><div class="mf-val" id="mfEddiVal">--</div></div>
+      <div class="mf-right"><span class="mf-sub" id="mfEddiT"></span></div>
+    </div>
+    <div class="mf-connector" id="mcEddiZappi"><div class="mf-line flow-down" style="background:var(--zappi)"></div><span class="mf-watt-label" id="mcZappiLbl"></span><span class="mf-dir">▼ auto</span></div>
+
+    <div class="mf-row" id="mfZappi" style="--mf-color:var(--zappi);--mf-glow:var(--zappi-glow);">
+      <span class="mf-icon">🚗</span>
+      <div class="mf-info"><div class="mf-name">Auto</div><div class="mf-val" id="mfZappiVal">--</div></div>
+    </div>
+    <div class="mf-connector" id="mcZappiBatt1"><div class="mf-line" id="mcBatt1Line" style="background:var(--batt)"></div><span class="mf-watt-label" id="mcBatt1Lbl"></span><span class="mf-dir" id="mcBatt1Dir"></span></div>
+
+    <div class="mf-row" id="mfBatt1" style="--mf-color:var(--batt);--mf-glow:var(--batt-glow);">
+      <span class="mf-icon">🔋</span>
+      <div class="mf-info"><div class="mf-name">Batterij 92</div><div class="mf-val" id="mfBatt1Val">--</div><div class="mf-sub" id="mfBatt1Soc">--</div></div>
+      <div class="mf-right"><div class="mf-soc-wrap"><div class="mf-soc" id="mfSoc1" style="width:0"></div></div></div>
+    </div>
+    <div class="mf-connector" id="mcBatt1Batt2"><div class="mf-line" id="mcBatt2Line" style="background:var(--batt)"></div><span class="mf-watt-label" id="mcBatt2Lbl"></span><span class="mf-dir" id="mcBatt2Dir"></span></div>
+
+    <div class="mf-row" id="mfBatt2" style="--mf-color:var(--batt);--mf-glow:var(--batt-glow);">
+      <span class="mf-icon">🔋</span>
+      <div class="mf-info"><div class="mf-name">Batterij 74</div><div class="mf-val" id="mfBatt2Val">--</div><div class="mf-sub" id="mfBatt2Soc">--</div></div>
+      <div class="mf-right"><div class="mf-soc-wrap"><div class="mf-soc" id="mfSoc2" style="width:0"></div></div></div>
+    </div>
+
+    <!-- Mobile appliance hint -->
+    <div id="mfHint" class="appliance-hint" style="display:none;position:relative;bottom:auto;left:auto;transform:none;margin-top:8px;">
+      <div class="hint-icons">🫧 👕</div>
+      <div class="hint-text">Zet de wasmachine of vaatwasser aan!</div>
+      <div class="hint-power" id="mfHintPower">-- kW overschot</div>
     </div>
   </div>
 
@@ -818,6 +978,191 @@ function socColor(soc) {
   return 'var(--batt-low)';
 }
 
+// ===== Mobile flow update =====
+function fmtMobile(watts) {
+  const abs = Math.abs(watts);
+  return abs >= 1000 ? `${(abs/1000).toFixed(1)} kW` : `${Math.round(abs)} W`;
+}
+
+function setMfActive(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('active', on);
+}
+
+function setConnector(id, lineId, watts, color, dirDown, label) {
+  const conn = document.getElementById(id);
+  const line = document.getElementById(lineId);
+  if (!conn || !line) return;
+  const on = Math.abs(watts) >= THRESH;
+  if (on) {
+    conn.classList.remove('hidden');
+    line.classList.add('active');
+    line.classList.toggle('flow-down', dirDown);
+    line.classList.toggle('flow-up', !dirDown);
+    line.style.background = color;
+  } else {
+    conn.classList.add('hidden');
+    line.classList.remove('active');
+  }
+}
+
+function updateMobile(pv, grid, house, eddi, zappi, bp1, bp2, b1Soc, b2Soc, b1Mode, b2Mode, eddiTemp) {
+  // Values
+  document.getElementById('mfPvVal').textContent = fmtMobile(pv);
+  document.getElementById('mfHouseVal').textContent = fmtMobile(house);
+  document.getElementById('mfGridVal').textContent = fmtMobile(grid);
+  document.getElementById('mfEddiVal').textContent = fmtMobile(eddi);
+  document.getElementById('mfZappiVal').textContent = fmtMobile(zappi);
+  document.getElementById('mfBatt1Val').textContent = fmtMobile(bp1);
+  document.getElementById('mfBatt2Val').textContent = fmtMobile(bp2);
+
+  // Active states
+  setMfActive('mfSolar', pv > THRESH);
+  setMfActive('mfHouse', house > THRESH);
+  setMfActive('mfGrid', Math.abs(grid) > THRESH);
+  setMfActive('mfEddi', eddi > THRESH);
+  setMfActive('mfZappi', zappi > THRESH);
+  setMfActive('mfBatt1', Math.abs(bp1) > THRESH || b1Soc != null);
+  setMfActive('mfBatt2', Math.abs(bp2) > THRESH || b2Soc != null);
+
+  // Solar -> House connector (always down when active)
+  const scConn = document.getElementById('mcSolarHouse');
+  const scLine = scConn?.querySelector('.mf-line');
+  if (scConn && scLine) {
+    if (pv > THRESH) {
+      scConn.classList.remove('hidden');
+      scLine.classList.add('active');
+      document.getElementById('mcSolarLbl').textContent = fmtMobile(pv);
+    } else {
+      scConn.classList.add('hidden');
+      scLine.classList.remove('active');
+    }
+  }
+
+  // Grid connector: grid > 0 = export (down from house to grid), grid < 0 = import (up from grid to house)
+  const gcConn = document.getElementById('mcHouseGrid');
+  const gcLine = document.getElementById('mcGridLine');
+  const gcDir = document.getElementById('mcGridDir');
+  if (gcConn && gcLine) {
+    if (Math.abs(grid) > THRESH) {
+      gcConn.classList.remove('hidden');
+      gcLine.classList.add('active');
+      if (grid > THRESH) {
+        gcLine.classList.add('flow-down');
+        gcLine.classList.remove('flow-up');
+        gcLine.style.background = 'var(--grid-export)';
+        gcDir.textContent = '▼ export naar net';
+        document.getElementById('mfGridSub').textContent = '⬆ Export';
+        document.getElementById('mfGridSub').style.color = '#22c55e';
+      } else {
+        gcLine.classList.remove('flow-down');
+        gcLine.classList.add('flow-up');
+        gcLine.style.background = 'var(--grid-import)';
+        gcDir.textContent = '▲ import van net';
+        document.getElementById('mfGridSub').textContent = '⬇ Import';
+        document.getElementById('mfGridSub').style.color = '#ef4444';
+      }
+      document.getElementById('mcGridLbl').textContent = fmtMobile(grid);
+    } else {
+      gcConn.classList.add('hidden');
+      gcLine.classList.remove('active');
+      document.getElementById('mfGridSub').textContent = '— Neutraal';
+      document.getElementById('mfGridSub').style.color = '';
+    }
+  }
+
+  // Eddi connector
+  const ecConn = document.getElementById('mcGridEddi');
+  const ecLine = ecConn?.querySelector('.mf-line');
+  if (ecConn && ecLine) {
+    if (eddi > THRESH) {
+      ecConn.classList.remove('hidden');
+      ecLine.classList.add('active');
+      document.getElementById('mcEddiLbl').textContent = fmtMobile(eddi);
+    } else {
+      ecConn.classList.add('hidden');
+      ecLine.classList.remove('active');
+    }
+  }
+  if (eddiTemp != null) document.getElementById('mfEddiT').textContent = `${eddiTemp}°C`;
+
+  // Zappi connector
+  const zcConn = document.getElementById('mcEddiZappi');
+  const zcLine = zcConn?.querySelector('.mf-line');
+  if (zcConn && zcLine) {
+    if (zappi > THRESH) {
+      zcConn.classList.remove('hidden');
+      zcLine.classList.add('active');
+      document.getElementById('mcZappiLbl').textContent = fmtMobile(zappi);
+    } else {
+      zcConn.classList.add('hidden');
+      zcLine.classList.remove('active');
+    }
+  }
+
+  // Battery 1 connector
+  const b1Conn = document.getElementById('mcZappiBatt1');
+  const b1Line = document.getElementById('mcBatt1Line');
+  const b1Dir = document.getElementById('mcBatt1Dir');
+  if (b1Conn && b1Line) {
+    if (Math.abs(bp1) > BATT_THRESH) {
+      b1Conn.classList.remove('hidden');
+      b1Line.classList.add('active');
+      b1Line.classList.toggle('flow-down', bp1 > 0);
+      b1Line.classList.toggle('flow-up', bp1 < 0);
+      b1Dir.textContent = bp1 > 0 ? '▼ laden' : '▲ ontladen';
+      document.getElementById('mcBatt1Lbl').textContent = fmtMobile(bp1);
+    } else {
+      b1Conn.classList.add('hidden');
+      b1Line.classList.remove('active');
+    }
+  }
+
+  // Battery 2 connector
+  const b2Conn = document.getElementById('mcBatt1Batt2');
+  const b2Line = document.getElementById('mcBatt2Line');
+  const b2Dir = document.getElementById('mcBatt2Dir');
+  if (b2Conn && b2Line) {
+    if (Math.abs(bp2) > BATT_THRESH) {
+      b2Conn.classList.remove('hidden');
+      b2Line.classList.add('active');
+      b2Line.classList.toggle('flow-down', bp2 > 0);
+      b2Line.classList.toggle('flow-up', bp2 < 0);
+      b2Dir.textContent = bp2 > 0 ? '▼ laden' : '▲ ontladen';
+      document.getElementById('mcBatt2Lbl').textContent = fmtMobile(bp2);
+    } else {
+      b2Conn.classList.add('hidden');
+      b2Line.classList.remove('active');
+    }
+  }
+
+  // Battery SOC
+  if (b1Soc != null) {
+    document.getElementById('mfBatt1Soc').textContent = `${b1Soc}% · ${b1Mode}`;
+    document.getElementById('mfSoc1').style.width = `${b1Soc}%`;
+    document.getElementById('mfSoc1').style.background = socColor(b1Soc);
+  } else {
+    document.getElementById('mfBatt1Soc').textContent = 'Offline';
+  }
+  if (b2Soc != null) {
+    document.getElementById('mfBatt2Soc').textContent = `${b2Soc}% · ${b2Mode}`;
+    document.getElementById('mfSoc2').style.width = `${b2Soc}%`;
+    document.getElementById('mfSoc2').style.background = socColor(b2Soc);
+  } else {
+    document.getElementById('mfBatt2Soc').textContent = 'Offline';
+  }
+
+  // Mobile appliance hint
+  const exportW = grid > 0 ? grid : 0;
+  const mfHint = document.getElementById('mfHint');
+  if (exportW >= 2000 && exportAbove2kw_since && (Date.now() - exportAbove2kw_since)/1000 >= EXPORT_HINT_SECONDS) {
+    mfHint.style.display = 'flex';
+    document.getElementById('mfHintPower').textContent = `${(exportW/1000).toFixed(1)} kW overschot`;
+  } else {
+    mfHint.style.display = 'none';
+  }
+}
+
 // ===== Data fetching =====
 async function fetchData() {
   const ts = Date.now();
@@ -1007,6 +1352,10 @@ function updateDisplay(data) {
     document.getElementById('statDayExport').textContent = `${energy.export_kwh || 0} kWh`;
     document.getElementById('statDayImport').textContent = `${energy.import_kwh || 0} kWh`;
   }
+
+  // Update mobile view
+  const eddiTemp = status.eddi_temperatures?.tp1;
+  updateMobile(pv, grid, house, eddi, zappi, b1Power, b2Power, b1Soc, b2Soc, b1Mode, b2Mode, eddiTemp);
 }
 
 // ===== Main loop =====

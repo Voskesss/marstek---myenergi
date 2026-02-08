@@ -1,12 +1,22 @@
 {
   "2026-02-07": {
-    "pv_wh": 1286.1,
-    "export_wh": 234.4,
-    "import_wh": 3.8,
-    "house_wh": 552.2,
+    "pv_wh": 21101.2,
+    "export_wh": 681.3,
+    "import_wh": 42391.9,
+    "house_wh": 31735.4,
     "batt_charge_wh": 0.0,
     "batt_discharge_wh": 0.0,
-    "eddi_wh": 502.2,
-    "zappi_wh": 0.0
+    "eddi_wh": 2393.7,
+    "zappi_wh": 28715.5
+  },
+  "2026-02-08": {
+    "pv_wh": 521.1,
+    "export_wh": 1.3,
+    "import_wh": 63733.4,
+    "house_wh": 12774.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 41.0,
+    "zappi_wh": 51458.8
   }
 }

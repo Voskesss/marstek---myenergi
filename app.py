@@ -2946,9 +2946,9 @@ async def _startup_simple_rule():
         whatsapp_tips_task = asyncio.create_task(_whatsapp_tips_scheduler())
         logger.info("📱 WhatsApp tips scheduler started")
         
-        # Start Battery Offline Monitor
-        battery_offline_task = asyncio.create_task(_battery_offline_monitor())
-        logger.info("🔌 Battery Offline Monitor started")
+        # Battery Offline Monitor - DISABLED (too many false alerts)
+        # battery_offline_task = asyncio.create_task(_battery_offline_monitor())
+        logger.info("🔌 Battery Offline Monitor DISABLED (te veel meldingen)")
         
         # Start Phase Monitor (3x25A check)
         await phase_monitor.start()
