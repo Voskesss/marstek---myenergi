@@ -1421,9 +1421,17 @@ phase_monitor = PhaseMonitor(myenergi, myenergi_lock, p1_reader)
 async def health():
     return {"ok": True}
 
+_last_good_status = None  # Cache for last successful /api/status response
+
 @app.get("/api/status")
 async def get_status():
     """Samengevoegde status van myenergi + marstek."""
+    global _last_good_status
+    cache_headers = {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
     try:
         # myenergi data (always try this first)
         async with myenergi_lock:
@@ -1463,7 +1471,7 @@ async def get_status():
         # Grid import-positief waarde (compat voor flow.html)
         grid_import_w = None if export_w is None else (-export_w)
         
-        return {
+        payload = {
             "timestamp": time.time(),
             "myenergi_raw": m,
             "grid_export_w": export_w,
@@ -1498,21 +1506,19 @@ async def get_status():
                 "use_tank_2": EDDI_USE_TANK_2,
                 "active_threshold_w": EDDI_ACTIVE_W,
                 "marstek_use_ble": MARSTEK_USE_BLE
-            }
+            },
+            "stale": False,
         }
-        # no-store headers to prevent caching in browsers/proxies
-        cache_headers = {
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        }
+        _last_good_status = payload
         return JSONResponse(content=payload, headers=cache_headers)
     except Exception as e:
-        cache_headers = {
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        }
+        # Return cached data if available, so dashboard stays alive
+        if _last_good_status:
+            stale = dict(_last_good_status)
+            stale["stale"] = True
+            stale["stale_reason"] = str(e)[:120]
+            stale["timestamp"] = time.time()
+            return JSONResponse(content=stale, headers=cache_headers)
         return JSONResponse(content={"error": str(e), "timestamp": time.time()}, headers=cache_headers)
 
 @app.get("/phase")
