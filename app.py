@@ -1268,6 +1268,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve background images for flow dashboard
+try:
+    app.mount("/bg", StaticFiles(directory="bg"), name="bg")
+except Exception:
+    pass
+
 # Serve de lokale BLE tool (geclonede repo) op /ble
 try:
     app.mount("/ble", StaticFiles(directory="external/marstek-venus-monitor", html=True), name="ble")

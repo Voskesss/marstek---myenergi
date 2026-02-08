@@ -37,6 +37,26 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      position: relative;
+    }
+
+    /* Dynamic landscape background */
+    .bg-landscape {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+    .bg-landscape.active { opacity: 0.7; }
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(180deg, rgba(10,14,26,0.05) 0%, rgba(10,14,26,0.4) 100%);
+      pointer-events: none;
     }
 
     /* Top bar */
@@ -45,9 +65,11 @@
       align-items: center;
       justify-content: space-between;
       padding: 12px 24px;
-      background: var(--card);
+      background: rgba(20,27,45,0.9);
       border-bottom: 1px solid var(--card-border);
       flex-shrink: 0;
+      position: relative;
+      z-index: 1;
     }
     .topbar-left { display:flex; align-items:center; gap:12px; }
     .topbar-title { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
@@ -65,13 +87,16 @@
       justify-content: center;
       padding: 20px;
       position: relative;
+      z-index: 1;
     }
 
     /* Energy cards */
     .energy-card {
       position: absolute;
-      background: var(--card);
-      border: 1px solid var(--card-border);
+      background: rgba(20,27,45,0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
       border-radius: 16px;
       padding: 16px 20px;
       min-width: 140px;
@@ -120,9 +145,11 @@
       transform: translate(-50%, -50%);
       z-index: 3;
       text-align: center;
-      background: var(--card);
+      background: rgba(20,27,45,0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-radius: 50%;
-      border: 1px solid var(--card-border);
+      border: 1px solid rgba(255,255,255,0.08);
     }
     .center-ring svg { transform: rotate(-90deg); }
     .center-ring-label {
@@ -396,12 +423,14 @@
     .hv-self { color: var(--text); }
 
     /* Bottom bar clickable */
-    .stats-bar { cursor: pointer; }
+    .stats-bar { cursor: pointer; position: relative; z-index: 2; }
     .stats-bar:hover { background: rgba(255,255,255,0.03); }
     .stats-bar-hint {
       font-size: 9px;
       color: var(--text-dim);
       text-align: center;
+      position: relative;
+      z-index: 2;
       padding: 2px 0 0;
       letter-spacing: 0.5px;
     }
@@ -513,6 +542,10 @@
   </style>
 </head>
 <body>
+
+  <!-- Dynamic landscape background -->
+  <div class="bg-landscape" id="bgLandscape"></div>
+  <div class="bg-overlay"></div>
 
   <div class="topbar">
     <div class="topbar-left">
@@ -926,11 +959,21 @@ function createFlowLine(id, color) {
   line.style.stroke = color;
   flowSvg.appendChild(line);
 
+  const bg = document.createElementNS(ns, 'rect');
+  bg.setAttribute('rx', '6');
+  bg.setAttribute('ry', '6');
+  bg.setAttribute('fill', 'rgba(10,14,26,0.7)');
+  bg.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+  bg.setAttribute('stroke-width', '0.5');
+  bg.style.opacity = '0';
+  bg.style.transition = 'opacity 0.5s ease';
+  flowSvg.appendChild(bg);
+
   const label = document.createElementNS(ns, 'text');
   label.setAttribute('class', 'flow-label');
   flowSvg.appendChild(label);
 
-  flowLines[id] = { line, label };
+  flowLines[id] = { line, label, bg };
 }
 
 function updateFlowLine(id, from, to, watts, color) {
@@ -965,17 +1008,27 @@ function updateFlowLine(id, from, to, watts, color) {
     fl.line.style.strokeWidth = `${sw.toFixed(1)}`;
   }
 
-  // Label at midpoint
+  // Label at midpoint with background pill
   fl.label.setAttribute('x', cx);
   fl.label.setAttribute('y', cy - 10);
   if (active) {
     const kw = Math.abs(watts) / 1000;
-    fl.label.textContent = kw >= 1 ? `${kw.toFixed(1)} kW` : `${Math.abs(watts)} W`;
+    const txt = kw >= 1 ? `${kw.toFixed(1)} kW` : `${Math.abs(watts)} W`;
+    fl.label.textContent = txt;
     fl.label.setAttribute('class', 'flow-label active');
     fl.label.style.fill = color;
+    // Size background pill to text
+    const pw = txt.length * 7.5 + 12;
+    const ph = 20;
+    fl.bg.setAttribute('x', cx - pw / 2);
+    fl.bg.setAttribute('y', cy - 10 - ph / 2 - 2);
+    fl.bg.setAttribute('width', pw);
+    fl.bg.setAttribute('height', ph);
+    fl.bg.style.opacity = '1';
   } else {
     fl.label.textContent = '';
     fl.label.setAttribute('class', 'flow-label');
+    fl.bg.style.opacity = '0';
   }
 }
 
@@ -1240,6 +1293,9 @@ function updateDisplay(data) {
   const eddi = w(status.eddi_power_w);
   const zappi = w(status.zappi_power_w);
 
+  // Update landscape background based on weather + PV
+  updateBackground(pv);
+
   const b1Der = b1.derived || {};
   const b2Der = b2.derived || {};
   const b1Power = Math.round(w(b1Der.power_w));
@@ -1438,6 +1494,86 @@ function onResize() {
 }
 
 window.addEventListener('resize', onResize);
+
+// ===== Dynamic landscape background =====
+// Images in /bg/: sunny.jpg, cloudy.jpg, rainy.jpg, sunset.jpg, snow_sunny.jpg
+// Logic: weather API + PV power → pick the right scene
+let _weatherCache = null;
+let _weatherLastFetch = 0;
+let _currentBg = '';
+
+async function updateBackground(pvW) {
+  const now = Date.now();
+  // Fetch weather every 5 minutes
+  if (!_weatherCache || now - _weatherLastFetch > 300000) {
+    try {
+      const res = await fetch('/api/weather/current');
+      const json = await res.json();
+      if (json.success && json.data) {
+        _weatherCache = json.data;
+        _weatherLastFetch = now;
+      }
+    } catch (e) { /* use cached */ }
+  }
+
+  let scene = 'cloudy'; // default
+  const hour = new Date().getHours();
+  const pv = Math.abs(pvW || 0);
+
+  if (_weatherCache) {
+    const desc = (_weatherCache.description || '').toLowerCase();
+    const clouds = _weatherCache.clouds || 100;
+    const sunrise = _weatherCache.sunrise || '07:00';
+    const sunset = _weatherCache.sunset || '17:00';
+    const sunriseH = parseInt(sunrise.split(':')[0]);
+    const sunsetH = parseInt(sunset.split(':')[0]);
+
+    // Night: before sunrise or after sunset+1
+    if (hour < sunriseH || hour > sunsetH + 1) {
+      scene = 'night';
+    }
+    // Sunset: within 1 hour of sunset
+    else if (hour >= sunsetH && hour <= sunsetH + 1) {
+      scene = 'sunset';
+    }
+    // Rain/storm
+    else if (desc.includes('regen') || desc.includes('rain') || desc.includes('storm') || desc.includes('drizzle') || desc.includes('motregen')) {
+      scene = 'rainy';
+    }
+    // Sunny: PV > 4kW overrides weather (your panels know best!)
+    else if (pv > 4000 || (clouds < 30 && pv > 0)) {
+      scene = 'sunny';
+    }
+    // Partly sunny
+    else if (pv > 1500 && clouds < 60) {
+      scene = 'sunny';
+    }
+    // Cloudy
+    else {
+      scene = 'cloudy';
+    }
+  } else {
+    // No weather data: use PV as indicator
+    if (hour < 6 || hour > 21) scene = 'night';
+    else if (pv > 4000) scene = 'sunny';
+    else if (pv > 500) scene = 'cloudy';
+    else scene = 'night';
+  }
+
+  // Only update if scene changed
+  if (scene !== _currentBg) {
+    _currentBg = scene;
+    const el = document.getElementById('bgLandscape');
+    if (scene === 'night') {
+      el.style.backgroundImage = 'none';
+      el.classList.remove('active');
+    } else {
+      el.style.backgroundImage = `url(/bg/${scene}.jpg)`;
+      el.classList.add('active');
+    }
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   onResize();
   initFlowLines();
