@@ -113,18 +113,35 @@
       margin-top: 4px;
     }
 
-    /* Card positions - centered layout */
-    .card-solar    { top: 6%;  left: 50%; transform: translateX(-50%); }
-    .card-grid     { top: 50%; right: 4%; transform: translateY(-50%); }
-    .card-house    { top: 50%; left: 50%; transform: translate(-50%,-50%); min-width:160px; }
-    .card-eddi     { bottom: 6%; left: 22%; transform: translateX(-50%); }
-    .card-zappi    { bottom: 6%; right: 22%; transform: translateX(50%); }
-    .card-batt1    { top: 50%; left: 4%; transform: translateY(-50%); }
-    .card-batt2    { top: 50%; left: 16%; transform: translateY(-50%); }
+    /* Center self-consumption ring */
+    .center-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+      text-align: center;
+      background: var(--card);
+      border-radius: 50%;
+      border: 1px solid var(--card-border);
+    }
+    .center-ring svg { transform: rotate(-90deg); }
+    .center-ring-label {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .center-pct { font-size: 32px; font-weight: 800; color: #22c55e; }
+    .center-sub { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .center-leaf { font-size: 14px; }
 
-    /* Responsive: stack batteries vertically on left */
-    .card-batt1    { top: 35%; left: 4%; transform: translateY(-50%); }
-    .card-batt2    { top: 65%; left: 4%; transform: translateY(-50%); }
+    /* Card positions */
+    .card-solar    { top: 4%;  left: 50%; transform: translateX(-50%); }
+    .card-batt1    { top: 24%; left: 3%; transform: none; }
+    .card-batt2    { top: 54%; left: 3%; transform: none; }
+    .card-eddi     { bottom: 4%; left: 18%; transform: translateX(-50%); }
+    .card-grid     { top: 14%; right: 3%; transform: none; }
+    .card-house    { top: 44%; right: 3%; transform: none; }
+    .card-zappi    { bottom: 4%; right: 18%; transform: translateX(50%); }
 
     /* SOC bar */
     .soc-bar-wrap {
@@ -513,6 +530,21 @@
     <!-- SVG flow lines -->
     <svg class="flow-svg" id="flowSvg"></svg>
 
+    <!-- Center: Self-consumption ring -->
+    <div class="center-ring" id="cardCenter">
+      <svg viewBox="0 0 140 140" width="140" height="140">
+        <circle cx="70" cy="70" r="58" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+        <circle id="centerRing" cx="70" cy="70" r="58" fill="none" stroke="#22c55e" stroke-width="8"
+          stroke-dasharray="364.4 364.4" stroke-dashoffset="364.4" stroke-linecap="round"
+          style="transition: stroke-dashoffset 1s ease, stroke 0.5s ease;"/>
+      </svg>
+      <div class="center-ring-label">
+        <span class="center-leaf">🍃</span>
+        <span class="center-pct" id="centerPct">--%</span>
+        <span class="center-sub">Zelfverbruik</span>
+      </div>
+    </div>
+
     <!-- Solar -->
     <div class="energy-card card-solar" id="cardSolar" style="--accent-color:var(--solar);--glow-color:var(--solar-glow);">
       <span class="icon">☀️</span>
@@ -520,19 +552,19 @@
       <div class="power"><span id="pvPower">--</span><span class="unit">W</span></div>
     </div>
 
+    <!-- House -->
+    <div class="energy-card card-house" id="cardHouse" style="--accent-color:var(--house);--glow-color:var(--house-glow);">
+      <span class="icon">🏠</span>
+      <div class="label">Huis</div>
+      <div class="power"><span id="housePower">--</span><span class="unit">W</span></div>
+    </div>
+
     <!-- Grid -->
     <div class="energy-card card-grid" id="cardGrid" style="--accent-color:var(--grid-import);--glow-color:var(--grid-glow-imp);">
       <span class="icon">🔌</span>
-      <div class="label">Elektriciteitsnet</div>
+      <div class="label">Net</div>
       <div class="power"><span id="gridPower">--</span><span class="unit">W</span></div>
       <div class="sub" id="gridSub"></div>
-    </div>
-
-    <!-- House (center) -->
-    <div class="energy-card card-house" id="cardHouse" style="--accent-color:var(--house);--glow-color:var(--house-glow);">
-      <span class="icon">🏠</span>
-      <div class="label">Huisverbruik</div>
-      <div class="power"><span id="housePower">--</span><span class="unit">W</span></div>
     </div>
 
     <!-- Eddi (boiler) -->
@@ -950,6 +982,7 @@ function updateFlowLine(id, from, to, watts, color) {
 // Create flow lines
 function initFlowLines() {
   createFlowLine('solar_house', 'var(--solar)');
+  createFlowLine('center_house', 'var(--house)');
   createFlowLine('grid_house', 'var(--grid-import)');
   createFlowLine('house_grid', 'var(--grid-export)');
   createFlowLine('house_eddi', 'var(--eddi)');
@@ -1213,6 +1246,18 @@ function updateDisplay(data) {
   const b1Mode = b1Der.mode || 'Offline';
   const b2Mode = b2Der.mode || 'Offline';
 
+  // Update center ring (self-consumption %)
+  if (energy && energy.self_consumption_pct != null) {
+    const selfPct = energy.self_consumption_pct;
+    const circ = 2 * Math.PI * 58; // 364.4
+    const offset = circ - (selfPct / 100) * circ;
+    const ring = document.getElementById('centerRing');
+    ring.setAttribute('stroke-dashoffset', offset);
+    ring.setAttribute('stroke', selfPct > 60 ? '#22c55e' : selfPct > 30 ? '#f59e0b' : '#ef4444');
+    document.getElementById('centerPct').textContent = `${selfPct}%`;
+    document.getElementById('centerPct').style.color = selfPct > 60 ? '#22c55e' : selfPct > 30 ? '#f59e0b' : '#ef4444';
+  }
+
   // Update cards
   document.getElementById('pvPower').textContent = fmtW(pv);
   document.querySelector('#cardSolar .unit').textContent = fmtUnit(pv);
@@ -1274,22 +1319,23 @@ function updateDisplay(data) {
   }
   setCardActive('cardBatt2', Math.abs(b2Power) > THRESH || (b2Soc != null));
 
-  // Flow lines
-  // Solar -> Huis (altijd richting huis)
-  updateFlowLine('solar_house', 'cardSolar', 'cardHouse', pv, 'var(--solar)');
-  // grid_w > 0 = EXPORT (huis -> grid), grid_w < 0 = IMPORT (grid -> huis)
-  updateFlowLine('grid_house', 'cardGrid', 'cardHouse', grid < -THRESH ? -grid : 0, 'var(--grid-import)');
-  updateFlowLine('house_grid', 'cardHouse', 'cardGrid', grid > THRESH ? grid : 0, 'var(--grid-export)');
-  // Loads
-  updateFlowLine('house_eddi', 'cardHouse', 'cardEddi', eddi, 'var(--eddi)');
-  updateFlowLine('house_zappi', 'cardHouse', 'cardZappi', zappi, 'var(--zappi)');
+  // Flow lines - all radiate from/to center ring
+  // Solar -> Center
+  updateFlowLine('solar_house', 'cardSolar', 'cardCenter', pv, 'var(--solar)');
+  // Center -> House
+  updateFlowLine('center_house', 'cardCenter', 'cardHouse', house, 'var(--house)');
+  // grid_w > 0 = EXPORT (center -> grid), grid_w < 0 = IMPORT (grid -> center)
+  updateFlowLine('grid_house', 'cardGrid', 'cardCenter', grid < -THRESH ? -grid : 0, 'var(--grid-import)');
+  updateFlowLine('house_grid', 'cardCenter', 'cardGrid', grid > THRESH ? grid : 0, 'var(--grid-export)');
+  // Loads from center
+  updateFlowLine('house_eddi', 'cardCenter', 'cardEddi', eddi, 'var(--eddi)');
+  updateFlowLine('house_zappi', 'cardCenter', 'cardZappi', zappi, 'var(--zappi)');
 
-  // Battery flows: positive = charging (house->batt), negative = discharging (batt->house)
-  // Use higher threshold (300W) to avoid showing tiny idle flows
-  updateFlowLine('house_batt1', 'cardHouse', 'cardBatt1', b1Power > BATT_THRESH ? b1Power : 0, 'var(--batt)');
-  updateFlowLine('batt1_house', 'cardBatt1', 'cardHouse', b1Power < -BATT_THRESH ? -b1Power : 0, 'var(--batt)');
-  updateFlowLine('house_batt2', 'cardHouse', 'cardBatt2', b2Power > BATT_THRESH ? b2Power : 0, 'var(--batt)');
-  updateFlowLine('batt2_house', 'cardBatt2', 'cardHouse', b2Power < -BATT_THRESH ? -b2Power : 0, 'var(--batt)');
+  // Battery flows: positive = charging (center->batt), negative = discharging (batt->center)
+  updateFlowLine('house_batt1', 'cardCenter', 'cardBatt1', b1Power > BATT_THRESH ? b1Power : 0, 'var(--batt)');
+  updateFlowLine('batt1_house', 'cardBatt1', 'cardCenter', b1Power < -BATT_THRESH ? -b1Power : 0, 'var(--batt)');
+  updateFlowLine('house_batt2', 'cardCenter', 'cardBatt2', b2Power > BATT_THRESH ? b2Power : 0, 'var(--batt)');
+  updateFlowLine('batt2_house', 'cardBatt2', 'cardCenter', b2Power < -BATT_THRESH ? -b2Power : 0, 'var(--batt)');
 
   // ===== Appliance hint: show washer/dishwasher when exporting >2kW for >5 min =====
   // grid_w > 0 = export
