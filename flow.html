@@ -305,7 +305,7 @@
     .energy-panel {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      max-height: 85vh;
+      max-height: 95vh;
       background: var(--card);
       border-top: 1px solid var(--card-border);
       border-radius: 20px 20px 0 0;
@@ -575,6 +575,7 @@
         <span class="center-leaf">🍃</span>
         <span class="center-pct" id="centerPct">--%</span>
         <span class="center-sub">Zelfverbruik</span>
+        <span class="center-sub" style="opacity:0.6;font-size:8px;">vandaag</span>
       </div>
     </div>
 
@@ -715,12 +716,24 @@
     </div>
     <div class="stat-sep"></div>
     <div class="stat-item">
-      <div class="stat-label">☀️ PV vandaag</div>
+      <div class="stat-label">☀️ Opgewekt</div>
       <div class="stat-value stat-neutral" id="statDayPv">--</div>
     </div>
     <div class="stat-item">
-      <div class="stat-label">🏠 Verbruik</div>
+      <div class="stat-label">⚡ Totaal</div>
+      <div class="stat-value stat-neutral" id="statDayTotal">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">🏠 Huis</div>
       <div class="stat-value stat-neutral" id="statDayHouse">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">🔥 Eddi</div>
+      <div class="stat-value stat-neutral" id="statDayEddi">--</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">🚗 Zappi</div>
+      <div class="stat-value stat-neutral" id="statDayZappi">--</div>
     </div>
     <div class="stat-item">
       <div class="stat-label">⬆ Export</div>
@@ -742,7 +755,7 @@
       <button class="panel-close" onclick="closePanel()">✕</button>
     </div>
 
-    <!-- Self-consumption donut -->
+    <!-- Self-consumption donut + production -->
     <div class="self-consumption-ring">
       <div class="donut-wrap">
         <svg viewBox="0 0 120 120" width="120" height="120">
@@ -759,62 +772,60 @@
       <div class="self-stats">
         <div class="self-stat">
           <div class="self-dot" style="background:var(--solar)"></div>
-          <span class="self-stat-label">Opgewekt</span>
+          <span class="self-stat-label">☀️ Opgewekt</span>
           <span class="self-stat-value" id="panelPv">-- kWh</span>
         </div>
         <div class="self-stat">
-          <div class="self-dot" style="background:var(--house)"></div>
-          <span class="self-stat-label">Verbruikt</span>
-          <span class="self-stat-value" id="panelHouse">-- kWh</span>
-        </div>
-        <div class="self-stat">
           <div class="self-dot" style="background:#22c55e"></div>
-          <span class="self-stat-label">Export</span>
+          <span class="self-stat-label">⬆ Export</span>
           <span class="self-stat-value" id="panelExport">-- kWh</span>
         </div>
         <div class="self-stat">
           <div class="self-dot" style="background:#ef4444"></div>
-          <span class="self-stat-label">Import</span>
+          <span class="self-stat-label">⬇ Import</span>
           <span class="self-stat-value" id="panelImport">-- kWh</span>
-        </div>
-        <div class="self-stat">
-          <div class="self-dot" style="background:var(--eddi)"></div>
-          <span class="self-stat-label">Boiler</span>
-          <span class="self-stat-value" id="panelEddi">-- kWh</span>
-        </div>
-        <div class="self-stat">
-          <div class="self-dot" style="background:var(--batt)"></div>
-          <span class="self-stat-label">Batterij ↑</span>
-          <span class="self-stat-value" id="panelBattC">-- kWh</span>
         </div>
       </div>
     </div>
 
-    <!-- Energy summary cards -->
+    <!-- Verbruik breakdown cards -->
+    <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Verbruik vandaag</div>
     <div class="energy-cards">
       <div class="e-card">
-        <div class="e-card-icon">☀️</div>
-        <div class="e-card-value" id="ecPv">--</div>
+        <div class="e-card-icon">⚡</div>
+        <div class="e-card-value" id="ecTotal">--</div>
         <div class="e-card-unit">kWh</div>
-        <div class="e-card-label">Opgewekt</div>
+        <div class="e-card-label">Totaal</div>
       </div>
       <div class="e-card">
         <div class="e-card-icon">🏠</div>
         <div class="e-card-value" id="ecHouse">--</div>
         <div class="e-card-unit">kWh</div>
-        <div class="e-card-label">Verbruikt</div>
+        <div class="e-card-label">Huis</div>
       </div>
       <div class="e-card">
-        <div class="e-card-icon">⬆️</div>
-        <div class="e-card-value" id="ecExport" style="color:#22c55e">--</div>
+        <div class="e-card-icon">🔥</div>
+        <div class="e-card-value" id="ecEddi" style="color:var(--eddi)">--</div>
         <div class="e-card-unit">kWh</div>
-        <div class="e-card-label">Export</div>
+        <div class="e-card-label">Eddi</div>
       </div>
       <div class="e-card">
-        <div class="e-card-icon">⬇️</div>
-        <div class="e-card-value" id="ecImport" style="color:#ef4444">--</div>
+        <div class="e-card-icon">🚗</div>
+        <div class="e-card-value" id="ecZappi" style="color:var(--zappi)">--</div>
         <div class="e-card-unit">kWh</div>
-        <div class="e-card-label">Import</div>
+        <div class="e-card-label">Zappi</div>
+      </div>
+      <div class="e-card">
+        <div class="e-card-icon">🔋</div>
+        <div class="e-card-value" id="ecBattC" style="color:var(--batt)">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Batterij ↑</div>
+      </div>
+      <div class="e-card">
+        <div class="e-card-icon">🔋</div>
+        <div class="e-card-value" id="ecBattD" style="color:var(--batt)">--</div>
+        <div class="e-card-unit">kWh</div>
+        <div class="e-card-label">Batterij ↓</div>
       </div>
     </div>
 
@@ -864,56 +875,56 @@ async function loadPanelData() {
     ring.setAttribute('stroke', selfPct > 60 ? '#22c55e' : selfPct > 30 ? '#f59e0b' : '#ef4444');
     document.getElementById('donutPct').textContent = `${selfPct}%`;
 
-    // Panel stats
+    // Panel stats (donut side)
     document.getElementById('panelPv').textContent = `${todayRes.pv_kwh} kWh`;
-    document.getElementById('panelHouse').textContent = `${todayRes.house_kwh} kWh`;
     document.getElementById('panelExport').textContent = `${todayRes.export_kwh} kWh`;
     document.getElementById('panelImport').textContent = `${todayRes.import_kwh} kWh`;
-    document.getElementById('panelEddi').textContent = `${todayRes.eddi_kwh} kWh`;
-    document.getElementById('panelBattC').textContent = `${todayRes.batt_charge_kwh} kWh`;
 
-    // Summary cards
-    document.getElementById('ecPv').textContent = todayRes.pv_kwh;
-    document.getElementById('ecHouse').textContent = todayRes.house_kwh;
-    document.getElementById('ecExport').textContent = todayRes.export_kwh;
-    document.getElementById('ecImport').textContent = todayRes.import_kwh;
+    // Verbruik breakdown cards
+    const tHouse = todayRes.house_kwh || 0;
+    const tEddi = todayRes.eddi_kwh || 0;
+    const tZappi = todayRes.zappi_kwh || 0;
+    const tTotal = (tHouse + tEddi + tZappi).toFixed(1);
+    document.getElementById('ecTotal').textContent = tTotal;
+    document.getElementById('ecHouse').textContent = tHouse;
+    document.getElementById('ecEddi').textContent = tEddi;
+    document.getElementById('ecZappi').textContent = tZappi;
+    document.getElementById('ecBattC').textContent = todayRes.batt_charge_kwh || 0;
+    document.getElementById('ecBattD').textContent = todayRes.batt_discharge_kwh || 0;
 
-    // History bars
+    // History rows - clear table with all values
     const container = document.getElementById('historyRows');
     if (!histRes || !histRes.length) {
       container.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">Nog geen historische data beschikbaar</div>';
       return;
     }
-    const maxPv = Math.max(...histRes.map(d => d.pv_kwh), 1);
     const days = ['zo','ma','di','wo','do','vr','za'];
-    let html = '';
+    let html = `<div style="display:grid;grid-template-columns:36px 1fr 1fr 1fr 1fr 1fr 1fr 44px;gap:4px 8px;font-size:11px;margin-top:8px;">
+      <span style="color:var(--text-dim)"></span>
+      <span style="color:var(--solar);font-weight:600;">☀️ PV</span>
+      <span style="color:var(--house);font-weight:600;">🏠 Huis</span>
+      <span style="color:var(--eddi);font-weight:600;">🔥 Eddi</span>
+      <span style="color:var(--zappi);font-weight:600;">🚗 Zappi</span>
+      <span style="color:#22c55e;font-weight:600;">⬆ Exp</span>
+      <span style="color:#ef4444;font-weight:600;">⬇ Imp</span>
+      <span style="color:var(--text-dim);font-weight:600;">🍃</span>`;
     for (const day of histRes) {
       const dt = new Date(day.date + 'T12:00:00');
       const dayName = days[dt.getDay()];
-      const pvW = Math.round((day.pv_kwh / maxPv) * 100);
-      const expW = Math.round((day.export_kwh / maxPv) * 100);
-      const impW = Math.max(2, Math.round((day.import_kwh / maxPv) * 100));
       const isToday = day.date === todayRes.date;
+      const op = isToday ? '1' : '0.7';
+      const bold = isToday ? 'font-weight:700;' : '';
       html += `
-        <div class="history-row" style="${isToday ? 'opacity:1' : 'opacity:0.7'}">
-          <span class="history-date">${isToday ? 'Nu' : dayName}</span>
-          <div class="history-bars">
-            <div class="history-bar-row">
-              <div class="history-bar" style="width:${pvW}%;background:var(--solar);"></div>
-              <div class="history-bar" style="width:${expW}%;background:#22c55e;"></div>
-            </div>
-            <div class="history-bar-row">
-              <div class="history-bar" style="width:${impW}%;background:#ef4444;opacity:0.7;"></div>
-            </div>
-          </div>
-          <div class="history-vals">
-            <span class="history-val hv-pv">${day.pv_kwh}</span>
-            <span class="history-val hv-exp">↑${day.export_kwh}</span>
-            <span class="history-val hv-imp">↓${day.import_kwh}</span>
-            <span class="history-val hv-self">${day.self_consumption_pct}%</span>
-          </div>
-        </div>`;
+      <span style="color:var(--text-dim);${bold}opacity:${op}">${isToday ? 'Nu' : dayName}</span>
+      <span style="color:var(--solar);${bold}opacity:${op}">${day.pv_kwh}</span>
+      <span style="color:var(--text);${bold}opacity:${op}">${day.house_kwh || 0}</span>
+      <span style="color:var(--eddi);${bold}opacity:${op}">${day.eddi_kwh || 0}</span>
+      <span style="color:var(--zappi);${bold}opacity:${op}">${day.zappi_kwh || 0}</span>
+      <span style="color:#22c55e;${bold}opacity:${op}">${day.export_kwh}</span>
+      <span style="color:#ef4444;${bold}opacity:${op}">${day.import_kwh}</span>
+      <span style="color:var(--text);${bold}opacity:${op}">${day.self_consumption_pct}%</span>`;
     }
+    html += '</div>';
     container.innerHTML = html;
   } catch (e) {
     console.warn('Panel data error:', e);
@@ -929,10 +940,13 @@ updateClock();
 
 // ===== Fullscreen =====
 function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
+  // If inside iframe (wrapper), request fullscreen on parent
+  const doc = window.parent !== window ? window.parent.document : document;
+  const el = window.parent !== window ? window.parent.document.documentElement : document.documentElement;
+  if (!doc.fullscreenElement) {
+    el.requestFullscreen();
   } else {
-    document.exitFullscreen();
+    doc.exitFullscreen();
   }
 }
 
@@ -1258,15 +1272,38 @@ async function safeFetch(url) {
   return res.json();
 }
 
+// Merge new data into old: keep old value if new is null/undefined
+function mergeData(old, fresh) {
+  if (!old || typeof old !== 'object') return fresh;
+  if (!fresh || typeof fresh !== 'object') return old;
+  const merged = { ...old };
+  for (const key of Object.keys(fresh)) {
+    if (fresh[key] != null) {
+      if (typeof fresh[key] === 'object' && !Array.isArray(fresh[key])) {
+        merged[key] = mergeData(old[key], fresh[key]);
+      } else {
+        merged[key] = fresh[key];
+      }
+    }
+  }
+  return merged;
+}
+
 async function fetchData() {
   const ts = Date.now();
   const [status, b1, b2, energy] = await Promise.all([
-    safeFetch(`/api/status?ts=${ts}`).catch(() => _lastData.status),
-    safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => _lastData.b1),
-    safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => _lastData.b2),
-    safeFetch(`/api/energy/today?ts=${ts}`).catch(() => _lastData.energy)
+    safeFetch(`/api/status?ts=${ts}`).catch(() => null),
+    safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => null),
+    safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => null),
+    safeFetch(`/api/energy/today?ts=${ts}`).catch(() => null)
   ]);
-  _lastData = { status, b1, b2, energy };
+  // Merge: keep previous good values when new ones are null
+  _lastData = {
+    status: mergeData(_lastData.status, status),
+    b1: mergeData(_lastData.b1, b1),
+    b2: mergeData(_lastData.b2, b2),
+    energy: mergeData(_lastData.energy, energy)
+  };
   return _lastData;
 }
 
@@ -1289,7 +1326,7 @@ function updateDisplay(data) {
   // Extract values
   const pv = w(status.pv_generation_w);
   const grid = w(status.grid_w);
-  const house = w(status.house_consumption_w);
+  const rawHouse = w(status.house_consumption_w);
   const eddi = w(status.eddi_power_w);
   const zappi = w(status.zappi_power_w);
 
@@ -1300,6 +1337,11 @@ function updateDisplay(data) {
   const b2Der = b2.derived || {};
   const b1Power = Math.round(w(b1Der.power_w));
   const b2Power = Math.round(w(b2Der.power_w));
+
+  // Backend fallback already subtracts eddi & zappi, but NOT battery (marstek timeout).
+  // Only subtract battery charging power to avoid double counting.
+  const battCharging = Math.max(0, b1Power) + Math.max(0, b2Power); // only charging (positive)
+  const house = Math.max(0, rawHouse - battCharging);
   const b1Soc = b1Der.soc_percent != null ? b1Der.soc_percent : null;
   const b2Soc = b2Der.soc_percent != null ? b2Der.soc_percent : null;
   const b1Mode = b1Der.mode || 'Offline';
@@ -1452,8 +1494,15 @@ function updateDisplay(data) {
 
   // Daily energy stats
   if (energy) {
+    const houseKwh = energy.house_kwh || 0;
+    const eddiKwh = energy.eddi_kwh || 0;
+    const zappiKwh = energy.zappi_kwh || 0;
+    const totalKwh = (houseKwh + eddiKwh + zappiKwh).toFixed(1);
     document.getElementById('statDayPv').textContent = `${energy.pv_kwh || 0} kWh`;
-    document.getElementById('statDayHouse').textContent = `${energy.house_kwh || 0} kWh`;
+    document.getElementById('statDayTotal').textContent = `${totalKwh} kWh`;
+    document.getElementById('statDayHouse').textContent = `${houseKwh} kWh`;
+    document.getElementById('statDayEddi').textContent = `${eddiKwh} kWh`;
+    document.getElementById('statDayZappi').textContent = `${zappiKwh} kWh`;
     document.getElementById('statDayExport').textContent = `${energy.export_kwh || 0} kWh`;
     document.getElementById('statDayImport').textContent = `${energy.import_kwh || 0} kWh`;
   }
@@ -1467,21 +1516,23 @@ function updateDisplay(data) {
 async function tick() {
   try {
     const data = await fetchData();
-    updateDisplay(data);
+    try {
+      updateDisplay(data);
+    } catch (ue) {
+      console.warn('updateDisplay error:', ue);
+    }
     failureCount = 0;
-    pollInterval = 2000;
     document.getElementById('statusDot').className = 'status-dot';
     document.getElementById('statusText').textContent = 'Live';
     document.title = 'Energie Flow';
   } catch (e) {
     failureCount++;
-    pollInterval = Math.min(pollInterval * 1.5, 15000);
     console.warn(`Fetch failed (${failureCount}x):`, e);
     document.getElementById('statusDot').className = 'status-dot offline';
     document.getElementById('statusText').textContent = `Verbinden... (${failureCount})`;
     document.title = '⚠️ Verbinden...';
   }
-  setTimeout(tick, pollInterval);
+  setTimeout(tick, 2000);
 }
 
 // ===== Resize handler =====

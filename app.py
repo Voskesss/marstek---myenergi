@@ -1122,7 +1122,7 @@ def extract_pv_generation_w(myenergi_status: Dict[str, Any]) -> Optional[int]:
                                 if harvi[ct_type_key] == "Generation":
                                     total_generation += int(harvi[ct_power_key])
             
-            return total_generation if total_generation > 0 else None
+            return max(0, total_generation)
                 
     except Exception:
         pass
@@ -1564,8 +1564,9 @@ async def dashboard():
     </head>
     <body>
       <h1>myenergi ↔ marstek</h1>
-      <div style=\"margin:8px 0\">
-        <a href=\"/setup\" style=\"color:#93c5fd\">⚙️ Setup</a>
+      <div style=\"margin:8px 0;display:flex;gap:12px;\">
+        <a href=\"/flow.html\" style=\"background:#2563eb;color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:600;\">⚡ Energie Flow</a>
+        <a href=\"/setup\" style=\"color:#93c5fd;padding:8px 0;\">⚙️ Setup</a>
       </div>
       <div id=\"msg\"></div>
       <div class=\"row\">
@@ -2162,6 +2163,9 @@ class EnergyTracker:
                 "import_kwh": round(d.get("import_wh", 0) / 1000, 2),
                 "house_kwh": round(d.get("house_wh", 0) / 1000, 2),
                 "eddi_kwh": round(d.get("eddi_wh", 0) / 1000, 2),
+                "zappi_kwh": round(d.get("zappi_wh", 0) / 1000, 2),
+                "batt_charge_kwh": round(d.get("batt_charge_wh", 0) / 1000, 2),
+                "batt_discharge_kwh": round(d.get("batt_discharge_wh", 0) / 1000, 2),
                 "self_consumption_pct": round(((pv - exp) / pv * 100) if pv > 100 else 0, 1),
             })
         return result
@@ -3177,6 +3181,16 @@ async def energy_today():
 async def energy_history(days: int = 7):
     """Get energy history for last N days."""
     return energy_tracker.get_history(min(days, 90))
+
+@app.get("/app")
+async def app_wrapper_page():
+    """Serve the wrapper page with both Flow and Dashboard in iframes."""
+    try:
+        with open("app.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error: {e}</h1>", status_code=500)
 
 @app.get("/flow.html")
 async def flow_visualization_page():
