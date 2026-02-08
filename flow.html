@@ -1196,22 +1196,25 @@ function updateMobile(pv, grid, house, eddi, zappi, bp1, bp2, b1Soc, b2Soc, b1Mo
   }
 }
 
-// ===== Data fetching =====
+// ===== Data fetching with fallback cache =====
+let _lastData = { status: {}, b1: {}, b2: {}, energy: {} };
+
+async function safeFetch(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
 async function fetchData() {
   const ts = Date.now();
-  const [statusRes, b1Res, b2Res, energyRes] = await Promise.all([
-    fetch(`/api/status?ts=${ts}`, { cache: 'no-store' }),
-    fetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`, { cache: 'no-store' }),
-    fetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`, { cache: 'no-store' }),
-    fetch(`/api/energy/today?ts=${ts}`, { cache: 'no-store' })
+  const [status, b1, b2, energy] = await Promise.all([
+    safeFetch(`/api/status?ts=${ts}`).catch(() => _lastData.status),
+    safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => _lastData.b1),
+    safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => _lastData.b2),
+    safeFetch(`/api/energy/today?ts=${ts}`).catch(() => _lastData.energy)
   ]);
-
-  const status = await statusRes.json();
-  const b1 = await b1Res.json();
-  const b2 = await b2Res.json();
-  const energy = await energyRes.json();
-
-  return { status, b1, b2, energy };
+  _lastData = { status, b1, b2, energy };
+  return _lastData;
 }
 
 // ===== Update display =====

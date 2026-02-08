@@ -1,450 +1,5 @@
 [
   {
-    "timestamp": "2026-01-25T20:56:45.827321",
-    "l1_w": 4077,
-    "l2_w": 4023,
-    "l3_w": 6478,
-    "zappi_w": 3511,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6478W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:56:52.077273",
-    "l1_w": 4079,
-    "l2_w": 4053,
-    "l3_w": 6470,
-    "zappi_w": 3512,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6470W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:56:58.367061",
-    "l1_w": 4079,
-    "l2_w": 4053,
-    "l3_w": 6470,
-    "zappi_w": 3512,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6470W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:05.366209",
-    "l1_w": 4076,
-    "l2_w": 4060,
-    "l3_w": 6480,
-    "zappi_w": 3511,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6480W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:11.392524",
-    "l1_w": 4074,
-    "l2_w": 4027,
-    "l3_w": 6491,
-    "zappi_w": 3511,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6491W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:17.382191",
-    "l1_w": 4074,
-    "l2_w": 4027,
-    "l3_w": 6491,
-    "zappi_w": 3511,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6491W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:23.417741",
-    "l1_w": 4105,
-    "l2_w": 4027,
-    "l3_w": 6473,
-    "zappi_w": 3543,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6473W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:29.450602",
-    "l1_w": 4103,
-    "l2_w": 4029,
-    "l3_w": 6457,
-    "zappi_w": 3540,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6457W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:35.456720",
-    "l1_w": 4103,
-    "l2_w": 4029,
-    "l3_w": 6457,
-    "zappi_w": 3540,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6457W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:41.479873",
-    "l1_w": 4109,
-    "l2_w": 4044,
-    "l3_w": 6508,
-    "zappi_w": 3542,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6508W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:48.502351",
-    "l1_w": 4109,
-    "l2_w": 4044,
-    "l3_w": 6508,
-    "zappi_w": 3530,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6508W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:57:54.691461",
-    "l1_w": 4093,
-    "l2_w": 4050,
-    "l3_w": 6506,
-    "zappi_w": 3530,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6506W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:58:00.893015",
-    "l1_w": 4079,
-    "l2_w": 4053,
-    "l3_w": 6513,
-    "zappi_w": 3514,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6513W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:58:07.315260",
-    "l1_w": 4079,
-    "l2_w": 4053,
-    "l3_w": 6513,
-    "zappi_w": 3514,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6513W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:58:13.390671",
-    "l1_w": 4070,
-    "l2_w": 4058,
-    "l3_w": 6527,
-    "zappi_w": 3508,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6527W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:58:19.610943",
-    "l1_w": 4062,
-    "l2_w": 4056,
-    "l3_w": 6522,
-    "zappi_w": 3493,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6522W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T20:58:25.673849",
-    "l1_w": 4056,
-    "l2_w": 4065,
-    "l3_w": 6525,
-    "zappi_w": 3493,
-    "zappi_charging": true,
-    "violations": [
-      "L3: 6525W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:03:30.716849",
-    "l1_w": 4046,
-    "l2_w": 4036,
-    "l3_w": 4519,
-    "zappi_w": 3487,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:08:33.206163",
-    "l1_w": 4070,
-    "l2_w": 3939,
-    "l3_w": 4487,
-    "zappi_w": 3495,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:13:35.319280",
-    "l1_w": 4093,
-    "l2_w": 3957,
-    "l3_w": 4405,
-    "zappi_w": 3467,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:18:36.243103",
-    "l1_w": 4100,
-    "l2_w": 3957,
-    "l3_w": 4466,
-    "zappi_w": 3474,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:23:36.838622",
-    "l1_w": 3959,
-    "l2_w": 3982,
-    "l3_w": 4390,
-    "zappi_w": 3482,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:28:38.137879",
-    "l1_w": 3948,
-    "l2_w": 4043,
-    "l3_w": 4317,
-    "zappi_w": 3489,
-    "zappi_charging": true,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:31:01.301813",
-    "l1_w": 3954,
-    "l2_w": 6265,
-    "l3_w": 4325,
-    "zappi_w": 3516,
-    "zappi_charging": true,
-    "violations": [
-      "L2: 6265W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:31:07.328815",
-    "l1_w": 3954,
-    "l2_w": 6265,
-    "l3_w": 4325,
-    "zappi_w": 3516,
-    "zappi_charging": true,
-    "violations": [
-      "L2: 6265W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:31:13.428694",
-    "l1_w": 3988,
-    "l2_w": 6236,
-    "l3_w": 4329,
-    "zappi_w": 3529,
-    "zappi_charging": true,
-    "violations": [
-      "L2: 6236W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:31:54.856017",
-    "l1_w": 5573,
-    "l2_w": 4053,
-    "l3_w": 4297,
-    "zappi_w": 3478,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5573W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:00.918830",
-    "l1_w": 5803,
-    "l2_w": 6304,
-    "l3_w": 4328,
-    "zappi_w": 3492,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5803W (>5100W)",
-      "L2: 6304W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:06.921571",
-    "l1_w": 5803,
-    "l2_w": 6304,
-    "l3_w": 4328,
-    "zappi_w": 3492,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5803W (>5100W)",
-      "L2: 6304W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:13.028316",
-    "l1_w": 5802,
-    "l2_w": 4021,
-    "l3_w": 4297,
-    "zappi_w": 3494,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5802W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:19.138918",
-    "l1_w": 5802,
-    "l2_w": 4021,
-    "l3_w": 4297,
-    "zappi_w": 3494,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5802W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:25.200144",
-    "l1_w": 5799,
-    "l2_w": 4020,
-    "l3_w": 4336,
-    "zappi_w": 3467,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5799W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:31.301423",
-    "l1_w": 5801,
-    "l2_w": 4058,
-    "l3_w": 4307,
-    "zappi_w": 3491,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5801W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:37.320356",
-    "l1_w": 5801,
-    "l2_w": 4058,
-    "l3_w": 4307,
-    "zappi_w": 3491,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5801W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
-    "timestamp": "2026-01-25T21:32:43.376618",
-    "l1_w": 5807,
-    "l2_w": 4013,
-    "l3_w": 4313,
-    "zappi_w": 3495,
-    "zappi_charging": true,
-    "violations": [
-      "L1: 5807W (>5100W)"
-    ],
-    "is_violation": true,
-    "is_real_violation": false
-  },
-  {
     "timestamp": "2026-01-25T21:32:49.540888",
     "l1_w": 5807,
     "l2_w": 4013,
@@ -123800,6 +123355,391 @@
     "l1_w": -436,
     "l2_w": 594,
     "l3_w": 2196,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T12:43:22.164756",
+    "l1_w": -264,
+    "l2_w": 899,
+    "l3_w": 41,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T12:48:27.813706",
+    "l1_w": -302,
+    "l2_w": 890,
+    "l3_w": 46,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T12:53:28.703681",
+    "l1_w": -191,
+    "l2_w": 932,
+    "l3_w": 25,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T12:58:30.523088",
+    "l1_w": -211,
+    "l2_w": 991,
+    "l3_w": 61,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:03:34.782824",
+    "l1_w": -434,
+    "l2_w": 927,
+    "l3_w": 100,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:08:40.507540",
+    "l1_w": -440,
+    "l2_w": 373,
+    "l3_w": 37,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:13:47.410720",
+    "l1_w": -329,
+    "l2_w": 363,
+    "l3_w": -31,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:19:01.468223",
+    "l1_w": -270,
+    "l2_w": 685,
+    "l3_w": -16,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:24:03.873627",
+    "l1_w": -138,
+    "l2_w": 228,
+    "l3_w": 94,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:29:05.663629",
+    "l1_w": -131,
+    "l2_w": 280,
+    "l3_w": 191,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:34:09.903845",
+    "l1_w": -103,
+    "l2_w": 510,
+    "l3_w": 206,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:39:10.500967",
+    "l1_w": -219,
+    "l2_w": 3175,
+    "l3_w": 2076,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:44:12.535865",
+    "l1_w": 1308,
+    "l2_w": 1843,
+    "l3_w": 225,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:49:13.072535",
+    "l1_w": 1291,
+    "l2_w": 656,
+    "l3_w": 261,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:54:21.770979",
+    "l1_w": -149,
+    "l2_w": 2883,
+    "l3_w": 239,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T13:59:22.494315",
+    "l1_w": 1926,
+    "l2_w": 417,
+    "l3_w": 267,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:04:26.059810",
+    "l1_w": 1683,
+    "l2_w": -189,
+    "l3_w": 281,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:09:31.673761",
+    "l1_w": 160,
+    "l2_w": -288,
+    "l3_w": 249,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:14:33.736975",
+    "l1_w": 169,
+    "l2_w": -269,
+    "l3_w": 269,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:19:39.562161",
+    "l1_w": -6,
+    "l2_w": -405,
+    "l3_w": 399,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:24:44.305234",
+    "l1_w": -33,
+    "l2_w": -330,
+    "l3_w": 2428,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:29:50.237265",
+    "l1_w": 92,
+    "l2_w": -276,
+    "l3_w": 272,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:34:55.131673",
+    "l1_w": 6,
+    "l2_w": -365,
+    "l3_w": 365,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:40:01.513582",
+    "l1_w": 86,
+    "l2_w": -328,
+    "l3_w": 220,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:45:06.938792",
+    "l1_w": 85,
+    "l2_w": -302,
+    "l3_w": 250,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:50:11.446735",
+    "l1_w": 39,
+    "l2_w": -362,
+    "l3_w": 245,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T14:55:14.606587",
+    "l1_w": -45,
+    "l2_w": -290,
+    "l3_w": 318,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:00:23.409276",
+    "l1_w": -24,
+    "l2_w": -266,
+    "l3_w": 336,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:05:24.363898",
+    "l1_w": 104,
+    "l2_w": -188,
+    "l3_w": 2538,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:10:31.590921",
+    "l1_w": 126,
+    "l2_w": -162,
+    "l3_w": 366,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:15:40.189047",
+    "l1_w": -68,
+    "l2_w": -148,
+    "l3_w": 357,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:20:45.804062",
+    "l1_w": -246,
+    "l2_w": -106,
+    "l3_w": 418,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:25:53.469602",
+    "l1_w": 923,
+    "l2_w": -97,
+    "l3_w": 280,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:30:55.322926",
+    "l1_w": 1005,
+    "l2_w": 124,
+    "l3_w": 2553,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-02-08T15:35:55.829459",
+    "l1_w": 998,
+    "l2_w": 135,
+    "l3_w": 2561,
     "zappi_w": 0,
     "zappi_charging": false,
     "violations": [],
