@@ -10,13 +10,603 @@
     "zappi_wh": 28715.5
   },
   "2026-02-08": {
-    "pv_wh": 11513.9,
-    "export_wh": 69.1,
-    "import_wh": 71889.6,
-    "house_wh": 30004.1,
+    "pv_wh": 11528.9,
+    "export_wh": 70.4,
+    "import_wh": 79552.7,
+    "house_wh": 37653.6,
     "batt_charge_wh": 0.0,
     "batt_discharge_wh": 0.0,
-    "eddi_wh": 1911.0,
+    "eddi_wh": 1935.3,
     "zappi_wh": 51458.8
+  },
+  "2026-02-09": {
+    "pv_wh": 19026.5,
+    "export_wh": 2436.1,
+    "import_wh": 50527.9,
+    "house_wh": 65210.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 113.0,
+    "zappi_wh": 1813.8
+  },
+  "2026-02-10": {
+    "pv_wh": 6753.2,
+    "export_wh": 60.2,
+    "import_wh": 58818.8,
+    "house_wh": 44105.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.2,
+    "zappi_wh": 21351.6
+  },
+  "2026-02-11": {
+    "pv_wh": 6002.8,
+    "export_wh": 361.9,
+    "import_wh": 48151.6,
+    "house_wh": 33542.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.5,
+    "zappi_wh": 20100.5
+  },
+  "2026-02-12": {
+    "pv_wh": 12025.6,
+    "export_wh": 884.3,
+    "import_wh": 58440.5,
+    "house_wh": 45899.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.3,
+    "zappi_wh": 23606.8
+  },
+  "2026-02-13": {
+    "pv_wh": 11545.9,
+    "export_wh": 1025.4,
+    "import_wh": 29736.7,
+    "house_wh": 40180.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.9,
+    "zappi_wh": 0.0
+  },
+  "2026-02-14": {
+    "pv_wh": 43171.2,
+    "export_wh": 13805.4,
+    "import_wh": 74340.4,
+    "house_wh": 30618.4,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 93.7,
+    "zappi_wh": 73219.2
+  },
+  "2026-02-15": {
+    "pv_wh": 34619.9,
+    "export_wh": 3833.6,
+    "import_wh": 60223.1,
+    "house_wh": 37772.0,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.7,
+    "zappi_wh": 53290.0
+  },
+  "2026-02-16": {
+    "pv_wh": 13165.6,
+    "export_wh": 1785.0,
+    "import_wh": 30510.3,
+    "house_wh": 38952.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 92.9,
+    "zappi_wh": 2890.7
+  },
+  "2026-02-17": {
+    "pv_wh": 27814.4,
+    "export_wh": 3662.4,
+    "import_wh": 51407.7,
+    "house_wh": 53338.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 1021.2,
+    "zappi_wh": 21067.4
+  },
+  "2026-02-18": {
+    "pv_wh": 34482.2,
+    "export_wh": 3904.0,
+    "import_wh": 76304.2,
+    "house_wh": 37680.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 10306.8,
+    "zappi_wh": 58999.9
+  },
+  "2026-02-19": {
+    "pv_wh": 8028.4,
+    "export_wh": 21.6,
+    "import_wh": 26742.5,
+    "house_wh": 33095.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 1046.2,
+    "zappi_wh": 524.6
+  },
+  "2026-02-20": {
+    "pv_wh": 7295.2,
+    "export_wh": 71.0,
+    "import_wh": 33151.2,
+    "house_wh": 39883.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 449.6,
+    "zappi_wh": 0.0
+  },
+  "2026-02-21": {
+    "pv_wh": 16322.6,
+    "export_wh": 386.5,
+    "import_wh": 57788.1,
+    "house_wh": 39890.7,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 5003.6,
+    "zappi_wh": 28865.1
+  },
+  "2026-02-22": {
+    "pv_wh": 5366.9,
+    "export_wh": 29.9,
+    "import_wh": 70699.1,
+    "house_wh": 29943.4,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 455.7,
+    "zappi_wh": 45620.2
+  },
+  "2026-02-23": {
+    "pv_wh": 12786.9,
+    "export_wh": 195.7,
+    "import_wh": 79997.6,
+    "house_wh": 47583.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 3403.1,
+    "zappi_wh": 41680.7
+  },
+  "2026-02-24": {
+    "pv_wh": 12579.8,
+    "export_wh": 156.6,
+    "import_wh": 67593.6,
+    "house_wh": 34005.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 5101.0,
+    "zappi_wh": 40960.1
+  },
+  "2026-02-25": {
+    "pv_wh": 50493.9,
+    "export_wh": 11910.9,
+    "import_wh": 32343.9,
+    "house_wh": 38436.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15374.8,
+    "zappi_wh": 18131.3
+  },
+  "2026-02-26": {
+    "pv_wh": 49541.6,
+    "export_wh": 5682.0,
+    "import_wh": 38413.0,
+    "house_wh": 42901.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 12781.5,
+    "zappi_wh": 27076.7
+  },
+  "2026-02-27": {
+    "pv_wh": 31680.1,
+    "export_wh": 4387.9,
+    "import_wh": 58666.0,
+    "house_wh": 31558.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 13300.9,
+    "zappi_wh": 41076.6
+  },
+  "2026-02-28": {
+    "pv_wh": 13453.1,
+    "export_wh": 378.6,
+    "import_wh": 85173.1,
+    "house_wh": 43058.6,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 1563.1,
+    "zappi_wh": 53714.8
+  },
+  "2026-03-01": {
+    "pv_wh": 41520.0,
+    "export_wh": 5608.8,
+    "import_wh": 34951.1,
+    "house_wh": 35749.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 12507.7,
+    "zappi_wh": 23139.2
+  },
+  "2026-03-02": {
+    "pv_wh": 62101.3,
+    "export_wh": 24209.1,
+    "import_wh": 19397.8,
+    "house_wh": 31667.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16996.1,
+    "zappi_wh": 9057.1
+  },
+  "2026-03-03": {
+    "pv_wh": 58072.1,
+    "export_wh": 14285.1,
+    "import_wh": 15818.5,
+    "house_wh": 33731.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16557.4,
+    "zappi_wh": 10314.9
+  },
+  "2026-03-04": {
+    "pv_wh": 56248.7,
+    "export_wh": 3642.9,
+    "import_wh": 24341.8,
+    "house_wh": 43715.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16021.7,
+    "zappi_wh": 17528.1
+  },
+  "2026-03-05": {
+    "pv_wh": 60617.7,
+    "export_wh": 5842.3,
+    "import_wh": 15040.1,
+    "house_wh": 32117.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15579.9,
+    "zappi_wh": 22229.8
+  },
+  "2026-03-06": {
+    "pv_wh": 51334.9,
+    "export_wh": 14292.0,
+    "import_wh": 10511.4,
+    "house_wh": 31569.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16999.7,
+    "zappi_wh": 0.0
+  },
+  "2026-03-07": {
+    "pv_wh": 45933.0,
+    "export_wh": 3354.8,
+    "import_wh": 50726.1,
+    "house_wh": 33528.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 14860.6,
+    "zappi_wh": 45088.5
+  },
+  "2026-03-08": {
+    "pv_wh": 55395.9,
+    "export_wh": 17359.5,
+    "import_wh": 26113.9,
+    "house_wh": 34296.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15449.9,
+    "zappi_wh": 15134.1
+  },
+  "2026-03-09": {
+    "pv_wh": 55644.5,
+    "export_wh": 17898.3,
+    "import_wh": 29256.4,
+    "house_wh": 33390.3,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16184.0,
+    "zappi_wh": 19392.9
+  },
+  "2026-03-10": {
+    "pv_wh": 32002.9,
+    "export_wh": 3724.9,
+    "import_wh": 67606.5,
+    "house_wh": 40365.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 10880.1,
+    "zappi_wh": 44924.8
+  },
+  "2026-03-11": {
+    "pv_wh": 15345.8,
+    "export_wh": 564.8,
+    "import_wh": 22260.9,
+    "house_wh": 32898.0,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 4235.0,
+    "zappi_wh": 0.0
+  },
+  "2026-03-12": {
+    "pv_wh": 50752.7,
+    "export_wh": 14840.3,
+    "import_wh": 38327.9,
+    "house_wh": 32868.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15210.4,
+    "zappi_wh": 26805.8
+  },
+  "2026-03-13": {
+    "pv_wh": 12411.0,
+    "export_wh": 130.7,
+    "import_wh": 49464.0,
+    "house_wh": 36606.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 5461.2,
+    "zappi_wh": 21030.1
+  },
+  "2026-03-14": {
+    "pv_wh": 19703.1,
+    "export_wh": 463.2,
+    "import_wh": 58185.7,
+    "house_wh": 38335.7,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 4160.9,
+    "zappi_wh": 34901.2
+  },
+  "2026-03-15": {
+    "pv_wh": 67333.6,
+    "export_wh": 23746.7,
+    "import_wh": 13239.1,
+    "house_wh": 39563.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 17335.4,
+    "zappi_wh": 0.0
+  },
+  "2026-03-16": {
+    "pv_wh": 56856.9,
+    "export_wh": 16011.5,
+    "import_wh": 10817.7,
+    "house_wh": 36318.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16261.0,
+    "zappi_wh": 0.0
+  },
+  "2026-03-17": {
+    "pv_wh": 19145.8,
+    "export_wh": 183.3,
+    "import_wh": 20592.7,
+    "house_wh": 32288.0,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 8047.6,
+    "zappi_wh": 0.0
+  },
+  "2026-03-18": {
+    "pv_wh": 83309.6,
+    "export_wh": 39014.7,
+    "import_wh": 34254.2,
+    "house_wh": 33921.4,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 19201.8,
+    "zappi_wh": 27398.9
+  },
+  "2026-03-19": {
+    "pv_wh": 79921.2,
+    "export_wh": 38556.5,
+    "import_wh": 32527.0,
+    "house_wh": 32621.6,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 17621.1,
+    "zappi_wh": 24524.0
+  },
+  "2026-03-20": {
+    "pv_wh": 82079.9,
+    "export_wh": 39759.7,
+    "import_wh": 26112.8,
+    "house_wh": 33079.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 20319.3,
+    "zappi_wh": 16555.4
+  },
+  "2026-03-21": {
+    "pv_wh": 82947.1,
+    "export_wh": 39771.5,
+    "import_wh": 33590.1,
+    "house_wh": 34812.5,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 18941.3,
+    "zappi_wh": 23055.0
+  },
+  "2026-03-22": {
+    "pv_wh": 84606.5,
+    "export_wh": 25221.6,
+    "import_wh": 16141.0,
+    "house_wh": 40405.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 20569.8,
+    "zappi_wh": 15868.3
+  },
+  "2026-03-23": {
+    "pv_wh": 63317.9,
+    "export_wh": 18530.0,
+    "import_wh": 12973.2,
+    "house_wh": 41375.6,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16788.9,
+    "zappi_wh": 0.0
+  },
+  "2026-03-24": {
+    "pv_wh": 51010.9,
+    "export_wh": 6971.1,
+    "import_wh": 11749.9,
+    "house_wh": 27288.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15842.2,
+    "zappi_wh": 13042.6
+  },
+  "2026-03-25": {
+    "pv_wh": 36821.8,
+    "export_wh": 5053.8,
+    "import_wh": 42339.2,
+    "house_wh": 38193.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 9822.4,
+    "zappi_wh": 26614.9
+  },
+  "2026-03-26": {
+    "pv_wh": 66326.6,
+    "export_wh": 28542.3,
+    "import_wh": 35738.7,
+    "house_wh": 37858.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15868.6,
+    "zappi_wh": 21141.0
+  },
+  "2026-03-27": {
+    "pv_wh": 55616.0,
+    "export_wh": 14931.1,
+    "import_wh": 45080.0,
+    "house_wh": 43736.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15181.1,
+    "zappi_wh": 27365.3
+  },
+  "2026-03-28": {
+    "pv_wh": 61926.5,
+    "export_wh": 23709.9,
+    "import_wh": 16937.7,
+    "house_wh": 40692.7,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 14539.3,
+    "zappi_wh": 0.0
+  },
+  "2026-03-29": {
+    "pv_wh": 55121.0,
+    "export_wh": 11266.7,
+    "import_wh": 14900.8,
+    "house_wh": 45827.4,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 13011.0,
+    "zappi_wh": 0.0
+  },
+  "2026-03-30": {
+    "pv_wh": 76574.9,
+    "export_wh": 14422.2,
+    "import_wh": 15934.2,
+    "house_wh": 46965.9,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16533.0,
+    "zappi_wh": 15303.3
+  },
+  "2026-03-31": {
+    "pv_wh": 52926.2,
+    "export_wh": 9145.6,
+    "import_wh": 21865.2,
+    "house_wh": 49473.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16514.4,
+    "zappi_wh": 0.0
+  },
+  "2026-04-01": {
+    "pv_wh": 97498.6,
+    "export_wh": 31031.8,
+    "import_wh": 9628.2,
+    "house_wh": 35703.1,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 21855.1,
+    "zappi_wh": 20530.0
+  },
+  "2026-04-02": {
+    "pv_wh": 28486.7,
+    "export_wh": 741.5,
+    "import_wh": 26930.6,
+    "house_wh": 41484.8,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 10584.6,
+    "zappi_wh": 3802.3
+  },
+  "2026-04-03": {
+    "pv_wh": 55832.1,
+    "export_wh": 3742.6,
+    "import_wh": 16987.8,
+    "house_wh": 32915.6,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15472.6,
+    "zappi_wh": 20649.3
+  },
+  "2026-04-04": {
+    "pv_wh": 57764.3,
+    "export_wh": 4710.5,
+    "import_wh": 21264.6,
+    "house_wh": 33333.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 15094.9,
+    "zappi_wh": 26192.5
+  },
+  "2026-04-05": {
+    "pv_wh": 52467.6,
+    "export_wh": 14699.8,
+    "import_wh": 12754.5,
+    "house_wh": 34780.5,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 16189.6,
+    "zappi_wh": 0.0
+  },
+  "2026-04-06": {
+    "pv_wh": 89467.0,
+    "export_wh": 25481.9,
+    "import_wh": 11950.7,
+    "house_wh": 36286.0,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 20557.1,
+    "zappi_wh": 20689.6
+  },
+  "2026-04-07": {
+    "pv_wh": 102236.6,
+    "export_wh": 23300.4,
+    "import_wh": 14128.5,
+    "house_wh": 39482.2,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 22352.3,
+    "zappi_wh": 33555.2
+  },
+  "2026-04-08": {
+    "pv_wh": 246.0,
+    "export_wh": 53.8,
+    "import_wh": 5033.7,
+    "house_wh": 5214.5,
+    "batt_charge_wh": 0.0,
+    "batt_discharge_wh": 0.0,
+    "eddi_wh": 2042.3,
+    "zappi_wh": 0.0
   }
 }

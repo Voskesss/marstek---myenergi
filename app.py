@@ -2137,8 +2137,8 @@ class EnergyTracker:
             "eddi_kwh": round(self.eddi_wh / 1000, 2),
             "zappi_kwh": round(self.zappi_wh / 1000, 2),
             "self_consumption_pct": round(
-                (((self.pv_wh + self.batt_discharge_wh) - self.export_wh) / (self.pv_wh + self.batt_discharge_wh) * 100)
-                if (self.pv_wh + self.batt_discharge_wh) > 100 else 0, 1
+                (((self.pv_wh + self.batt_discharge_wh) - self.export_wh) / (self.house_wh + self.eddi_wh + self.zappi_wh + self.batt_charge_wh) * 100)
+                if (self.house_wh + self.eddi_wh + self.zappi_wh + self.batt_charge_wh) > 100 else 0, 1
             ),
         }
 
@@ -2168,8 +2168,8 @@ class EnergyTracker:
                 "batt_charge_kwh": round(d.get("batt_charge_wh", 0) / 1000, 2),
                 "batt_discharge_kwh": round(d.get("batt_discharge_wh", 0) / 1000, 2),
                 "self_consumption_pct": round(
-                    (((pv + d.get("batt_discharge_wh", 0)) - exp) / (pv + d.get("batt_discharge_wh", 0)) * 100)
-                    if (pv + d.get("batt_discharge_wh", 0)) > 100 else 0, 1
+                    (((pv + d.get("batt_discharge_wh", 0)) - exp) / (d.get("house_wh", 0) + d.get("eddi_wh", 0) + d.get("zappi_wh", 0) + d.get("batt_charge_wh", 0)) * 100)
+                    if (d.get("house_wh", 0) + d.get("eddi_wh", 0) + d.get("zappi_wh", 0) + d.get("batt_charge_wh", 0)) > 100 else 0, 1
                 ),
             })
         return result

@@ -1458,15 +1458,22 @@ function updateDisplay(data) {
     const saved = (genKwh * KWH_PRICE).toFixed(2).replace('.', ',');
     const cost = (impKwh * KWH_PRICE).toFixed(2).replace('.', ',');
     const zappiKwh = energy.zappi_kwh || 0;
-    const zappiCost = (zappiKwh * KWH_PRICE).toFixed(2).replace('.', ',');
-    const costMinZappi = ((impKwh - zappiKwh) * KWH_PRICE);
+    // Zappi uit net = max wat uit net kan komen voor zappi (niet meer dan totale import)
+    const zappiFromGrid = Math.min(zappiKwh, impKwh);
+    const zappiFromSun = zappiKwh - zappiFromGrid;
+    const zappiGridCost = (zappiFromGrid * KWH_PRICE).toFixed(2).replace('.', ',');
+    const costMinZappi = ((impKwh - zappiFromGrid) * KWH_PRICE);
     document.getElementById('daySaved').textContent = `€ ${saved}`;
     document.getElementById('daySavedKwh').textContent = `${genKwh.toFixed(1)} kWh eigen opwek`;
     document.getElementById('dayCost').textContent = `€ ${cost}`;
     document.getElementById('dayCostKwh').textContent = `${impKwh.toFixed(1)} kWh uit net`;
     const zappiEl = document.getElementById('dayCostZappi');
     if (zappiKwh > 0.01) {
-      zappiEl.textContent = `🚗 Zappi € ${zappiCost} · zonder: € ${costMinZappi.toFixed(2).replace('.', ',')}`;
+      let zTxt = `🚗 Zappi ${zappiKwh.toFixed(1)} kWh`;
+      if (zappiFromSun > 0.01) zTxt += ` (${zappiFromSun.toFixed(1)} zon)`;
+      zTxt += ` · uit net € ${zappiGridCost}`;
+      zTxt += ` · rest € ${costMinZappi.toFixed(2).replace('.', ',')}`;
+      zappiEl.textContent = zTxt;
     } else {
       zappiEl.textContent = '';
     }
@@ -1509,11 +1516,20 @@ function updateDisplay(data) {
   document.getElementById('eddiPower').textContent = fmtW(eddi);
   document.querySelector('#cardEddi .unit').textContent = fmtUnit(eddi);
   setCardActive('cardEddi', eddi > THRESH);
-  // Eddi temperature
-  const tp1 = status.eddi_temperatures?.tp1;
-  if (tp1 != null) {
-    document.getElementById('eddiSub').textContent = `${tp1}°C`;
-    document.getElementById('statEddiTemp').textContent = `${tp1}°C`;
+  // Eddi temperatures (both tanks)
+  const tank1 = status.eddi_temperatures?.tank1;
+  const tank2 = status.eddi_temperatures?.tank2;
+  let tempTxt = '';
+  if (tank1 != null && tank2 != null) {
+    tempTxt = `${tank1}°C / ${tank2}°C`;
+  } else if (tank1 != null) {
+    tempTxt = `${tank1}°C`;
+  } else if (tank2 != null) {
+    tempTxt = `${tank2}°C`;
+  }
+  if (tempTxt) {
+    document.getElementById('eddiSub').textContent = tempTxt;
+    document.getElementById('statEddiTemp').textContent = tempTxt;
   }
 
   document.getElementById('zappiPower').textContent = fmtW(zappi);
@@ -1633,7 +1649,7 @@ function updateDisplay(data) {
   }
 
   // Update mobile view
-  const eddiTemp = status.eddi_temperatures?.tp1;
+  const eddiTemp = tempTxt || '--';
   updateMobile(pv, grid, house, eddi, zappi, b1Power, b2Power, b1Soc, b2Soc, b1Mode, b2Mode, eddiTemp);
 }
 
