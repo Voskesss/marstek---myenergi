@@ -2308,6 +2308,18 @@ async def _set_battery_power(bid: str, power_w: int) -> Dict[str, Any]:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+async def _set_battery_discharge(bid: str, power_w: int) -> Dict[str, Any]:
+    """Helper to send force-discharge setpoint; power_w=0 -> stop."""
+    try:
+        if power_w and power_w > 0:
+            payload = {"action": "discharge", "power_w": int(power_w)}
+        else:
+            payload = {"action": "stop"}
+        result = await battery_control_by_id(bid, payload)  # type: ignore[arg-type]
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 async def _simple_rule_loop():
     global simple_rule
     cfg = simple_rule.cfg
@@ -2370,108 +2382,122 @@ async def _simple_rule_loop():
 
                 target_total = simple_rule.prev_set_total
                 
-                # Anti-feed mode parameters
+                # Anti-feed: alleen als zon weg is (lage PV) én er net-import is
                 pv_threshold = cfg.get("pv_threshold_w", 50)
                 import_threshold = cfg.get("import_threshold_w", 100)
                 
-                # Check for anti-feed condition: no PV + importing from grid
                 if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
-                    # Anti-feed mode: discharge batteries to grid
-                    # Each battery is checked INDIVIDUALLY for min SOC
-                    logger.info(f"☀️ SIMPLE RULE: No PV ({pv_w}W) + importing ({grid_w}W) - Setting ANTI-FEED mode")
+                    # Force discharge (Modbus control) — Anti-Feed work_mode alleen is na FW-update niet genoeg
+                    import_margin = int(cfg.get("import_margin_w", cfg.get("buffer_w", 200)))
+                    cap = int(cfg.get("per_battery_max_w", 2500))
+                    target_total = max(0, min(int(cfg.get("max_batt_total_w", 5000)), int(grid_w) - import_margin))
+                    logger.info(
+                        f"☀️ SIMPLE RULE: Zon weg (PV={pv_w}W) + import ({grid_w}W) → force discharge target={target_total}W"
+                    )
                     try:
                         items = (await list_batteries())['items']  # type: ignore[index]
-                        logger.info(f"🔋 Found {len(items)} batteries: {[it['id'] for it in items]}")
                     except Exception as e:
                         logger.error(f"❌ Failed to list batteries: {e}")
                         continue
+
+                    # Eerst SOC checken: welke batterijen mogen ontladen?
                     per: Dict[str, Any] = {}
-                    logger.info(f"🔄 Starting battery loop for {len(items)} batteries")
+                    available: list = []
                     for it in items:
                         bid = it['id']
-                        logger.info(f"🔄 Processing battery {bid}")
+                        entry = _get_entry_for(bid)
+                        if not entry:
+                            per[bid] = {"mode": "discharge", "ok": False, "error": "not_in_registry", "set": 0}
+                            continue
+                        client = entry['client']
+                        lock = entry['lock']
                         try:
-                            # Get the existing battery client from registry
-                            logger.info(f"🔍 Getting entry for {bid}")
-                            entry = _get_entry_for(bid)
-                            if not entry:
-                                logger.warning(f"⚡ Battery {bid} not found in registry")
-                                per[bid] = {"mode": "anti-feed", "ok": False, "error": "not_in_registry"}
-                                continue
-                            
-                            logger.info(f"🔍 Got client and lock for {bid}")
-                            client = entry['client']
-                            lock = entry['lock']
-                            
-                            # Check SOC before allowing discharge (anti-feed) - INDIVIDUAL battery check
-                            # Use async timeout to prevent blocking
-                            try:
-                                battery_data = await asyncio.wait_for(
-                                    asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
-                                    timeout=5.0
+                            battery_data = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                timeout=5.0
+                            )
+                            current_soc = battery_data.get("soc_percent", {}).get("value", 100) if battery_data else 100
+                            min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
+                            if current_soc <= min_soc:
+                                logger.warning(
+                                    f"🔋 Battery {bid} SOC te laag ({current_soc}% <= {min_soc}%) - STOP ontladen"
                                 )
-                                current_soc = battery_data.get("soc_percent", {}).get("value", 100) if battery_data else 100
-                                min_soc = cfg.get("battery_config", {}).get(bid, {}).get("minimum_soc_percent", 15)
-                                
-                                if current_soc <= min_soc:
-                                    logger.warning(f"🔋 Battery {bid} SOC too low ({current_soc}% <= {min_soc}%) - SKIP this battery (others continue)")
-                                    # Check ACTUAL mode from battery (work_mode register 42000)
-                                    # Work mode: 0=Manual, 1=Anti-Feed, 2=Trade
-                                    actual_mode = battery_data.get("work_mode", {}).get("value", -1) if battery_data else -1
-                                    logger.info(f"🔍 Actual battery mode from Modbus: {actual_mode} (0=Manual, 1=Anti-Feed, 2=Trade)")
-                                    
-                                    # If in anti-feed or discharging (power < 0), STOP it immediately
-                                    battery_power = battery_data.get("battery_power", {}).get("value", 0) if battery_data else 0
-                                    if actual_mode == 1 or battery_power < -50:  # Anti-feed or actively discharging
-                                        logger.warning(f"⚠️ Battery {bid} is discharging ({battery_power}W) - Switching to Manual mode to STOP!")
-                                        async with lock:
-                                            stop_result = client.set_work_mode(0)  # Manual mode
-                                        simple_rule.battery_modes[bid] = "manual"
-                                        logger.info(f"✅ Mode switch result: {stop_result}")
-                                    else:
-                                        logger.info(f"ℹ️ Battery {bid} not actively discharging (mode={actual_mode}, power={battery_power}W)")
-                                    
-                                    per[bid] = {"mode": "blocked_min_soc", "ok": True, "soc": current_soc, "min_soc": min_soc}
-                                    continue
-                            except Exception as e:
-                                error_type = "timeout" if "timeout" in str(e).lower() else "connection" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor"]) else "unknown"
-                                logger.warning(f"⚠️ Modbus {error_type} for {bid} - BLOCKING anti-feed for safety (app continues)")
-                                # If battery is currently in anti-feed, STOP it immediately (safety first!)
-                                current_mode = simple_rule.battery_modes.get(bid, "unknown")
-                                if current_mode == "anti-feed":
-                                    logger.warning(f"⚠️ Battery {bid} in anti-feed but SOC unknown - Attempting emergency stop...")
-                                    try:
-                                        async with lock:
-                                            stop_result = client.set_work_mode(0)  # Manual mode
-                                        if stop_result.get("ok"):
-                                            simple_rule.battery_modes[bid] = "manual"
-                                            logger.info(f"✅ Emergency stop successful for {bid}")
-                                        else:
-                                            logger.warning(f"⚠️ Emergency stop failed for {bid}, will retry next cycle")
-                                    except Exception as stop_error:
-                                        logger.warning(f"⚠️ Could not emergency stop {bid} (Modbus issue), will retry: {stop_error}")
-                                per[bid] = {"mode": "blocked", "ok": False, "error": f"modbus_{error_type}", "will_retry": True}
-                                continue
-                            
-                            # Set work mode to Anti-Feed (1) - only if not already in anti-feed
-                            current_mode = simple_rule.battery_modes.get(bid, "unknown")
-                            logger.info(f"🔍 Current mode for {bid}: {current_mode}")
-                            if current_mode != "anti-feed":
                                 async with lock:
-                                    result = client.set_work_mode(1)
-                                if result.get("ok"):
-                                    simple_rule.battery_modes[bid] = "anti-feed"
-                                per[bid] = {"mode": "anti-feed", "ok": result.get("ok", False)}
-                                logger.info(f"⚡ Battery {bid} switched to anti-feed: {result}")
-                            else:
-                                per[bid] = {"mode": "anti-feed", "ok": True, "already_set": True}
-                                logger.info(f"✅ Battery {bid} already in anti-feed mode (skipping)")
+                                    stop_result = client.set_control("stop")
+                                simple_rule.battery_modes[bid] = "stopped_min_soc"
+                                per[bid] = {
+                                    "mode": "blocked_min_soc",
+                                    "ok": True,
+                                    "soc": current_soc,
+                                    "min_soc": min_soc,
+                                    "set": 0,
+                                    "stop_ok": bool(stop_result.get("ok")),
+                                }
+                                continue
+                            available.append({"id": bid, "soc": current_soc, "entry": entry})
                         except Exception as e:
-                            error_type = "modbus_error" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor", "timeout"]) else "logic_error"
-                            logger.warning(f"⚠️ Battery {bid} temporary error ({error_type}), will retry next cycle: {e}")
-                            per[bid] = {"mode": "error", "ok": False, "error": error_type, "will_retry": True}
-                    
-                    # Mark health as OK for anti-feed mode
+                            error_type = (
+                                "timeout" if "timeout" in str(e).lower()
+                                else "connection" if any(x in str(e) for x in ["Broken pipe", "Connection", "Bad file descriptor"])
+                                else "unknown"
+                            )
+                            logger.warning(f"⚠️ Modbus {error_type} voor {bid} - geen discharge deze ronde: {e}")
+                            # Veiligheid: probeer te stoppen als we dachten te ontladen
+                            if simple_rule.battery_modes.get(bid) in ("anti-feed", "discharging"):
+                                try:
+                                    async with lock:
+                                        client.set_control("stop")
+                                    simple_rule.battery_modes[bid] = "manual"
+                                except Exception:
+                                    pass
+                            per[bid] = {"mode": "blocked", "ok": False, "error": f"modbus_{error_type}", "set": 0, "will_retry": True}
+
+                    # Verdeel discharge over beschikbare batterijen
+                    n_avail = len(available)
+                    setpoints: Dict[str, int] = {}
+                    if n_avail > 0 and target_total > 0:
+                        remaining = int(target_total)
+                        base_share = min(cap, remaining // n_avail)
+                        for bat in available:
+                            sp = max(0, min(base_share, remaining, cap))
+                            setpoints[bat["id"]] = sp
+                            remaining -= sp
+                        # Rest verdelen
+                        idx = 0
+                        while remaining > 0 and idx < n_avail * 2:
+                            bid = available[idx % n_avail]["id"]
+                            space = max(0, cap - setpoints.get(bid, 0))
+                            if space > 0:
+                                give = min(space, remaining)
+                                setpoints[bid] = setpoints.get(bid, 0) + give
+                                remaining -= give
+                            idx += 1
+                    else:
+                        for bat in available:
+                            setpoints[bat["id"]] = 0
+
+                    set_total = 0
+                    for bat in available:
+                        bid = bat["id"]
+                        sp = int(setpoints.get(bid, 0))
+                        try:
+                            res = await _set_battery_discharge(bid, sp)
+                            ok = bool(res.get("success") or res.get("ok"))
+                            if ok:
+                                simple_rule.battery_modes[bid] = "discharging" if sp > 0 else "stopped"
+                            per[bid] = {
+                                "mode": "discharge" if sp > 0 else "idle",
+                                "ok": ok,
+                                "set": sp,
+                                "soc": bat["soc"],
+                            }
+                            if ok:
+                                set_total += sp
+                            logger.info(f"⚡ Battery {bid} force discharge {sp}W → ok={ok}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Battery {bid} discharge error: {e}")
+                            per[bid] = {"mode": "error", "ok": False, "error": str(e), "set": 0, "will_retry": True}
+
                     try:
                         h = simple_rule.last.get("health", {})
                         h.update({
@@ -2492,13 +2518,13 @@ async def _simple_rule_loop():
                         "overschot_w": 0,
                         "mode": "anti-feed",
                         "target_export_w": target_export,
-                        "batt_target_total_w": 0,
-                        "batt_set_total_w": 0,
+                        "batt_target_total_w": int(target_total),
+                        "batt_set_total_w": int(set_total),
                         "per_battery": per,
                         "cooldown": False,
                         "ts": time.time(),
+                        "error": None,
                     })
-                    # Continue to next iteration
                     dt = time.time() - t0
                     await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
                     continue
@@ -2717,12 +2743,14 @@ async def _soc_safety_monitor():
                     # Safety check: if SOC low AND discharging
                     if current_soc <= min_soc and battery_power < -50:
                         logger.warning(f"🛡️ SOC SAFETY: {bid} at {current_soc}% (min {min_soc}%) and discharging ({battery_power}W)")
-                        logger.warning(f"🛡️ Emergency stop - switching {bid} to Manual mode!")
+                        logger.warning(f"🛡️ Emergency stop - force stop via Modbus control")
                         
                         async with lock:
-                            result = client.set_work_mode(0)  # Force Manual
+                            # Na FW-update: set_work_mode alleen is niet betrouwbaar; expliciet stoppen
+                            result = client.set_control("stop")
                         
                         if result.get("ok"):
+                            simple_rule.battery_modes[bid] = "stopped_min_soc"
                             logger.info(f"✅ SOC SAFETY: Successfully stopped {bid}")
                         else:
                             logger.warning(f"⚠️ SOC SAFETY: Failed to stop {bid}, will retry")
