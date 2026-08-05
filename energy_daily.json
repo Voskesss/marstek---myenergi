@@ -890,13 +890,13 @@
     "zappi_wh": 29213.6
   },
   "2026-08-05": {
-    "pv_wh": 59091.2,
-    "export_wh": 37131.7,
-    "import_wh": 6657.5,
-    "house_wh": 17983.1,
+    "pv_wh": 59366.0,
+    "export_wh": 37143.1,
+    "import_wh": 6671.6,
+    "house_wh": 18239.8,
     "batt_charge_wh": 0.0,
     "batt_discharge_wh": 0.0,
-    "eddi_wh": 11169.7,
+    "eddi_wh": 11189.2,
     "zappi_wh": 0.0
   }
 }

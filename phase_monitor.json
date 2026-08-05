@@ -1,16 +1,5 @@
 [
   {
-    "timestamp": "2026-07-05T09:30:52.935055",
-    "l1_w": -1262,
-    "l2_w": 1395,
-    "l3_w": -134,
-    "zappi_w": 0,
-    "zappi_charging": false,
-    "violations": [],
-    "is_violation": false,
-    "is_real_violation": false
-  },
-  {
     "timestamp": "2026-07-05T09:35:55.020337",
     "l1_w": -908,
     "l2_w": 1634,
@@ -112745,6 +112734,17 @@
     "l1_w": -831,
     "l2_w": 953,
     "l3_w": -130,
+    "zappi_w": 0,
+    "zappi_charging": false,
+    "violations": [],
+    "is_violation": false,
+    "is_real_violation": false
+  },
+  {
+    "timestamp": "2026-08-05T17:49:43.204418",
+    "l1_w": -806,
+    "l2_w": 959,
+    "l3_w": -153,
     "zappi_w": 0,
     "zappi_charging": false,
     "violations": [],
