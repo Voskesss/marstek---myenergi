@@ -607,6 +607,27 @@
     </div>
   </div>
 
+  <!-- Frank tarieven: middenonder tussen Eddi en Zappi -->
+  <div id="frankPanel" style="position:fixed;left:50%;transform:translateX(-50%);bottom:10%;z-index:6;width:min(300px,42vw);">
+    <div style="background:rgba(10,14,26,0.88);backdrop-filter:blur(10px);border:1px solid rgba(56,189,248,0.28);border-radius:12px;padding:10px 12px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;">
+        <div>
+          <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Frank tarief nu</div>
+          <div style="font-size:18px;font-weight:700;color:#38bdf8;" id="frankPriceNow">€ --</div>
+          <div style="font-size:10px;color:#64748b;" id="frankPriceMeta">laden…</div>
+        </div>
+        <div style="text-align:right;font-size:10px;color:#94a3b8;line-height:1.35;">
+          <div>min <span id="frankMin" style="color:#22c55e;">--</span></div>
+          <div>max <span id="frankMax" style="color:#ef4444;">--</span></div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;">Vandaag</div>
+      <div id="frankBarsToday" style="display:flex;align-items:flex-end;gap:2px;height:32px;margin-bottom:8px;"></div>
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;">Morgen <span id="frankTomorrowLabel" style="color:#64748b;"></span></div>
+      <div id="frankBarsTomorrow" style="display:flex;align-items:flex-end;gap:2px;height:32px;"></div>
+    </div>
+  </div>
+
   <div class="flow-container" id="flowContainer">
     <!-- SVG flow lines -->
     <svg class="flow-svg" id="flowSvg"></svg>
@@ -1766,10 +1787,79 @@ async function updateBackground(pvW) {
   }
 }
 
+function fmtEurKwh(v) {
+  if (v == null || Number.isNaN(v)) return '--';
+  return '€ ' + Number(v).toFixed(3).replace('.', ',') + '/kWh';
+}
+
+function renderFrankBars(containerId, prices, highlightHour, sharedMin, sharedMax) {
+  const bars = document.getElementById(containerId);
+  if (!bars) return;
+  bars.innerHTML = '';
+  if (!prices || !prices.length) {
+    bars.innerHTML = '<div style="font-size:10px;color:#64748b;padding:4px 0;">nog niet beschikbaar</div>';
+    return;
+  }
+  const vals = prices.map(p => p.price_eur_kwh);
+  const minV = sharedMin != null ? sharedMin : Math.min(...vals);
+  const maxV = sharedMax != null ? sharedMax : Math.max(...vals);
+  const span = Math.max(0.01, maxV - minV);
+  prices.forEach(p => {
+    const h = 6 + ((p.price_eur_kwh - minV) / span) * 26;
+    const el = document.createElement('div');
+    el.title = `${String(p.hour).padStart(2,'0')}:00 → ${fmtEurKwh(p.price_eur_kwh)}`;
+    let color = 'rgba(148,163,184,0.45)';
+    if (highlightHour != null && p.hour === highlightHour) color = '#38bdf8';
+    else if (p.price_eur_kwh <= minV + 0.00001) color = '#22c55e';
+    else if (p.price_eur_kwh >= maxV - 0.00001) color = '#ef4444';
+    el.style.cssText = `flex:1;min-width:0;height:${h}px;border-radius:2px 2px 0 0;background:${color};`;
+    bars.appendChild(el);
+  });
+}
+
+async function updateFrankPrices() {
+  try {
+    const res = await fetch('/api/frank/prices');
+    const json = await res.json();
+    if (!json.success || !json.data) throw new Error(json.error || 'geen data');
+    const d = json.data;
+    const cur = d.current;
+    const today = d.today || {};
+    const tomorrow = d.tomorrow || {};
+    const todayPrices = today.prices || [];
+    const tomPrices = tomorrow.prices || [];
+
+    document.getElementById('frankPriceNow').textContent = fmtEurKwh(cur && cur.price_eur_kwh);
+    const hourLabel = cur ? (String(cur.hour).padStart(2, '0') + ':00') : '--';
+    document.getElementById('frankPriceMeta').textContent = `uur ${hourLabel}`;
+    document.getElementById('frankMin').textContent = fmtEurKwh(today.min && today.min.price_eur_kwh);
+    document.getElementById('frankMax').textContent = fmtEurKwh(today.max && today.max.price_eur_kwh);
+
+    const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
+    const sharedMin = allVals.length ? Math.min(...allVals) : null;
+    const sharedMax = allVals.length ? Math.max(...allVals) : null;
+
+    renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax);
+    const tomLabel = document.getElementById('frankTomorrowLabel');
+    if (tomorrow.available && tomPrices.length) {
+      tomLabel.textContent = `(min ${fmtEurKwh(tomorrow.min && tomorrow.min.price_eur_kwh)})`;
+      renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax);
+    } else {
+      tomLabel.textContent = '(na ~15:00)';
+      renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
+    }
+  } catch (e) {
+    document.getElementById('frankPriceNow').textContent = '€ --';
+    document.getElementById('frankPriceMeta').textContent = 'Frank offline';
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   onResize();
   initFlowLines();
   tick();
+  updateFrankPrices();
+  setInterval(updateFrankPrices, 5 * 60 * 1000);
 });
 </script>
 </body>

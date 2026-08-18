@@ -3080,6 +3080,21 @@ async def get_solar_forecast():
         return {"success": False, "error": str(e)}
 
 # =========================
+# Frank Energie prices (display)
+# =========================
+from frank_energie import frank_client
+
+@app.get("/api/frank/prices")
+async def get_frank_prices(force: bool = False):
+    """Frank Energie dynamic electricity prices (today + tomorrow if published)."""
+    try:
+        data = await frank_client.get_overview(force=force)
+        return {"success": True, "data": data}
+    except Exception as e:
+        logger.error(f"Frank prices error: {e}")
+        return {"success": False, "error": str(e)}
+
+# =========================
 # WhatsApp Test Endpoint
 # =========================
 @app.post("/api/whatsapp/test")
