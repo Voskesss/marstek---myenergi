@@ -1086,13 +1086,9 @@ def extract_house_consumption_w(myenergi_status: Dict[str, Any], battery_power_w
             grid_w = extract_grid_export_w(myenergi_status) or 0
             pv_gen = extract_pv_generation_w(myenergi_status) or 0
 
-            # Huisverbruik = PV Generatie + Grid Import - Eddi Verbruik - Zappi Verbruik - Batterij Laden
-            # Let op: grid_w is positief bij import (vanuit huis perspectief), negatief bij export.
-            # Batterij laden is positief (verbruikt energie), ontladen is negatief (levert energie)
-            # De formule `pv_gen + grid_w` dekt dus zowel import als export correct.
-            # Voorbeeld Import: 0 (pv) + 2000 (grid import) - 0 - 0 - 500 (batterij laden) = 1500 (huis verbruik)
-            # Voorbeeld Export: 5000 (pv) + (-1000) (grid export) - 0 - 0 - 0 = 4000 (huis verbruik)
-            house_consumption = pv_gen + grid_w - eddi_w - zappi_w - battery_power_w
+            # grid_w uit extract_grid_export_w: positief = export, negatief = import
+            # Huis = PV - export - Eddi - Zappi - batterij_laden (+ ontlaad)
+            house_consumption = pv_gen - grid_w - eddi_w - zappi_w - battery_power_w
             logger.info(f"House consumption fallback: pv={pv_gen}, grid={grid_w}, eddi={eddi_w}, zappi={zappi_w}, battery={battery_power_w} -> house={house_consumption}")
             return max(0, int(house_consumption))
                 
@@ -1474,15 +1470,15 @@ async def get_status():
         # Calculate house consumption with battery power included
         house_w = extract_house_consumption_w(m, battery_power_w)
         
-        # Grid import-positief waarde (compat voor flow.html)
-        grid_import_w = None if export_w is None else (-export_w)
+        # Grid: export_w positief = export, negatief = import (flow.html conventie)
+        grid_import_w = None if export_w is None else max(0, -int(export_w))
         
         payload = {
             "timestamp": time.time(),
             "myenergi_raw": m,
             "grid_export_w": export_w,
             "grid_import_w": grid_import_w,
-            "grid_w": grid_import_w,  # alias used by some UIs (import = +)
+            "grid_w": export_w,
             "eddi_power_w": eddi_w,
             "zappi_power_w": zappi_w,
             "house_consumption_w": house_w,
@@ -2200,6 +2196,10 @@ class SimpleRuleState:
             "price_hysteresis_s": 600,
             "battery_total_capacity_kwh": 10.0,
             "battery_charge_power_kw": 2.5,
+            "weather_evening_start_hour": 15,
+            "weather_horizon_hours": 4,
+            "weather_confidence_min": 60,
+            "weather_evening_target_soc": 95.0,
         }
         self.last: Dict[str, Any] = {
             "grid_w": None,
@@ -2226,6 +2226,7 @@ class SimpleRuleState:
         self.price_charge_since: Optional[float] = None
         self.price_not_since: Optional[float] = None
         self.price_charge_active: bool = False
+        self.avg_soc_cache: Optional[float] = None  # laatste bekende gemiddelde SOC
     
     def _load_battery_limits(self) -> dict:
         """Load minimum SOC limits from battery_config.json"""
@@ -2390,17 +2391,51 @@ async def _simple_rule_loop():
 
                 target_total = simple_rule.prev_set_total
                 
-                # Dagelijkse tariefband + laadplanning (SOC uit vorige iteratie)
+                # SOC snel uitlezen voor laadplanning (lichtgewicht, enkel register 32104)
+                try:
+                    _soc_quick: list = []
+                    for _bid, _reg in list(manager.registry.items()):
+                        try:
+                            _bd = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(None, _reg['client'].read_battery_data),
+                                timeout=2.0
+                            )
+                            _sv = (_bd or {}).get("soc_percent", {}).get("value")
+                            if _sv and 0 < float(_sv) <= 100:
+                                _soc_quick.append(float(_sv))
+                        except Exception:
+                            pass
+                    if _soc_quick:
+                        # Gebruik de laagste SOC: als één batterij nog niet op doel zit, laden
+                        simple_rule.avg_soc_cache = min(_soc_quick)
+                except Exception:
+                    pass
+
+                # Doel-SOC kan hoger in de namiddag/avond als weinig zon meer verwacht wordt.
+                target_soc_for_plan = float(cfg.get("price_charge_target_soc", 85.0))
+                weather_hint: Dict[str, Any] = {}
+                try:
+                    now_hour = datetime.now().hour
+                    if now_hour >= int(cfg.get("weather_evening_start_hour", 15)):
+                        weather_hint = await weather_service.get_no_sun_likely(
+                            horizon_hours=int(cfg.get("weather_horizon_hours", 4))
+                        )
+                        if weather_hint.get("no_sun_likely") and int(weather_hint.get("confidence", 0)) >= int(cfg.get("weather_confidence_min", 60)):
+                            target_soc_for_plan = max(target_soc_for_plan, float(cfg.get("weather_evening_target_soc", 95.0)))
+                except Exception as we:
+                    logger.debug(f"Weather hint skipped: {we}")
+
+                # Dagelijkse tariefband + laadplanning (SOC uit vorige iteratie of cache)
                 price_plan: Dict[str, Any] = {}
                 overview: Dict[str, Any] = {}
-                _prev_soc = simple_rule.last.get("battery_soc")
+                _prev_soc = simple_rule.avg_soc_cache
                 try:
                     from frank_energie import frank_client as _frank
                     overview = await _frank.get_overview(
                         soc_pct=float(_prev_soc) if _prev_soc is not None else None,
                         battery_capacity_kwh=float(cfg.get("battery_total_capacity_kwh", 10.0)),
                         charge_power_kw=float(cfg.get("battery_charge_power_kw", 2.5)),
-                        target_soc_pct=float(cfg.get("price_charge_target_soc", 85.0)),
+                        target_soc_pct=target_soc_for_plan,
                     )
                     price_plan = overview.get("plan") or {}
                 except Exception as pe:
@@ -2416,21 +2451,43 @@ async def _simple_rule_loop():
                 eddi_now = int(eddi_w_raw or 0)
                 zappi_now = int(zappi_w_raw or 0)
                 # Echt overschot = gemeten export naar het net (niet PV minus huis/Eddi-reservering)
-                export_now = max(0, -int(grid_w))
+                # grid_w in simple rule: positief = import (CT clamp conventie)
+                export_now = max(0, -int(grid_w)) if int(grid_w) < 0 else 0
+                import_now = max(0, int(grid_w)) if int(grid_w) > 0 else max(0, -int(grid_w))
                 low_after_priority = export_now < 100
                 zappi_heavy = zappi_now > 200
+                pv_threshold = cfg.get("pv_threshold_w", 50)
+                import_threshold = cfg.get("import_threshold_w", 100)
+                anti_feed_needed = (
+                    pv_w is not None
+                    and int(pv_w) < pv_threshold
+                    and import_now > import_threshold
+                )
                 hyst_s = float(cfg.get("price_hysteresis_s", 600))
                 price_charge_on = False
                 charge_schedule = (price_plan.get("charge_schedule") or {})
                 schedule_active = bool(charge_schedule.get("active_now", False))
+                cheap_thr = price_plan.get("cheap_threshold_eur_kwh")
+                price_is_cheap = price_band == "cheap" or (
+                    price_now is not None
+                    and cheap_thr is not None
+                    and float(price_now) <= float(cheap_thr)
+                )
+                # Nog laden nodig? Alleen als min-SOC onder doel zit (niet als al_at_target)
+                schedule_needs_charge = charge_schedule.get("reason") not in ("already_at_target", "soc_unknown", None) \
+                    and float(charge_schedule.get("needed_kwh") or 0) > 0.05
                 if cfg.get("price_charge_enabled", True):
-                    # schedule_active = dit uur staat in de geplande goedkoopste uren
                     candidate = (
                         schedule_active
+                        and schedule_needs_charge
+                        and price_is_cheap
                         and low_after_priority
                         and not zappi_heavy
+                        and not anti_feed_needed
                     )
-                    if zappi_heavy:
+                    # Hard stop: zappi trekt zwaar OF doel bereikt → direct uit, geen hysteresis
+                    hard_stop = zappi_heavy or not schedule_needs_charge
+                    if hard_stop:
                         simple_rule.price_charge_since = None
                         simple_rule.price_not_since = None
                         simple_rule.price_charge_active = False
@@ -2458,7 +2515,15 @@ async def _simple_rule_loop():
                     "pv_after_priority_w": export_now,
                     "schedule_active": schedule_active,
                     "charge_schedule": charge_schedule,
+                    "weather_hint": weather_hint,
                 }
+
+                # Anti-feed heeft voorrang: 's avonds/nacht import → ontladen, niet netladen.
+                if anti_feed_needed and price_charge_on:
+                    price_charge_on = False
+                    simple_rule.price_charge_active = False
+                    simple_rule.price_charge_since = None
+                    simple_rule.price_not_since = None
 
                 # Goedkoop uur: laden uit net (zon mag tegelijk naar huis/Eddi). 10 min hysteresis.
                 if price_charge_on:
@@ -2478,6 +2543,7 @@ async def _simple_rule_loop():
                     per: Dict[str, Any] = {}
                     available: list = []
                     blocked_bids = set()
+                    _soc_pc: list = []
                     for it in items:
                         bid = it['id']
                         entry = _get_entry_for(bid)
@@ -2491,6 +2557,8 @@ async def _simple_rule_loop():
                                 timeout=5.0
                             )
                             current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                            if current_soc and 0 < current_soc <= 100:
+                                _soc_pc.append(float(current_soc))
                             max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
                             limit_soc = min(int(price_target_soc), int(max_soc))
                             if current_soc >= limit_soc:
@@ -2501,6 +2569,9 @@ async def _simple_rule_loop():
                         except Exception as e:
                             logger.warning(f"⚠️ Price-charge SOC check {bid}: {e}")
                             per[bid] = {"mode": "blocked", "ok": False, "error": str(e), "set": 0}
+
+                    if _soc_pc:
+                        simple_rule.avg_soc_cache = min(_soc_pc)
 
                     n_avail = len(available)
                     setpoints: Dict[str, int] = {}
@@ -2551,13 +2622,8 @@ async def _simple_rule_loop():
                     await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
                     continue
 
-                # Anti-feed: zon weg + import, maar niet in goedkoop uur (dan laden we)
-                # Mid: vasthouden tot dure avond. Unknown (geen prijzen): oude gedrag.
-                pv_threshold = cfg.get("pv_threshold_w", 50)
-                import_threshold = cfg.get("import_threshold_w", 100)
-                allow_discharge = price_band in ("expensive", "unknown")
-                
-                if allow_discharge and pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
+                # Anti-feed: zon weg + import → batterijen ontladen (ook bij mid-tarief).
+                if anti_feed_needed:
                     # Force discharge (Modbus control) — Anti-Feed work_mode alleen is na FW-update niet genoeg
                     import_margin = int(cfg.get("import_margin_w", cfg.get("buffer_w", 200)))
                     cap = int(cfg.get("per_battery_max_w", 2500))
@@ -2726,6 +2792,7 @@ async def _simple_rule_loop():
                 blocked_bids = set()
                 
                 # Pre-check: which batteries are blocked (max SOC)?
+                _soc_readings_this_iter: list = []
                 for it in items:
                     bid = it['id']
                     try:
@@ -2737,6 +2804,8 @@ async def _simple_rule_loop():
                                 timeout=3.0
                             )
                             current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                            if current_soc and 0 < current_soc <= 100:
+                                _soc_readings_this_iter.append(float(current_soc))
                             max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
                             if current_soc >= max_soc:
                                 logger.info(f"🔋 Battery {bid} at max SOC ({current_soc}% >= {max_soc}%) - SKIP")
@@ -2745,6 +2814,10 @@ async def _simple_rule_loop():
                     except Exception as e:
                         logger.warning(f"⚠️ Could not check SOC for {bid}: {e}")
                 
+                # Update SOC cache voor volgende Frank-aanroep (min = meest conservatief)
+                if _soc_readings_this_iter:
+                    simple_rule.avg_soc_cache = min(_soc_readings_this_iter)
+
                 # Only distribute to available (non-blocked) batteries
                 available = [it for it in items if it['id'] not in blocked_bids]
                 n_avail = max(1, len(available))
@@ -3249,6 +3322,16 @@ async def get_solar_forecast():
     """Get solar-relevant weather forecast"""
     try:
         data = await weather_service.get_solar_forecast()
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/weather/solar-hours")
+async def get_weather_solar_hours(hours: int = 12):
+    """Compacte zonne-verwachting per uur voor sidebar weergave."""
+    try:
+        h = max(1, min(24, int(hours)))
+        data = await weather_service.get_solar_hours(hours=h)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}

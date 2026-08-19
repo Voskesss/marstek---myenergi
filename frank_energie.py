@@ -257,6 +257,7 @@ def _build_daily_plan(
         battery_capacity_kwh=battery_capacity_kwh,
         charge_power_kw=charge_power_kw,
         target_soc_pct=target_soc_pct,
+        cheap_threshold_eur_kwh=cheap_thr,
     )
 
     return {
@@ -283,6 +284,7 @@ def _build_charge_schedule(
     battery_capacity_kwh: float,
     charge_power_kw: float,
     target_soc_pct: float,
+    cheap_threshold_eur_kwh: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
     """Bepaal de optimale laaduren op basis van huidige SOC en toekomstige prijzen.
 
@@ -313,17 +315,24 @@ def _build_charge_schedule(
     cur_hour = current["hour"] if current else now_nl.hour
 
     # Bouw kandidaatlijst: toekomstige uren van vandaag + morgen (als beschikbaar)
-    # Elk slot = {"day": "today"/"tomorrow", "hour": int, "price": float, "from": str}
+    # Alleen vandaag: batterijen gaan 's nachts leeg, morgen opnieuw plannen
     candidates: List[Dict[str, Any]] = []
     for p in today_prices:
-        if p["hour"] >= cur_hour:  # huidig uur meenemen
+        if p["hour"] >= cur_hour:
+            if cheap_threshold_eur_kwh is not None and p["price_eur_kwh"] > cheap_threshold_eur_kwh:
+                continue
             candidates.append({"day": "today", "hour": p["hour"], "price": p["price_eur_kwh"], "from": p["from"]})
-    if tomorrow_prices:
-        for p in tomorrow_prices:
-            candidates.append({"day": "tomorrow", "hour": p["hour"], "price": p["price_eur_kwh"], "from": p["from"]})
 
     if not candidates:
-        return {"active_now": False, "reason": "no_future_prices", "planned_slots": [], "needed_hours": round(needed_hours, 2)}
+        return {
+            "active_now": False,
+            "reason": "no_cheap_slots_left",
+            "soc_now": round(soc_now, 1),
+            "target_soc": target,
+            "needed_kwh": needed_kwh,
+            "needed_hours": round(needed_hours, 2),
+            "planned_slots": [],
+        }
 
     # Sorteer op prijs, pak genoeg uren (ceil naar boven)
     import math

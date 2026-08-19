@@ -594,6 +594,25 @@
       letter-spacing: 1px;
       margin-bottom: 8px;
     }
+    .sim-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .sim-toggle-btn {
+      border: 1px solid rgba(56,189,248,0.35);
+      background: rgba(56,189,248,0.12);
+      color: #7dd3fc;
+      border-radius: 8px;
+      font-size: 10px;
+      padding: 4px 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+    .sim-toggle-btn:active { transform: translateY(1px); }
 
     /* Price label pill */
     .price-label-pill {
@@ -659,6 +678,24 @@
     .frank-bar-item:hover {
       filter: brightness(1.5);
       transform: scaleY(1.08);
+    }
+    .bar-hour-labels {
+      display: flex;
+      gap: 2px;
+      margin-top: 3px;
+      height: 10px;
+    }
+    .bar-hour-label {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      font-size: 8px;
+      line-height: 10px;
+      color: #64748b;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
     }
 
     /* Frank tooltip */
@@ -752,7 +789,7 @@
   <div id="sidePanel">
 
     <!-- Sectie A: Huidig tarief -->
-    <div class="side-section">
+    <div class="side-section" id="priceSection">
       <div class="side-section-title">Frank Energie — Tarief Nu</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
         <div>
@@ -771,16 +808,25 @@
     </div>
 
     <!-- Sectie B: Staafdiagrammen -->
-    <div class="side-section">
+    <div class="side-section" id="barsSection">
       <div class="side-section-title">Vandaag</div>
       <div class="frank-bars" id="frankBarsToday"></div>
       <div class="side-section-title" style="margin-top:10px;">Morgen <span id="frankTomorrowLabel" style="color:#64748b;font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
       <div class="frank-bars" id="frankBarsTomorrow"></div>
+      <div class="side-section-title" style="margin-top:10px;">
+        Zon komende uren
+        <span id="solarBarsSource" style="color:#64748b;font-weight:400;text-transform:none;letter-spacing:0;"></span>
+      </div>
+      <div class="frank-bars" id="solarBars"></div>
+      <div class="bar-hour-labels" id="solarBarsLabels"></div>
     </div>
 
     <!-- Sectie C: Simulatie -->
-    <div class="side-section" style="flex:1;">
-      <div class="side-section-title">Simulatie — Wat zou er nu gebeuren?</div>
+    <div class="side-section" id="simulationSection" style="flex:1;">
+      <div class="sim-header-row">
+        <div class="side-section-title" style="margin-bottom:0;">Simulatie — Wat zou er nu gebeuren?</div>
+        <button class="sim-toggle-btn" id="simPanelToggleBtn" type="button">⬆️ Naar boven</button>
+      </div>
       <div style="font-size:9px;color:#475569;margin-bottom:8px;">simulatie + echte sturing via dagelijkse tariefband</div>
 
       <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Overschot nu</div>
@@ -1602,7 +1648,7 @@ function updateMobile(pv, grid, house, eddi, zappi, bp1, bp2, b1Soc, b2Soc, b1Mo
 }
 
 // ===== Data fetching with fallback cache =====
-let _lastData = { status: {}, b1: {}, b2: {}, energy: {}, sr: {} };
+let _lastData = { status: {}, b1: {}, b2: {}, energy: {} };
 
 async function safeFetch(url) {
   const res = await fetch(url, { cache: 'no-store' });
@@ -1629,12 +1675,11 @@ function mergeData(old, fresh) {
 
 async function fetchData() {
   const ts = Date.now();
-  const [status, b1, b2, energy, sr] = await Promise.all([
+  const [status, b1, b2, energy] = await Promise.all([
     safeFetch(`/api/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/energy/today?ts=${ts}`).catch(() => null),
-    safeFetch(`/api/simple_rule/status?ts=${ts}`).catch(() => null),
   ]);
   // Merge: keep previous good values when new ones are null
   _lastData = {
@@ -1642,7 +1687,6 @@ async function fetchData() {
     b1: mergeData(_lastData.b1, b1),
     b2: mergeData(_lastData.b2, b2),
     energy: mergeData(_lastData.energy, energy),
-    sr: mergeData(_lastData.sr, sr),
   };
   return _lastData;
 }
@@ -2102,8 +2146,78 @@ function renderFrankBars(containerId, prices, highlightHour, sharedMin, sharedMa
   });
 }
 
+function renderSolarBars(containerId, hours) {
+  const bars = document.getElementById(containerId);
+  const labels = document.getElementById('solarBarsLabels');
+  if (!bars) return;
+  bars.innerHTML = '';
+  if (labels) labels.innerHTML = '';
+  if (!hours || !hours.length) {
+    bars.innerHTML = '<div style="font-size:10px;color:#64748b;padding:4px 0;">nog niet beschikbaar</div>';
+    return;
+  }
+  hours.forEach((hRow, idx) => {
+    const score = Math.max(0, Math.min(100, Number(hRow.solar_score || 0)));
+    const barH = 6 + (score / 100) * 26;
+    let color = 'rgba(148,163,184,0.45)';
+    if (score >= 65) color = '#22c55e';
+    else if (score >= 35) color = '#fbbf24';
+    else color = '#64748b';
+    const el = document.createElement('div');
+    el.className = 'frank-bar-item';
+    if (idx === 0) {
+      el.style.cssText = `height:${barH}px;background:#38bdf8;`;
+      el.title = `${hRow.time} nu · zon-score ${score}% · bewolking ${hRow.clouds}%`;
+    } else {
+      el.style.cssText = `height:${barH}px;background:${color};`;
+      el.title = `${hRow.time} · zon-score ${score}% · bewolking ${hRow.clouds}%`;
+    }
+    bars.appendChild(el);
+
+    if (labels) {
+      const lbl = document.createElement('div');
+      lbl.className = 'bar-hour-label';
+      const hh = String(hRow.time || '--:--').slice(0, 2);
+      lbl.textContent = hh;
+      labels.appendChild(lbl);
+    }
+  });
+}
+
 // ===== Frank prices: cached data for simulation =====
 let _frankData = null;
+let _solarData = null;
+let _simPanelUp = false;
+
+function applySimulationPanelPosition() {
+  const sidePanel = document.getElementById('sidePanel');
+  const sim = document.getElementById('simulationSection');
+  const price = document.getElementById('priceSection');
+  const bars = document.getElementById('barsSection');
+  const btn = document.getElementById('simPanelToggleBtn');
+  if (!sidePanel || !sim || !btn) return;
+
+  if (_simPanelUp) {
+    sidePanel.insertBefore(sim, price || sidePanel.firstChild);
+    btn.textContent = '⬇️ Naar onder';
+    btn.title = 'Zet simulatie terug onder de prijs/zon blokken';
+  } else {
+    // Plaats simulatie onder de prijs- en zonsecties
+    if (bars && bars.nextSibling) {
+      sidePanel.insertBefore(sim, bars.nextSibling);
+    } else {
+      sidePanel.appendChild(sim);
+    }
+    btn.textContent = '⬆️ Naar boven';
+    btn.title = 'Zet simulatie boven de prijs/zon blokken';
+  }
+}
+
+function toggleSimulationPanelPosition() {
+  _simPanelUp = !_simPanelUp;
+  try { localStorage.setItem('simPanelUp', _simPanelUp ? '1' : '0'); } catch (e) {}
+  applySimulationPanelPosition();
+}
 
 async function updateFrankPrices() {
   try {
@@ -2162,53 +2276,152 @@ async function updateFrankPrices() {
       renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
     }
 
-    // Laadplanning wordt bijgewerkt via updateSimulation() met live SOC uit simple_rule
+    // Laadplanning wordt bijgewerkt via updateSimulation() met live SOC uit b1/b2
   } catch (e) {
     document.getElementById('frankPriceNow').textContent = '€ --';
     document.getElementById('frankPriceMeta').textContent = 'Frank offline';
   }
 }
 
-function _updateScheduleRow(schedule) {
+async function updateWeatherSolar() {
+  try {
+    const res = await fetch('/api/weather/solar-hours?hours=12');
+    const json = await res.json();
+    if (!json.success || !json.data) throw new Error(json.error || 'geen data');
+    _solarData = json.data;
+    renderSolarBars('solarBars', _solarData.hours || []);
+    const srcEl = document.getElementById('solarBarsSource');
+    if (srcEl) srcEl.textContent = `(${_solarData.source || 'onbekend'})`;
+  } catch (e) {
+    renderSolarBars('solarBars', []);
+    const srcEl = document.getElementById('solarBarsSource');
+    if (srcEl) srcEl.textContent = '(offline)';
+  }
+}
+
+function _computeSchedule(frankData, liveData) {
+  // Bereken laadplanning volledig in de browser op basis van live SOC + prijsdata.
+  // Geen afhankelijkheid van server-side charge_schedule.
+  if (!frankData || !liveData) return null;
+
+  const CAPACITY_KWH = 10.0;
+  const CHARGE_KW    = 2.5;
+  const TARGET_SOC   = (frankData.plan && frankData.plan.charge_target_soc) || 85;
+
+  // SOC uit batterij-API data (b1/b2)
+  const soc1 = liveData.b1 && liveData.b1.data && liveData.b1.data.soc_percent && liveData.b1.data.soc_percent.value;
+  const soc2 = liveData.b2 && liveData.b2.data && liveData.b2.data.soc_percent && liveData.b2.data.soc_percent.value;
+  const socs = [soc1, soc2].filter(s => s != null && s > 0 && s <= 100);
+  if (!socs.length) return null;
+  const avgSoc = socs.reduce((a, b) => a + b, 0) / socs.length;
+
+  if (avgSoc >= TARGET_SOC) {
+    return { done: true, avgSoc: Math.round(avgSoc * 10) / 10, targetSoc: TARGET_SOC };
+  }
+
+  const neededKwh  = Math.round(((TARGET_SOC - avgSoc) / 100) * CAPACITY_KWH * 100) / 100;
+  const neededHours = neededKwh / CHARGE_KW;
+  const nSlots     = Math.ceil(neededHours);
+
+  // Bouw kandidaatlijst: toekomstige uren vandaag + morgen
+  const curHour = frankData.current ? frankData.current.hour : new Date().getHours();
+  const today   = (frankData.today && frankData.today.prices) || [];
+  const cheapThr = (frankData.plan && frankData.plan.cheap_threshold_eur_kwh != null)
+    ? frankData.plan.cheap_threshold_eur_kwh
+    : 0.10;
+  // Alleen vandaag + alleen uren onder goedkope drempel
+  const candidates = [];
+  for (const p of today) {
+    if (p.hour >= curHour && p.price_eur_kwh <= cheapThr) {
+      candidates.push({ day: 'today', hour: p.hour, price: p.price_eur_kwh });
+    }
+  }
+  if (!candidates.length) return { done: false, avgSoc: Math.round(avgSoc*10)/10, targetSoc: TARGET_SOC, neededKwh, neededHours: Math.round(neededHours*100)/100, slots: [], activeNow: false };
+
+  const cheapest = [...candidates].sort((a, b) => a.price - b.price).slice(0, nSlots);
+  const plannedTodayHours = new Set(cheapest.filter(s => s.day === 'today').map(s => s.hour));
+  const activeNow = plannedTodayHours.has(curHour);
+  const sorted = [...cheapest].sort((a, b) => (a.day === b.day ? a.hour - b.hour : a.day === 'today' ? -1 : 1));
+
+  return {
+    done: false,
+    avgSoc: Math.round(avgSoc * 10) / 10,
+    targetSoc: TARGET_SOC,
+    neededKwh,
+    neededHours: Math.round(neededHours * 100) / 100,
+    nSlots,
+    slots: sorted,
+    activeNow,
+    plannedTodayHours,
+    plannedTomHours: new Set(cheapest.filter(s => s.day === 'tomorrow').map(s => s.hour)),
+  };
+}
+
+function _updateScheduleRow(frankData, liveData) {
   const row  = document.getElementById('simScheduleRow');
   const icon = document.getElementById('simScheduleIcon');
   const text = document.getElementById('simScheduleText');
   const sub  = document.getElementById('simScheduleSub');
   if (!row || !text) return;
 
-  if (!schedule || schedule.reason === 'soc_unknown') {
+  const sched = _computeSchedule(frankData, liveData);
+
+  if (!sched) {
     text.textContent = 'SOC onbekend — planning niet mogelijk';
     if (sub) sub.textContent = '';
     row.className = 'sim-row blue';
+    if (icon) icon.textContent = '📅';
     return;
   }
 
-  if (schedule.reason === 'already_at_target') {
-    text.textContent = `Batterij al op doel (${schedule.soc_now}% ≥ ${schedule.target_soc}%)`;
+  if (sched.done) {
+    text.textContent = `Batterij al op doel (${sched.avgSoc}% ≥ ${sched.targetSoc}%)`;
     if (sub) sub.textContent = 'Geen netladingen nodig';
     row.className = 'sim-row green';
     if (icon) icon.textContent = '✅';
     return;
   }
 
-  const slots = schedule.planned_slots || [];
-  const slotLabels = slots.map(s => {
+  const slotLabels = sched.slots.map(s => {
     const day = s.day === 'tomorrow' ? 'morgen' : 'vandaag';
     return `${String(s.hour).padStart(2,'0')}:00 (${day}, ${fmtEurKwh(s.price)})`;
   }).join(' · ');
 
-  if (schedule.active_now) {
-    text.textContent = `🔋 Nu laden — ${schedule.needed_kwh} kWh nodig (${schedule.needed_hours}u)`;
-    if (sub) sub.textContent = `Gepland: ${slotLabels || '—'} · kosten ~${fmtEurKwh(schedule.total_cost_eur / (schedule.needed_hours || 1))}/kWh gem.`;
+  if (sched.activeNow) {
+    text.textContent = `Nu laden — ${sched.neededKwh} kWh nodig`;
+    if (sub) sub.textContent = `Gepland: ${slotLabels || '—'} · SOC ${sched.avgSoc}% → ${sched.targetSoc}%`;
     row.className = 'sim-row green';
     if (icon) icon.textContent = '⚡';
   } else {
-    const next = slots.find(s => s.day === 'today' || s.day === 'tomorrow');
-    const nextStr = next ? `Goedkoopst: ${String(next.hour).padStart(2,'0')}:00 (${next.day === 'tomorrow' ? 'morgen' : 'vandaag'}) à ${fmtEurKwh(next.price)}` : 'Geen goedkoop slot gevonden';
-    text.textContent = `Wachten op goedkoop slot · ${schedule.needed_kwh} kWh nodig`;
-    if (sub) sub.textContent = `${nextStr} · SOC ${schedule.soc_now}% → ${schedule.target_soc}%`;
+    const next = sched.slots[0];
+    const nextStr = next
+      ? `Goedkoopst: ${String(next.hour).padStart(2,'0')}:00 (${next.day === 'tomorrow' ? 'morgen' : 'vandaag'}) à ${fmtEurKwh(next.price)}`
+      : 'Geen slot gevonden';
+    text.textContent = `Wachten op goedkoop slot · ${sched.neededKwh} kWh nodig`;
+    if (sub) sub.textContent = `${nextStr} · SOC ${sched.avgSoc}% → ${sched.targetSoc}%`;
     row.className = 'sim-row blue';
     if (icon) icon.textContent = '📅';
+  }
+
+  // Update staafdiagram-markering met geplande uren
+  if (sched.plannedTodayHours || sched.plannedTomHours) {
+    _rerenderBarsWithSchedule(sched.plannedTodayHours, sched.plannedTomHours);
+  }
+}
+
+function _rerenderBarsWithSchedule(todayHours, tomHours) {
+  if (!_frankData) return;
+  const d = _frankData;
+  const plan = d.plan || {};
+  const todayPrices = (d.today && d.today.prices) || [];
+  const tomPrices   = (d.tomorrow && d.tomorrow.prices) || [];
+  const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
+  const sharedMin = allVals.length ? Math.min(...allVals) : null;
+  const sharedMax = allVals.length ? Math.max(...allVals) : null;
+  const cur = d.current;
+  renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax, plan.cheap_hours, plan.expensive_hours, [...(todayHours || [])]);
+  if (d.tomorrow && d.tomorrow.available && tomPrices.length) {
+    renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax, [], [], [...(tomHours || [])]);
   }
 }
 
@@ -2494,11 +2707,8 @@ function updateSimulation() {
   const sim = computeSimulation(_frankData, _lastData);
   if (!sim) return;
 
-  // Laadplanning: haal uit live simple_rule data (actuele SOC), niet uit Frank-cache
-  const liveSchedule = (_lastData.sr && _lastData.sr.last && _lastData.sr.last.price)
-    ? _lastData.sr.last.price.charge_schedule
-    : null;
-  if (liveSchedule !== undefined) _updateScheduleRow(liveSchedule);
+  // Laadplanning: bereken direct in browser uit live SOC + prijsdata
+  _updateScheduleRow(_frankData, _lastData);
 
   const surplusRow  = document.getElementById('simSurplusRow');
   const surplusText = document.getElementById('simSurplusText');
@@ -2552,8 +2762,18 @@ window.addEventListener('DOMContentLoaded', () => {
   onResize();
   initFlowLines();
   tick();
+  try {
+    _simPanelUp = localStorage.getItem('simPanelUp') === '1';
+  } catch (e) {
+    _simPanelUp = false;
+  }
+  const simBtn = document.getElementById('simPanelToggleBtn');
+  if (simBtn) simBtn.addEventListener('click', toggleSimulationPanelPosition);
+  applySimulationPanelPosition();
   updateFrankPrices();
+  updateWeatherSolar();
   setInterval(updateFrankPrices, 5 * 60 * 1000);
+  setInterval(updateWeatherSolar, 10 * 60 * 1000);
 });
 </script>
 </body>
