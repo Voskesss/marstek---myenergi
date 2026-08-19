@@ -2185,16 +2185,21 @@ class SimpleRuleState:
         self.task: Optional[asyncio.Task] = None
         # defaults (can be overridden via enable payload)
         self.cfg: Dict[str, Any] = {
-            "buffer_w": 200,
-            "export_margin_w": 100,
-            "threshold_start_w": 150,
-            "threshold_stop_w": 100,
-            "ramp_step_w": 500,        # per tick (was 150, te traag)
+            "buffer_w": 50,
+            "export_margin_w": 50,
+            "threshold_start_w": 40,
+            "threshold_stop_w": 60,
+            "ramp_step_w": 200,
             "loop_interval_s": 3.0,    # 3 seconds (was 5s)
             "cooldown_s": 8,
             "max_batt_total_w": 5000,  # total across all batteries
             "per_battery_max_w": 2500, # hard cap per battery
-            "battery_config": self._load_battery_limits()  # Load from battery_config.json
+            "battery_config": self._load_battery_limits(),  # Load from battery_config.json
+            "price_charge_enabled": True,
+            "price_charge_total_w": 2500,
+            "price_hysteresis_s": 600,
+            "battery_total_capacity_kwh": 10.0,
+            "battery_charge_power_kw": 2.5,
         }
         self.last: Dict[str, Any] = {
             "grid_w": None,
@@ -2218,6 +2223,9 @@ class SimpleRuleState:
         self.prev_set_total: float = 0.0
         self.cooldown_until: float = 0.0
         self.battery_modes: Dict[str, str] = {}  # Track battery modes: bid -> "manual"|"anti-feed"|"unknown"
+        self.price_charge_since: Optional[float] = None
+        self.price_not_since: Optional[float] = None
+        self.price_charge_active: bool = False
     
     def _load_battery_limits(self) -> dict:
         """Load minimum SOC limits from battery_config.json"""
@@ -2382,11 +2390,174 @@ async def _simple_rule_loop():
 
                 target_total = simple_rule.prev_set_total
                 
-                # Anti-feed: alleen als zon weg is (lage PV) én er net-import is
+                # Dagelijkse tariefband + laadplanning (SOC uit vorige iteratie)
+                price_plan: Dict[str, Any] = {}
+                overview: Dict[str, Any] = {}
+                _prev_soc = simple_rule.last.get("battery_soc")
+                try:
+                    from frank_energie import frank_client as _frank
+                    overview = await _frank.get_overview(
+                        soc_pct=float(_prev_soc) if _prev_soc is not None else None,
+                        battery_capacity_kwh=float(cfg.get("battery_total_capacity_kwh", 10.0)),
+                        charge_power_kw=float(cfg.get("battery_charge_power_kw", 2.5)),
+                        target_soc_pct=float(cfg.get("price_charge_target_soc", 85.0)),
+                    )
+                    price_plan = overview.get("plan") or {}
+                except Exception as pe:
+                    logger.debug(f"Frank price plan skip: {pe}")
+                price_band = price_plan.get("band") or "unknown"
+                price_now = None
+                try:
+                    price_now = (overview.get("current") or {}).get("price_eur_kwh")
+                except Exception:
+                    price_now = None
+                price_target_soc = int(price_plan.get("charge_target_soc") or 85)
+                house_now = int(house_w_raw or 0)
+                eddi_now = int(eddi_w_raw or 0)
+                zappi_now = int(zappi_w_raw or 0)
+                # Echt overschot = gemeten export naar het net (niet PV minus huis/Eddi-reservering)
+                export_now = max(0, -int(grid_w))
+                low_after_priority = export_now < 100
+                zappi_heavy = zappi_now > 200
+                hyst_s = float(cfg.get("price_hysteresis_s", 600))
+                price_charge_on = False
+                charge_schedule = (price_plan.get("charge_schedule") or {})
+                schedule_active = bool(charge_schedule.get("active_now", False))
+                if cfg.get("price_charge_enabled", True):
+                    # schedule_active = dit uur staat in de geplande goedkoopste uren
+                    candidate = (
+                        schedule_active
+                        and low_after_priority
+                        and not zappi_heavy
+                    )
+                    if zappi_heavy:
+                        simple_rule.price_charge_since = None
+                        simple_rule.price_not_since = None
+                        simple_rule.price_charge_active = False
+                    elif candidate:
+                        simple_rule.price_not_since = None
+                        if not simple_rule.price_charge_since:
+                            simple_rule.price_charge_since = now
+                        if (not simple_rule.price_charge_active) and (now - simple_rule.price_charge_since) >= hyst_s:
+                            simple_rule.price_charge_active = True
+                    else:
+                        simple_rule.price_charge_since = None
+                        if not simple_rule.price_not_since:
+                            simple_rule.price_not_since = now
+                        if simple_rule.price_charge_active and (now - simple_rule.price_not_since) >= hyst_s:
+                            simple_rule.price_charge_active = False
+                    price_charge_on = bool(simple_rule.price_charge_active)
+
+                price_info = {
+                    "band": price_band,
+                    "price_eur_kwh": price_now,
+                    "cheap_threshold": price_plan.get("cheap_threshold_eur_kwh"),
+                    "expensive_threshold": price_plan.get("expensive_threshold_eur_kwh"),
+                    "target_soc": price_target_soc,
+                    "charging": price_charge_on,
+                    "pv_after_priority_w": export_now,
+                    "schedule_active": schedule_active,
+                    "charge_schedule": charge_schedule,
+                }
+
+                # Goedkoop uur: laden uit net (zon mag tegelijk naar huis/Eddi). 10 min hysteresis.
+                if price_charge_on:
+                    cap = int(cfg.get("per_battery_max_w", 2500))
+                    target_total = int(cfg.get("price_charge_total_w", 2500))
+                    sched_slots = [f"{s['day']}@{s['hour']}h" for s in charge_schedule.get("planned_slots", [])]
+                    logger.info(
+                        f"💶 PRICE CHARGE: schedule={sched_slots} price={price_now} "
+                        f"soc={charge_schedule.get('soc_now')}%→{price_target_soc}% "
+                        f"need={charge_schedule.get('needed_kwh')}kWh → charge {target_total}W"
+                    )
+                    try:
+                        items = (await list_batteries())['items']  # type: ignore[index]
+                    except Exception as e:
+                        logger.error(f"❌ Failed to list batteries: {e}")
+                        continue
+                    per: Dict[str, Any] = {}
+                    available: list = []
+                    blocked_bids = set()
+                    for it in items:
+                        bid = it['id']
+                        entry = _get_entry_for(bid)
+                        if not entry:
+                            per[bid] = {"mode": "price_charge", "ok": False, "error": "not_in_registry", "set": 0}
+                            continue
+                        client = entry['client']
+                        try:
+                            battery_data = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(None, client.read_battery_data),
+                                timeout=5.0
+                            )
+                            current_soc = battery_data.get("soc_percent", {}).get("value", 0) if battery_data else 0
+                            max_soc = cfg.get("battery_config", {}).get(bid, {}).get("maximum_soc_percent", 87)
+                            limit_soc = min(int(price_target_soc), int(max_soc))
+                            if current_soc >= limit_soc:
+                                per[bid] = {"set": 0, "ok": True, "mode": "blocked_target_soc", "soc": current_soc, "target_soc": limit_soc}
+                                blocked_bids.add(bid)
+                                continue
+                            available.append({"id": bid, "soc": current_soc, "entry": entry})
+                        except Exception as e:
+                            logger.warning(f"⚠️ Price-charge SOC check {bid}: {e}")
+                            per[bid] = {"mode": "blocked", "ok": False, "error": str(e), "set": 0}
+
+                    n_avail = len(available)
+                    setpoints: Dict[str, int] = {}
+                    remaining = int(target_total) if n_avail else 0
+                    base_share = min(cap, remaining // n_avail) if n_avail else 0
+                    for bat in available:
+                        sp = max(0, min(base_share, remaining, cap))
+                        setpoints[bat["id"]] = sp
+                        remaining -= sp
+                    set_total = 0
+                    for bat in available:
+                        bid = bat["id"]
+                        sp = int(setpoints.get(bid, 0))
+                        if sp > 0 and simple_rule.battery_modes.get(bid, "unknown") != "manual":
+                            try:
+                                entry = bat["entry"]
+                                async with entry["lock"]:
+                                    mode_result = entry["client"].set_work_mode(0)
+                                if mode_result.get("ok"):
+                                    simple_rule.battery_modes[bid] = "manual"
+                            except Exception as e:
+                                logger.warning(f"Price-charge mode switch {bid}: {e}")
+                        res = await _set_battery_power(bid, sp)
+                        ok = bool(res.get("success") or res.get("ok"))
+                        if ok:
+                            simple_rule.battery_modes[bid] = "charging" if sp > 0 else "stopped"
+                            set_total += sp
+                        per[bid] = {"mode": "price_charge", "ok": ok, "set": sp, "soc": bat["soc"]}
+                    # Stop blocked batteries
+                    for bid in blocked_bids:
+                        await _set_battery_power(bid, 0)
+
+                    simple_rule.prev_set_total = set_total
+                    simple_rule.last.update({
+                        "grid_w": grid_w,
+                        "pv_w": pv_w,
+                        "overschot_w": int(ema_overschot),
+                        "mode": "price_charge",
+                        "price": price_info,
+                        "batt_target_total_w": int(target_total),
+                        "batt_set_total_w": int(set_total),
+                        "per_battery": per,
+                        "cooldown": False,
+                        "ts": time.time(),
+                        "error": None,
+                    })
+                    dt = time.time() - t0
+                    await asyncio.sleep(max(0.05, cfg["loop_interval_s"] - dt))
+                    continue
+
+                # Anti-feed: zon weg + import, maar niet in goedkoop uur (dan laden we)
+                # Mid: vasthouden tot dure avond. Unknown (geen prijzen): oude gedrag.
                 pv_threshold = cfg.get("pv_threshold_w", 50)
                 import_threshold = cfg.get("import_threshold_w", 100)
+                allow_discharge = price_band in ("expensive", "unknown")
                 
-                if pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
+                if allow_discharge and pv_w is not None and pv_w < pv_threshold and grid_w > import_threshold:
                     # Force discharge (Modbus control) — Anti-Feed work_mode alleen is na FW-update niet genoeg
                     import_margin = int(cfg.get("import_margin_w", cfg.get("buffer_w", 200)))
                     cap = int(cfg.get("per_battery_max_w", 2500))
@@ -2517,6 +2688,7 @@ async def _simple_rule_loop():
                         "pv_w": pv_w,
                         "overschot_w": 0,
                         "mode": "anti-feed",
+                        "price": price_info,
                         "target_export_w": target_export,
                         "batt_target_total_w": int(target_total),
                         "batt_set_total_w": int(set_total),
@@ -2642,6 +2814,8 @@ async def _simple_rule_loop():
                 simple_rule.last.update({
                     "grid_w": grid_w,
                     "overschot_w": int(ema_overschot),
+                    "mode": "surplus_charge" if int(target_total) > 0 else "idle",
+                    "price": price_info,
                     "target_export_w": target_export,
                     "batt_target_total_w": int(target_total),
                     "batt_set_total_w": int(set_total),

@@ -552,7 +552,145 @@
       color: var(--text-dim);
     }
 
+    /* ===== Main layout: side panel + flow ===== */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Side panel */
+    #sidePanel {
+      background: rgba(10,14,26,0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 14px 10px;
+      gap: 12px;
+      z-index: 2;
+    }
+    #sidePanel::-webkit-scrollbar { width: 4px; }
+    #sidePanel::-webkit-scrollbar-track { background: transparent; }
+    #sidePanel::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 2px; }
+
+    .side-section {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .side-section-title {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    /* Price label pill */
+    .price-label-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .price-label-pill.laag { background: rgba(34,197,94,0.2); color: #22c55e; }
+    .price-label-pill.normaal { background: rgba(251,191,36,0.2); color: #fbbf24; }
+    .price-label-pill.hoog { background: rgba(239,68,68,0.2); color: #ef4444; }
+
+    /* Simulation action rows */
+    .sim-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-top: 6px;
+    }
+    .sim-row-icon { font-size: 16px; flex-shrink: 0; }
+    .sim-row-text { flex: 1; font-size: 11px; font-weight: 600; }
+    .sim-row-sub { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+    .sim-row.green { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); }
+    .sim-row.blue  { background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.25); }
+    .sim-row.orange{ background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.25); }
+    .sim-row.red   { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.25); }
+
+    /* SEC1000 bar */
+    .sec-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .sec-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s ease, background 0.5s ease;
+    }
+
+    /* Frank bars inline */
+    .frank-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 32px;
+    }
+    .frank-bar-item {
+      flex: 1;
+      min-width: 0;
+      border-radius: 2px 2px 0 0;
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.15s ease;
+      transform-origin: bottom;
+    }
+    .frank-bar-item:hover {
+      filter: brightness(1.5);
+      transform: scaleY(1.08);
+    }
+
+    /* Frank tooltip */
+    #frankTooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      background: rgba(10,14,26,0.96);
+      border: 1px solid rgba(56,189,248,0.4);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      display: none;
+      transition: opacity 0.1s ease;
+    }
+    #frankTooltip .tt-hour { font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+    #frankTooltip .tt-price { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    #frankTooltip .tt-label { font-size: 10px; margin-top: 2px; }
+
     @media (max-width: 768px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+      #sidePanel {
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+        max-height: 42vh;
+      }
       .flow-container { display: none !important; }
       .mobile-flow { display: flex !important; }
       .stats-bar { gap: 12px; padding: 8px 12px; flex-wrap: wrap; }
@@ -607,26 +745,97 @@
     </div>
   </div>
 
-  <!-- Frank tarieven: middenonder tussen Eddi en Zappi -->
-  <div id="frankPanel" style="position:fixed;left:50%;transform:translateX(-50%);bottom:10%;z-index:6;width:min(300px,42vw);">
-    <div style="background:rgba(10,14,26,0.88);backdrop-filter:blur(10px);border:1px solid rgba(56,189,248,0.28);border-radius:12px;padding:10px 12px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;">
+  <!-- Main layout: left side panel + right flow -->
+  <div class="main-layout">
+
+  <!-- ===== Left: Side Panel (tarieven + simulatie) ===== -->
+  <div id="sidePanel">
+
+    <!-- Sectie A: Huidig tarief -->
+    <div class="side-section">
+      <div class="side-section-title">Frank Energie — Tarief Nu</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
         <div>
-          <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Frank tarief nu</div>
-          <div style="font-size:18px;font-weight:700;color:#38bdf8;" id="frankPriceNow">€ --</div>
-          <div style="font-size:10px;color:#64748b;" id="frankPriceMeta">laden…</div>
+          <div style="font-size:26px;font-weight:800;color:#38bdf8;font-variant-numeric:tabular-nums;letter-spacing:-1px;" id="frankPriceNow">€ --</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px;" id="frankPriceMeta">laden…</div>
+          <div style="margin-top:6px;"><span class="price-label-pill normaal" id="frankPriceLabel">--</span></div>
         </div>
-        <div style="text-align:right;font-size:10px;color:#94a3b8;line-height:1.35;">
-          <div>min <span id="frankMin" style="color:#22c55e;">--</span></div>
-          <div>max <span id="frankMax" style="color:#ef4444;">--</span></div>
+        <div style="text-align:right;font-size:10px;color:#94a3b8;line-height:1.8;">
+          <div>min <span id="frankMin" style="color:#22c55e;font-weight:700;">--</span></div>
+          <div>gem <span id="frankAvg" style="color:#94a3b8;font-weight:600;">--</span></div>
+          <div>max <span id="frankMax" style="color:#ef4444;font-weight:700;">--</span></div>
+          <div style="margin-top:4px;font-size:9px;color:#64748b;">koop ≤ <span id="frankCheapThr" style="color:#22c55e;">--</span></div>
+          <div style="font-size:9px;color:#64748b;">duur ≥ <span id="frankExpThr" style="color:#ef4444;">--</span></div>
         </div>
       </div>
-      <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;">Vandaag</div>
-      <div id="frankBarsToday" style="display:flex;align-items:flex-end;gap:2px;height:32px;margin-bottom:8px;"></div>
-      <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;">Morgen <span id="frankTomorrowLabel" style="color:#64748b;"></span></div>
-      <div id="frankBarsTomorrow" style="display:flex;align-items:flex-end;gap:2px;height:32px;"></div>
     </div>
-  </div>
+
+    <!-- Sectie B: Staafdiagrammen -->
+    <div class="side-section">
+      <div class="side-section-title">Vandaag</div>
+      <div class="frank-bars" id="frankBarsToday"></div>
+      <div class="side-section-title" style="margin-top:10px;">Morgen <span id="frankTomorrowLabel" style="color:#64748b;font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+      <div class="frank-bars" id="frankBarsTomorrow"></div>
+    </div>
+
+    <!-- Sectie C: Simulatie -->
+    <div class="side-section" style="flex:1;">
+      <div class="side-section-title">Simulatie — Wat zou er nu gebeuren?</div>
+      <div style="font-size:9px;color:#475569;margin-bottom:8px;">simulatie + echte sturing via dagelijkse tariefband</div>
+
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Overschot nu</div>
+      <div class="sim-row green" id="simSurplusRow">
+        <span class="sim-row-icon">☀️</span>
+        <div>
+          <div class="sim-row-text" id="simSurplusText">Berekening loopt…</div>
+          <div class="sim-row-sub" id="simSurplusSub"></div>
+        </div>
+      </div>
+
+      <!-- Batterij -->
+      <div style="font-size:10px;color:#94a3b8;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">🔋 Batterijen</div>
+      <div class="sim-row green" id="simBattRow">
+        <span class="sim-row-icon" id="simBattIcon">🔋</span>
+        <div>
+          <div class="sim-row-text" id="simBattText">Berekening loopt…</div>
+          <div class="sim-row-sub" id="simBattSub"></div>
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:#94a3b8;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">🔌 Netladen-regel</div>
+      <div class="sim-row blue" id="simNetRow">
+        <span class="sim-row-icon" id="simNetIcon">🔌</span>
+        <div>
+          <div class="sim-row-text" id="simNetText">Berekening loopt…</div>
+          <div class="sim-row-sub" id="simNetSub"></div>
+        </div>
+      </div>
+
+      <!-- Laadplanning -->
+      <div style="font-size:10px;color:#94a3b8;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">📅 Laadplanning</div>
+      <div class="sim-row blue" id="simScheduleRow">
+        <span class="sim-row-icon" id="simScheduleIcon">📅</span>
+        <div>
+          <div class="sim-row-text" id="simScheduleText">Berekening loopt…</div>
+          <div class="sim-row-sub" id="simScheduleSub"></div>
+        </div>
+      </div>
+
+      <!-- SEC1000 -->
+      <div style="font-size:10px;color:#94a3b8;margin-top:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">⚡ Omvormers (SEC1000)</div>
+      <div class="sim-row green" id="simSecRow">
+        <span class="sim-row-icon" id="simSecIcon">🌞</span>
+        <div style="flex:1;">
+          <div class="sim-row-text" id="simSecText">Berekening loopt…</div>
+          <div class="sim-row-sub" id="simSecSub"></div>
+          <div class="sec-bar-wrap" id="simSecBarWrap" style="display:none;">
+            <div class="sec-bar" id="simSecBar" style="width:0%;background:#ef4444;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#sidePanel -->
 
   <div class="flow-container" id="flowContainer">
     <!-- SVG flow lines -->
@@ -709,7 +918,8 @@
       <div class="hint-text">Zet de wasmachine of vaatwasser aan!</div>
       <div class="hint-power">-- kW overschot</div>
     </div>
-  </div>
+  </div><!-- /.flow-container -->
+  </div><!-- /.main-layout -->
 
   <!-- ===== Mobile vertical flow ===== -->
   <div class="mobile-flow" id="mobileFlow">
@@ -924,6 +1134,13 @@
       <div id="historyRows"></div>
     </div>
   </div>
+
+<!-- Frank tooltip -->
+<div id="frankTooltip">
+  <div class="tt-hour" id="ttHour"></div>
+  <div class="tt-price" id="ttPrice"></div>
+  <div class="tt-label" id="ttLabel"></div>
+</div>
 
 <script>
 // ===== Configuration =====
@@ -1385,7 +1602,7 @@ function updateMobile(pv, grid, house, eddi, zappi, bp1, bp2, b1Soc, b2Soc, b1Mo
 }
 
 // ===== Data fetching with fallback cache =====
-let _lastData = { status: {}, b1: {}, b2: {}, energy: {} };
+let _lastData = { status: {}, b1: {}, b2: {}, energy: {}, sr: {} };
 
 async function safeFetch(url) {
   const res = await fetch(url, { cache: 'no-store' });
@@ -1412,18 +1629,20 @@ function mergeData(old, fresh) {
 
 async function fetchData() {
   const ts = Date.now();
-  const [status, b1, b2, energy] = await Promise.all([
+  const [status, b1, b2, energy, sr] = await Promise.all([
     safeFetch(`/api/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => null),
-    safeFetch(`/api/energy/today?ts=${ts}`).catch(() => null)
+    safeFetch(`/api/energy/today?ts=${ts}`).catch(() => null),
+    safeFetch(`/api/simple_rule/status?ts=${ts}`).catch(() => null),
   ]);
   // Merge: keep previous good values when new ones are null
   _lastData = {
     status: mergeData(_lastData.status, status),
     b1: mergeData(_lastData.b1, b1),
     b2: mergeData(_lastData.b2, b2),
-    energy: mergeData(_lastData.energy, energy)
+    energy: mergeData(_lastData.energy, energy),
+    sr: mergeData(_lastData.sr, sr),
   };
   return _lastData;
 }
@@ -1683,6 +1902,11 @@ async function tick() {
     } catch (ue) {
       console.warn('updateDisplay error:', ue);
     }
+    try {
+      updateSimulation();
+    } catch (se) {
+      console.warn('updateSimulation error:', se);
+    }
     failureCount = 0;
     document.getElementById('statusDot').className = 'status-dot';
     document.getElementById('statusText').textContent = 'Live';
@@ -1792,7 +2016,55 @@ function fmtEurKwh(v) {
   return '€ ' + Number(v).toFixed(3).replace('.', ',') + '/kWh';
 }
 
-function renderFrankBars(containerId, prices, highlightHour, sharedMin, sharedMax) {
+// ===== Frank tooltip =====
+const _tt = document.getElementById ? document.getElementById('frankTooltip') : null;
+function showFrankTooltip(e, p, isMin, isMax, isCurrent, isPlanned) {
+  const tt = document.getElementById('frankTooltip');
+  if (!tt) return;
+  const hourStr = `${String(p.hour).padStart(2,'0')}:00 – ${String(p.hour + 1).padStart(2,'0')}:00`;
+  document.getElementById('ttHour').textContent = hourStr;
+  const priceEl = document.getElementById('ttPrice');
+  priceEl.textContent = fmtEurKwh(p.price_eur_kwh);
+  const labelEl = document.getElementById('ttLabel');
+  if (isCurrent) {
+    priceEl.style.color = '#38bdf8';
+    labelEl.textContent = '▶ Huidig uur' + (isPlanned ? ' · 🔋 gepland laden' : '');
+    labelEl.style.color = '#38bdf8';
+  } else if (isPlanned) {
+    priceEl.style.color = '#86efac';
+    labelEl.textContent = '🔋 Gepland laden';
+    labelEl.style.color = '#86efac';
+  } else if (isMin) {
+    priceEl.style.color = '#22c55e';
+    labelEl.textContent = '✓ Goedkoopste uur';
+    labelEl.style.color = '#22c55e';
+  } else if (isMax) {
+    priceEl.style.color = '#ef4444';
+    labelEl.textContent = '✗ Duurste uur';
+    labelEl.style.color = '#ef4444';
+  } else {
+    priceEl.style.color = 'var(--text)';
+    labelEl.textContent = '';
+  }
+  tt.style.display = 'block';
+  positionFrankTooltip(e);
+}
+function positionFrankTooltip(e) {
+  const tt = document.getElementById('frankTooltip');
+  if (!tt) return;
+  const x = e.clientX + 14;
+  const y = e.clientY - 10;
+  const tw = tt.offsetWidth || 160;
+  const th = tt.offsetHeight || 60;
+  tt.style.left = (x + tw > window.innerWidth ? e.clientX - tw - 8 : x) + 'px';
+  tt.style.top  = (y + th > window.innerHeight ? e.clientY - th - 8 : y) + 'px';
+}
+function hideFrankTooltip() {
+  const tt = document.getElementById('frankTooltip');
+  if (tt) tt.style.display = 'none';
+}
+
+function renderFrankBars(containerId, prices, highlightHour, sharedMin, sharedMax, cheapHours, expHours, plannedHours) {
   const bars = document.getElementById(containerId);
   if (!bars) return;
   bars.innerHTML = '';
@@ -1800,22 +2072,38 @@ function renderFrankBars(containerId, prices, highlightHour, sharedMin, sharedMa
     bars.innerHTML = '<div style="font-size:10px;color:#64748b;padding:4px 0;">nog niet beschikbaar</div>';
     return;
   }
+  const cheapSet = new Set(cheapHours || []);
+  const expSet = new Set(expHours || []);
+  const plannedSet = new Set(plannedHours || []);
   const vals = prices.map(p => p.price_eur_kwh);
   const minV = sharedMin != null ? sharedMin : Math.min(...vals);
   const maxV = sharedMax != null ? sharedMax : Math.max(...vals);
   const span = Math.max(0.01, maxV - minV);
   prices.forEach(p => {
     const h = 6 + ((p.price_eur_kwh - minV) / span) * 26;
-    const el = document.createElement('div');
-    el.title = `${String(p.hour).padStart(2,'0')}:00 → ${fmtEurKwh(p.price_eur_kwh)}`;
+    const isCurrent = highlightHour != null && p.hour === highlightHour;
+    const isMin = p.price_eur_kwh <= minV + 0.00001;
+    const isMax = p.price_eur_kwh >= maxV - 0.00001;
+    const isPlanned = plannedSet.has(p.hour);
     let color = 'rgba(148,163,184,0.45)';
-    if (highlightHour != null && p.hour === highlightHour) color = '#38bdf8';
-    else if (p.price_eur_kwh <= minV + 0.00001) color = '#22c55e';
-    else if (p.price_eur_kwh >= maxV - 0.00001) color = '#ef4444';
-    el.style.cssText = `flex:1;min-width:0;height:${h}px;border-radius:2px 2px 0 0;background:${color};`;
+    if (isCurrent) color = '#38bdf8';
+    else if (cheapSet.has(p.hour) || isMin) color = '#22c55e';
+    else if (expSet.has(p.hour) || isMax) color = '#ef4444';
+    const el = document.createElement('div');
+    el.className = 'frank-bar-item';
+    let extra = '';
+    if (isPlanned && !isCurrent) extra = 'outline:2px solid #86efac;outline-offset:-2px;';
+    el.style.cssText = `height:${h}px;background:${color};${extra}`;
+    if (isPlanned) el.title = `Gepland laden: ${p.hour}:00`;
+    el.addEventListener('mouseenter', e => showFrankTooltip(e, p, isMin && !isCurrent, isMax && !isCurrent, isCurrent, isPlanned));
+    el.addEventListener('mousemove', positionFrankTooltip);
+    el.addEventListener('mouseleave', hideFrankTooltip);
     bars.appendChild(el);
   });
 }
+
+// ===== Frank prices: cached data for simulation =====
+let _frankData = null;
 
 async function updateFrankPrices() {
   try {
@@ -1823,6 +2111,7 @@ async function updateFrankPrices() {
     const json = await res.json();
     if (!json.success || !json.data) throw new Error(json.error || 'geen data');
     const d = json.data;
+    _frankData = d;
     const cur = d.current;
     const today = d.today || {};
     const tomorrow = d.tomorrow || {};
@@ -1834,23 +2123,428 @@ async function updateFrankPrices() {
     document.getElementById('frankPriceMeta').textContent = `uur ${hourLabel}`;
     document.getElementById('frankMin').textContent = fmtEurKwh(today.min && today.min.price_eur_kwh);
     document.getElementById('frankMax').textContent = fmtEurKwh(today.max && today.max.price_eur_kwh);
+    const avgEl = document.getElementById('frankAvg');
+    if (avgEl) avgEl.textContent = fmtEurKwh(today.avg);
+
+    const plan = d.plan || {};
+    const cheapThrEl = document.getElementById('frankCheapThr');
+    const expThrEl = document.getElementById('frankExpThr');
+    if (cheapThrEl) cheapThrEl.textContent = fmtEurKwh(plan.cheap_threshold_eur_kwh);
+    if (expThrEl) expThrEl.textContent = fmtEurKwh(plan.expensive_threshold_eur_kwh);
+
+    // Price label pill: dagelijkse band, geen vaste €0,10
+    const pill = document.getElementById('frankPriceLabel');
+    if (pill) {
+      const band = plan.band || 'unknown';
+      const map = { cheap: 'laag', mid: 'normaal', expensive: 'hoog', unknown: 'normaal' };
+      const label = map[band] || 'normaal';
+      pill.textContent = band === 'cheap' ? 'laag (vandaag)' : band === 'expensive' ? 'hoog (vandaag)' : band === 'mid' ? 'midden' : '--';
+      pill.className = `price-label-pill ${label}`;
+    }
 
     const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
     const sharedMin = allVals.length ? Math.min(...allVals) : null;
     const sharedMax = allVals.length ? Math.max(...allVals) : null;
 
-    renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax);
+    // Geplande laaduren uit charge_schedule
+    const schedule = plan.charge_schedule || {};
+    const plannedSlots = schedule.planned_slots || [];
+    const plannedTodayHours = plannedSlots.filter(s => s.day === 'today').map(s => s.hour);
+    const plannedTomHours = plannedSlots.filter(s => s.day === 'tomorrow').map(s => s.hour);
+
+    renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax, plan.cheap_hours, plan.expensive_hours, plannedTodayHours);
     const tomLabel = document.getElementById('frankTomorrowLabel');
     if (tomorrow.available && tomPrices.length) {
       tomLabel.textContent = `(min ${fmtEurKwh(tomorrow.min && tomorrow.min.price_eur_kwh)})`;
-      renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax);
+      renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax, [], [], plannedTomHours);
     } else {
       tomLabel.textContent = '(na ~15:00)';
       renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
     }
+
+    // Laadplanning wordt bijgewerkt via updateSimulation() met live SOC uit simple_rule
   } catch (e) {
     document.getElementById('frankPriceNow').textContent = '€ --';
     document.getElementById('frankPriceMeta').textContent = 'Frank offline';
+  }
+}
+
+function _updateScheduleRow(schedule) {
+  const row  = document.getElementById('simScheduleRow');
+  const icon = document.getElementById('simScheduleIcon');
+  const text = document.getElementById('simScheduleText');
+  const sub  = document.getElementById('simScheduleSub');
+  if (!row || !text) return;
+
+  if (!schedule || schedule.reason === 'soc_unknown') {
+    text.textContent = 'SOC onbekend — planning niet mogelijk';
+    if (sub) sub.textContent = '';
+    row.className = 'sim-row blue';
+    return;
+  }
+
+  if (schedule.reason === 'already_at_target') {
+    text.textContent = `Batterij al op doel (${schedule.soc_now}% ≥ ${schedule.target_soc}%)`;
+    if (sub) sub.textContent = 'Geen netladingen nodig';
+    row.className = 'sim-row green';
+    if (icon) icon.textContent = '✅';
+    return;
+  }
+
+  const slots = schedule.planned_slots || [];
+  const slotLabels = slots.map(s => {
+    const day = s.day === 'tomorrow' ? 'morgen' : 'vandaag';
+    return `${String(s.hour).padStart(2,'0')}:00 (${day}, ${fmtEurKwh(s.price)})`;
+  }).join(' · ');
+
+  if (schedule.active_now) {
+    text.textContent = `🔋 Nu laden — ${schedule.needed_kwh} kWh nodig (${schedule.needed_hours}u)`;
+    if (sub) sub.textContent = `Gepland: ${slotLabels || '—'} · kosten ~${fmtEurKwh(schedule.total_cost_eur / (schedule.needed_hours || 1))}/kWh gem.`;
+    row.className = 'sim-row green';
+    if (icon) icon.textContent = '⚡';
+  } else {
+    const next = slots.find(s => s.day === 'today' || s.day === 'tomorrow');
+    const nextStr = next ? `Goedkoopst: ${String(next.hour).padStart(2,'0')}:00 (${next.day === 'tomorrow' ? 'morgen' : 'vandaag'}) à ${fmtEurKwh(next.price)}` : 'Geen goedkoop slot gevonden';
+    text.textContent = `Wachten op goedkoop slot · ${schedule.needed_kwh} kWh nodig`;
+    if (sub) sub.textContent = `${nextStr} · SOC ${schedule.soc_now}% → ${schedule.target_soc}%`;
+    row.className = 'sim-row blue';
+    if (icon) icon.textContent = '📅';
+  }
+}
+
+// ===== Simulation logic =====
+let _simCurtailCandidateSince = null;
+let _simNetCharge = { candidateSince: null, notCandidateSince: null, active: false };
+function computeSimulation(frankData, liveData) {
+  if (!frankData || !frankData.current) return null;
+  const EDDI_TARGET_TEMP = 55;
+  const SIM_CURTAIL_EXPORT_W = 300;
+  const SIM_CURTAIL_DELAY_MS = 10 * 60 * 1000;
+  const SIM_NETCHARGE_DELAY_MS = 10 * 60 * 1000;
+  const PRICE_VERY_LOW = 0.00;
+  const SURPLUS_LOW_W = 150;
+  const TARGET_SOC_CHEAP = 85;
+  const TARGET_SOC_VERY_CHEAP = 95;
+  const cur = frankData.current;
+  const plan = frankData.plan || {};
+  const price = cur.price_eur_kwh;
+  const cheapThr = plan.cheap_threshold_eur_kwh != null ? plan.cheap_threshold_eur_kwh : 0.10;
+  const expThr = plan.expensive_threshold_eur_kwh != null ? plan.expensive_threshold_eur_kwh : 0.25;
+  const status = liveData.status || {};
+  const b1Der = (liveData.b1 && liveData.b1.derived) || {};
+  const b2Der = (liveData.b2 && liveData.b2.derived) || {};
+
+  const pv   = w(status.pv_generation_w);
+  const grid = w(status.grid_w);  // >0 = export, <0 = import
+  const rawHouse = w(status.house_consumption_w);
+  const eddi = w(status.eddi_power_w);
+  const zappi = w(status.zappi_power_w);
+  const tank1 = status.eddi_temperatures?.tank1;
+  const tank2 = status.eddi_temperatures?.tank2;
+  const b1Power = w(b1Der.power_w);
+  const b2Power = w(b2Der.power_w);
+  const b1Soc = b1Der.soc_percent != null ? b1Der.soc_percent : null;
+  const b2Soc = b2Der.soc_percent != null ? b2Der.soc_percent : null;
+  const socs = [b1Soc, b2Soc].filter(s => s != null);
+  const avgSoc = socs.length ? socs.reduce((a, b) => a + b, 0) / socs.length : null;
+
+  const priceLabel = plan.band === 'cheap' ? 'laag' : plan.band === 'expensive' ? 'hoog' : 'normaal';
+  const pvHigh = pv > 500;
+  const exporting = grid > 200;   // positive = export naar net
+  const batteriesNeedCharge = avgSoc != null ? avgSoc < TARGET_SOC_VERY_CHEAP : false;
+  const eddiNeedsHeat =
+    eddi > 50 ||
+    (tank1 != null && tank1 < EDDI_TARGET_TEMP) ||
+    (tank2 != null && tank2 < EDDI_TARGET_TEMP);
+  const buffersNeedEnergy = batteriesNeedCharge || eddiNeedsHeat;
+  // Benader "echt overschot": PV minus wat intern nog nodig is.
+  // Zelfde huiscorrectie als elders in de UI: laadvermogen eruit, ontlaadvermogen erbij.
+  const battChargingW = Math.max(0, b1Power) + Math.max(0, b2Power);
+  const battDischargingW = Math.abs(Math.min(0, b1Power)) + Math.abs(Math.min(0, b2Power));
+  const houseCorrectedW = Math.max(0, rawHouse - battChargingW + battDischargingW);
+  // Eddi: als tank1 al op target is, ga uit van lager element (tank2); anders volle Eddi-capaciteit.
+  const tank1Ready = tank1 != null && tank1 >= EDDI_TARGET_TEMP;
+  const eddiReserveTargetW = tank1Ready ? 1500 : 3200;
+  const eddiWantedW = eddiNeedsHeat ? Math.max(eddi, eddiReserveTargetW) : 0;
+  // Simpel laadpotentieel voor batterij op basis van SOC-ruimte (max 5 kW totaal = 2x 2.5 kW).
+  const batteryWantedW = (batteriesNeedCharge && avgSoc != null)
+    ? Math.max(0, Math.min(5000, Math.round(((95 - avgSoc) / 95) * 5000)))
+    : 0;
+  const internalNeedW = houseCorrectedW + eddiWantedW + zappi + batteryWantedW;
+  const realSurplusW = Math.max(0, pv - internalNeedW);
+  // Volgorde: huis → Eddi → Zappi (als die draait) → pas daarna batterij-zon.
+  const pvAfterPriorityW = pv - houseCorrectedW - eddiWantedW - zappi;
+  const exportW = grid > 0 ? grid : 0; // flow: positief = export naar net
+  const hasRealSurplus = exportW > 100;
+  const lowAfterPriority = !hasRealSurplus;
+  const zappiActive = zappi > 200;
+  const veryCheap = !!plan.very_cheap || (price != null && price <= PRICE_VERY_LOW);
+  const cheap = plan.band === 'cheap' || (price != null && price <= cheapThr);
+  const netChargeTargetSoc = plan.charge_target_soc != null ? plan.charge_target_soc : (veryCheap ? TARGET_SOC_VERY_CHEAP : TARGET_SOC_CHEAP);
+  const socBelowCheapTarget = avgSoc != null && avgSoc < netChargeTargetSoc;
+
+  const stableCurtailCandidate = pv > 50 && realSurplusW > SIM_CURTAIL_EXPORT_W && !buffersNeedEnergy;
+  const now = Date.now();
+
+  if (stableCurtailCandidate) {
+    if (!_simCurtailCandidateSince) _simCurtailCandidateSince = now;
+  } else {
+    _simCurtailCandidateSince = null;
+  }
+
+  const stableCurtailMs = _simCurtailCandidateSince ? (now - _simCurtailCandidateSince) : 0;
+  const stableCurtailMinutes = Math.floor(stableCurtailMs / 60000);
+  const stableCurtailReady = stableCurtailMs >= SIM_CURTAIL_DELAY_MS;
+
+  // Echt overschot = gemeten export naar het net, niet PV minus huis/Eddi.
+  let surplusAction, surplusColor, surplusSub;
+  if (hasRealSurplus) {
+    surplusAction = `${Math.round(exportW)} W écht overschot (export)`;
+    surplusColor  = 'green';
+    surplusSub    = 'Dit moet de batterij in, niet terug naar het net';
+  } else if (pv <= 50) {
+    surplusAction = 'Geen zon-overschot';
+    surplusColor  = 'blue';
+    surplusSub    = `PV ${Math.round(pv)} W · huis ${Math.round(houseCorrectedW)} W · export ${Math.round(exportW)} W`;
+  } else {
+    surplusAction = 'Geen echt overschot';
+    surplusColor  = 'blue';
+    surplusSub    = `Zon gaat naar huis/Eddi · export ${Math.round(exportW)} W (marge)`;
+  }
+
+  // Netladen mag parallel met zon→Eddi. Alleen niet als Zappi hard trekt.
+  // Wel 10 min hysteresis, anders gaat het advies flipperen.
+  let netAction, netColor, netIcon, netSub, doNetCharge = false;
+  const netCandidate =
+    avgSoc != null &&
+    !zappiActive &&
+    lowAfterPriority &&
+    cheap &&
+    socBelowCheapTarget;
+
+  if (zappiActive) {
+    _simNetCharge.candidateSince = null;
+    _simNetCharge.notCandidateSince = null;
+    _simNetCharge.active = false;
+    netAction = 'Niet netladen';
+    netColor  = 'orange';
+    netIcon   = '🚗';
+    netSub    = `Zappi trekt ${Math.round(zappi)} W — te zwaar, batterij wacht`;
+  } else if (avgSoc == null) {
+    netAction = 'SOC onbekend';
+    netColor  = 'blue';
+    netIcon   = '🔌';
+    netSub    = 'Geen batterijdata, netladen overslaan';
+  } else {
+    if (netCandidate) {
+      _simNetCharge.notCandidateSince = null;
+      if (!_simNetCharge.candidateSince) _simNetCharge.candidateSince = now;
+      if (!_simNetCharge.active && (now - _simNetCharge.candidateSince) >= SIM_NETCHARGE_DELAY_MS) {
+        _simNetCharge.active = true;
+      }
+    } else {
+      _simNetCharge.candidateSince = null;
+      if (!_simNetCharge.notCandidateSince) _simNetCharge.notCandidateSince = now;
+      if (_simNetCharge.active && (now - _simNetCharge.notCandidateSince) >= SIM_NETCHARGE_DELAY_MS) {
+        _simNetCharge.active = false;
+      }
+    }
+
+    doNetCharge = _simNetCharge.active;
+    const waitOnMin = _simNetCharge.candidateSince
+      ? Math.floor((now - _simNetCharge.candidateSince) / 60000)
+      : 0;
+    const waitOffMin = _simNetCharge.notCandidateSince
+      ? Math.floor((now - _simNetCharge.notCandidateSince) / 60000)
+      : 0;
+
+    if (doNetCharge) {
+      netAction = `Laden uit net tot ${netChargeTargetSoc}%`;
+      netColor  = 'blue';
+      netIcon   = '🔌';
+      if (netCandidate) {
+        netSub = eddiNeedsHeat
+          ? `Zon mag naar Eddi, goedkoop net naar batterij · SOC ${Math.round(avgSoc)}% → ${netChargeTargetSoc}%`
+          : `Laag tarief ${fmtEurKwh(price)} · geen overschot na huis+Eddi · tot ${netChargeTargetSoc}%`;
+      } else {
+        netSub = `Nog 10 min vasthouden tegen flipperen (${waitOffMin}/10 min)`;
+      }
+    } else if (netCandidate) {
+      netAction = 'Nog niet netladen';
+      netColor  = 'blue';
+      netIcon   = '⏳';
+      netSub    = `Voorwaarden ok${eddiNeedsHeat ? ' (zon→Eddi mag parallel)' : ''} · wacht 10 min stabiel (${waitOnMin}/10 min)`;
+    } else if (!lowAfterPriority) {
+      netAction = 'Niet netladen';
+      netColor  = 'green';
+      netIcon   = '☀️';
+      netSub    = `Eerst ${Math.round(exportW)} W export naar de batterij`;
+    } else if (!cheap) {
+      netAction = 'Niet netladen';
+      netColor  = 'orange';
+      netIcon   = '⏳';
+      netSub    = `Tarief ${fmtEurKwh(price)} is niet laag voor vandaag (≤ ${fmtEurKwh(cheapThr)}). Wachten op goedkoop uur.`;
+    } else if (!socBelowCheapTarget) {
+      netAction = 'Niet netladen';
+      netColor  = 'green';
+      netIcon   = '🔋';
+      netSub    = `SOC ${Math.round(avgSoc)}% al op/boven doel ${netChargeTargetSoc}%`;
+    } else {
+      netAction = 'Niet netladen';
+      netColor  = 'blue';
+      netIcon   = '🔌';
+      netSub    = 'Voorwaarden niet stabiel genoeg';
+    }
+  }
+
+  // Batterij-advies
+  let battAction, battColor, battIcon, battSub;
+  if (avgSoc !== null && avgSoc <= 10 && priceLabel === 'hoog') {
+    battAction = 'Batterij bijna leeg · spaar SOC';
+    battColor  = 'red';
+    battIcon   = '🪫';
+    battSub    = `SOC ${Math.round(avgSoc)}% · tarief hoog, niet volledig leegtrekken`;
+  } else if (hasRealSurplus && batteriesNeedCharge) {
+    battAction = 'Batterijen vullen met export';
+    battColor  = 'green';
+    battIcon   = '☀️';
+    battSub    = `${Math.round(exportW)} W gaat nu naar het net → moet de batterij in`;
+  } else if (doNetCharge) {
+    battAction = `Batterijen laden uit net tot ${netChargeTargetSoc}%`;
+    battColor  = 'blue';
+    battIcon   = '🔌';
+    battSub    = eddiNeedsHeat
+      ? `Zon naar Eddi, goedkoop net naar batterij · tot ${netChargeTargetSoc}%`
+      : netSub;
+  } else if (eddiNeedsHeat && lowAfterPriority) {
+    battAction = 'Eddi eerst op zon, batterij wacht';
+    battColor  = 'orange';
+    battIcon   = '🔥';
+    battSub    = `Geen rest-zon na Eddi · netladen pas na 10 min stabiel goedkoop uur`;
+  } else if (priceLabel === 'hoog' && avgSoc != null && avgSoc > 10) {
+    battAction = 'Batterij ontlaadt naar huis';
+    battColor  = 'orange';
+    battIcon   = '🔋';
+    battSub    = `Tarief hoog · geen overschot voor batterij`;
+  } else {
+    battAction = 'Wachten';
+    battColor  = 'green';
+    battIcon   = '🔋';
+    battSub    = `Geen overschot na huis+Eddi en tarief niet laag genoeg`;
+  }
+  if (avgSoc !== null && battSub.indexOf('SOC') === -1) battSub += ` · gem SOC ${Math.round(avgSoc)}%`;
+
+  // SEC1000-advies: toon gewenste aansturing, niet alleen huidige situatie
+  let secAction, secPct = 0, secColor, secIcon, secSub;
+  if (pv <= 50) {
+    secAction = 'Omvormers leveren nu niets';
+    secColor  = 'blue';
+    secIcon   = '🌙';
+    secSub    = 'Geen of bijna geen zon op dit moment';
+    secPct    = 0;
+  } else if (buffersNeedEnergy) {
+    secAction = 'Omvormers op vol vermogen houden';
+    secColor  = 'green';
+    secIcon   = '🌞';
+    if (eddiNeedsHeat && batteriesNeedCharge) {
+      secSub = `Eddi eerst (reserve ${eddiReserveTargetW} W), daarna batterijen · nog niet afschalen`;
+    } else if (eddiNeedsHeat) {
+      secSub = `Eddi eerst tot beide boilers ${EDDI_TARGET_TEMP}°C (reserve ${eddiReserveTargetW} W)`;
+    } else if (batteriesNeedCharge) {
+      secSub = `Eddi klaar · eerst batterijen vullen, nog niet afschalen`;
+    } else {
+      secSub = `Buffers klaar · vol vermogen tot 10 min stabiel overschot`;
+    }
+  } else if (stableCurtailCandidate && !stableCurtailReady) {
+    secPct    = 0;
+    secAction = 'Nog niet afschalen';
+    secColor  = 'blue';
+    secIcon   = '⏳';
+    secSub    = `${Math.round(realSurplusW)} W echt overschot · wacht op 10 min stabiel (${stableCurtailMinutes}/10 min)`;
+  } else if (exporting && price <= 0) {
+    secPct    = pv > 0 ? Math.min(100, Math.round((realSurplusW / pv) * 100)) : 0;
+    secAction = `Omvormers afschalen ~${secPct}%`;
+    secColor  = 'red';
+    secIcon   = '📉';
+    secSub    = `${Math.round(realSurplusW)} W echt overschot · buffers vol/genoeg warm · >10 min`;
+  } else if (exporting && priceLabel === 'laag') {
+    secPct    = 0;
+    secAction = 'Omvormers op vol vermogen';
+    secColor  = 'green';
+    secIcon   = '🌞';
+    secSub    = `${Math.round(grid)} W export · tarief laag maar positief`;
+  } else {
+    secAction = 'Omvormers op vol vermogen';
+    secColor  = 'green';
+    secIcon   = '🌞';
+    secSub    = `PV ${Math.round(pv)} W · aansturing blijft productie toelaten`;
+    secPct    = 0;
+  }
+
+  return {
+    priceLabel, battAction, battColor, battIcon, battSub,
+    secAction, secPct, secColor, secIcon, secSub,
+    surplusAction, surplusColor, surplusSub,
+    netAction, netColor, netIcon, netSub
+  };
+}
+
+function updateSimulation() {
+  if (!_frankData || !_lastData) return;
+  const sim = computeSimulation(_frankData, _lastData);
+  if (!sim) return;
+
+  // Laadplanning: haal uit live simple_rule data (actuele SOC), niet uit Frank-cache
+  const liveSchedule = (_lastData.sr && _lastData.sr.last && _lastData.sr.last.price)
+    ? _lastData.sr.last.price.charge_schedule
+    : null;
+  if (liveSchedule !== undefined) _updateScheduleRow(liveSchedule);
+
+  const surplusRow  = document.getElementById('simSurplusRow');
+  const surplusText = document.getElementById('simSurplusText');
+  const surplusSub  = document.getElementById('simSurplusSub');
+  if (surplusRow) surplusRow.className = `sim-row ${sim.surplusColor || 'blue'}`;
+  if (surplusText) surplusText.textContent = sim.surplusAction || '';
+  if (surplusSub) surplusSub.textContent = sim.surplusSub || '';
+
+  // Batterij rij
+  const battRow  = document.getElementById('simBattRow');
+  const battIcon = document.getElementById('simBattIcon');
+  const battText = document.getElementById('simBattText');
+  const battSub  = document.getElementById('simBattSub');
+  if (battRow) { battRow.className = `sim-row ${sim.battColor}`; }
+  if (battIcon) battIcon.textContent = sim.battIcon;
+  if (battText) battText.textContent = sim.battAction;
+  if (battSub)  battSub.textContent  = sim.battSub || '';
+
+  const netRow  = document.getElementById('simNetRow');
+  const netIcon = document.getElementById('simNetIcon');
+  const netText = document.getElementById('simNetText');
+  const netSub  = document.getElementById('simNetSub');
+  if (netRow) netRow.className = `sim-row ${sim.netColor || 'blue'}`;
+  if (netIcon) netIcon.textContent = sim.netIcon || '🔌';
+  if (netText) netText.textContent = sim.netAction || '';
+  if (netSub) netSub.textContent = sim.netSub || '';
+
+  // SEC rij
+  const secRow  = document.getElementById('simSecRow');
+  const secIcon = document.getElementById('simSecIcon');
+  const secText = document.getElementById('simSecText');
+  const secSub  = document.getElementById('simSecSub');
+  const secBarWrap = document.getElementById('simSecBarWrap');
+  const secBar  = document.getElementById('simSecBar');
+  if (secRow) { secRow.className = `sim-row ${sim.secColor}`; }
+  if (secIcon) secIcon.textContent = sim.secIcon;
+  if (secText) secText.textContent = sim.secAction;
+  if (secSub)  secSub.textContent  = sim.secSub || '';
+  if (secBarWrap && secBar) {
+    if (sim.secPct > 0) {
+      secBarWrap.style.display = 'block';
+      secBar.style.width = `${sim.secPct}%`;
+      secBar.style.background = '#ef4444';
+    } else {
+      secBarWrap.style.display = 'none';
+    }
   }
 }
 

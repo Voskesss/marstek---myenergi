@@ -152,6 +152,18 @@
                 <div class="metric"><span class="metric-label">Morgen</span><span class="metric-value" id="weatherTomorrow">-</span></div>
                 <div class="metric"><span class="metric-label">PV Potentieel 24u</span><span class="metric-value" id="weatherSolarPotential">-</span></div>
             </div>
+            <div class="card">
+                <h3>🧪 SEC1000 Simulatie (fictief)</h3>
+                <div class="metric"><span class="metric-label">Omvormer afschalen</span><span class="metric-value" id="secCurtailPct">0%</span></div>
+                <div style="padding: 6px 0 14px 0;">
+                    <input id="secCurtailSlider" type="range" min="0" max="100" step="1" value="0"
+                           oninput="setSecCurtailPct(this.value)" />
+                </div>
+                <div class="metric"><span class="metric-label">Fictieve PV na afschalen</span><span class="metric-value" id="secPvAfter">-</span></div>
+                <div class="metric"><span class="metric-label">Fictief net-effect</span><span class="metric-value" id="secGridAfter">-</span></div>
+                <div class="metric"><span class="metric-label">Teruglevering over</span><span class="metric-value" id="secExportLeft">-</span></div>
+                <div class="metric"><span class="metric-label">Interpretatie</span><span class="metric-value" id="secHint" style="font-size:14px;">Sleep de slider om te testen</span></div>
+            </div>
 
             <!-- Legacy cards kept but hidden by startAutoRefresh; leave them here for safety/testing -->
             <!-- Column 2: Battery 1 -->
@@ -286,6 +298,57 @@
 
     <script>
         let autoRefreshInterval;
+        let secCurtailPct = 0;
+        let secLast = { pv_w: 0, grid_w: 0, house_w: 0, eddi_w: 0, zappi_w: 0 };
+
+        function setSecCurtailPct(v) {
+            secCurtailPct = Math.max(0, Math.min(100, Number(v || 0)));
+            const pctEl = document.getElementById('secCurtailPct');
+            if (pctEl) pctEl.textContent = `${secCurtailPct}%`;
+            updateSecSimulation();
+        }
+
+        function updateSecSimulation() {
+            const pv = Number(secLast.pv_w || 0);
+            const grid = Number(secLast.grid_w || 0); // >0 export, <0 import
+            const curtailW = pv > 0 ? (pv * secCurtailPct / 100) : 0;
+            const pvAfter = Math.max(0, pv - curtailW);
+            const gridAfter = grid - curtailW;
+            const exportLeft = Math.max(0, gridAfter);
+
+            const pvAfterEl = document.getElementById('secPvAfter');
+            const gridAfterEl = document.getElementById('secGridAfter');
+            const exportLeftEl = document.getElementById('secExportLeft');
+            const hintEl = document.getElementById('secHint');
+
+            if (pvAfterEl) pvAfterEl.textContent = `${Math.round(pvAfter)}W`;
+            if (gridAfterEl) {
+                gridAfterEl.textContent = gridAfter < 0
+                    ? `${Math.abs(Math.round(gridAfter))}W ← van net`
+                    : gridAfter > 0
+                        ? `${Math.round(gridAfter)}W → naar net`
+                        : '0W';
+                gridAfterEl.className = `metric-value ${gridAfter > 50 ? 'status-good' : gridAfter < -50 ? 'status-warning' : ''}`;
+            }
+            if (exportLeftEl) {
+                exportLeftEl.textContent = `${Math.round(exportLeft)}W`;
+                exportLeftEl.className = `metric-value ${exportLeft > 50 ? 'status-danger' : 'status-good'}`;
+            }
+
+            if (hintEl) {
+                if (grid <= 0) {
+                    hintEl.textContent = 'Nu is er geen export; afschalen zou vooral meer net-import geven.';
+                    hintEl.className = 'metric-value status-warning';
+                } else if (exportLeft > 50) {
+                    hintEl.textContent = 'Nog export over: extra opslag/verbruik of meer afschalen nodig.';
+                    hintEl.className = 'metric-value status-danger';
+                } else {
+                    hintEl.textContent = 'Export vrijwel weg in deze simulatie.';
+                    hintEl.className = 'metric-value status-good';
+                }
+            }
+        }
+
         // Anti-flicker cache with zero-confirmation
         const __stable = {
             cache: {},
@@ -1194,6 +1257,10 @@
             // Zappi Status
             const zappi_w = __stable.numZeroAware('zappi_w', Number(data.zappi_power_w || 0), { ttlMs: 6000, confirmZeros: 2 });
             document.getElementById('zappiPower').textContent = `${zappi_w}W`;
+
+            // SEC1000 fictieve simulatie input updaten
+            secLast = { pv_w, grid_w, house_w, eddi_w, zappi_w };
+            updateSecSimulation();
         }
 
         // --- Initializer ---
