@@ -323,6 +323,52 @@ class WeatherService:
             "source": sh.get("source", "unknown"),
         }
 
+    async def get_tomorrow_sun_likely(
+        self,
+        *,
+        solar_min: float = 55.0,
+        look_hours: int = 36,
+    ) -> Dict[str, Any]:
+        """Heuristiek: morgen overdag veel zon? (daglicht-uren met solar_score > 0)."""
+        sh = await self.get_solar_hours(hours=max(12, look_hours))
+        rows = sh.get("hours") or []
+        if not rows:
+            return {
+                "tomorrow_sun_likely": False,
+                "confidence": 0,
+                "avg_solar_score": 0.0,
+                "daylight_hours": 0,
+                "source": sh.get("source", "none"),
+            }
+        # Neem uren na vandaag (vanaf middernacht): ruwweg 24h-horizon vanaf nu,
+        # maar alleen daglicht (solar_score > 0).
+        daylight = [r for r in rows if float(r.get("solar_score") or 0) > 0]
+        # Prefer uren verder weg (morgen): skip eerste ~6 daglicht-uren van vandaag als er genoeg is
+        if len(daylight) > 10:
+            tomorrowish = daylight[6:]
+        else:
+            tomorrowish = daylight
+        if not tomorrowish:
+            return {
+                "tomorrow_sun_likely": False,
+                "confidence": 0,
+                "avg_solar_score": 0.0,
+                "daylight_hours": 0,
+                "source": sh.get("source", "unknown"),
+            }
+        avg_solar = sum(float(r.get("solar_score") or 0) for r in tomorrowish) / len(tomorrowish)
+        avg_clouds = sum(float(r.get("clouds") or 100) for r in tomorrowish) / len(tomorrowish)
+        likely = avg_solar >= float(solar_min)
+        confidence = int(min(100, max(0, avg_solar)))
+        return {
+            "tomorrow_sun_likely": bool(likely),
+            "confidence": confidence,
+            "avg_solar_score": round(avg_solar, 1),
+            "avg_clouds": round(avg_clouds, 1),
+            "daylight_hours": len(tomorrowish),
+            "source": sh.get("source", "unknown"),
+        }
+
 
 # Global instance
 weather_service = WeatherService()

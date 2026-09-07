@@ -614,6 +614,54 @@
     }
     .sim-toggle-btn:active { transform: translateY(1px); }
 
+    /* Laadmodus — groot voor touchscreen, sticky bovenaan sidebar */
+    #chargeModeSection {
+      position: sticky;
+      top: 0;
+      z-index: 12;
+      background: rgba(10,14,26,0.97);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(56,189,248,0.25);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .charge-mode-row {
+      display: flex;
+      gap: 10px;
+    }
+    .charge-mode-btn {
+      flex: 1;
+      min-height: 58px;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 14px 10px;
+      border-radius: 14px;
+      border: 2px solid rgba(148,163,184,0.35);
+      background: rgba(255,255,255,0.06);
+      color: #e2e8f0;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .charge-mode-btn:active { transform: scale(0.97); }
+    .charge-mode-btn.active {
+      border-color: #38bdf8;
+      background: rgba(56,189,248,0.22);
+      color: #7dd3fc;
+      box-shadow: 0 0 0 2px rgba(56,189,248,0.35);
+    }
+    .charge-mode-status {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 10px;
+      line-height: 1.45;
+    }
+    #chargeModeSection .side-section-title {
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+
     /* Price label pill */
     .price-label-pill {
       display: inline-block;
@@ -777,6 +825,7 @@
         <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Gekost vandaag</div>
         <div style="font-size:18px;font-weight:700;color:#ef4444;" id="dayCost">€ 0,00</div>
         <div style="font-size:10px;color:#64748b;" id="dayCostKwh">0.0 kWh uit net</div>
+        <div style="font-size:9px;color:#475569;margin-top:2px;" id="dayCostFrank">Frank uurtarief</div>
         <div style="font-size:10px;color:#f59e0b;margin-top:2px;" id="dayCostZappi"></div>
       </div>
     </div>
@@ -787,6 +836,17 @@
 
   <!-- ===== Left: Side Panel (tarieven + simulatie) ===== -->
   <div id="sidePanel">
+
+    <!-- Laadmodus — altijd bovenaan, groot voor touch -->
+    <div class="side-section" id="chargeModeSection">
+      <div class="side-section-title">Batterij laden</div>
+      <div class="charge-mode-row">
+        <button class="charge-mode-btn" id="chargeModeOff" type="button" data-mode="off">Uit</button>
+        <button class="charge-mode-btn" id="chargeModePrice" type="button" data-mode="price">Frank</button>
+        <button class="charge-mode-btn" id="chargeModeManual" type="button" data-mode="manual">Handmatig</button>
+      </div>
+      <div class="charge-mode-status" id="chargeModeStatus">Modus laden…</div>
+    </div>
 
     <!-- Sectie A: Huidig tarief -->
     <div class="side-section" id="priceSection">
@@ -821,7 +881,7 @@
       <div class="bar-hour-labels" id="solarBarsLabels"></div>
     </div>
 
-    <!-- Sectie C: Simulatie -->
+    <!-- Sectie D: Simulatie -->
     <div class="side-section" id="simulationSection" style="flex:1;">
       <div class="sim-header-row">
         <div class="side-section-title" style="margin-bottom:0;">Simulatie — Wat zou er nu gebeuren?</div>
@@ -1648,7 +1708,7 @@ function updateMobile(pv, grid, house, eddi, zappi, bp1, bp2, b1Soc, b2Soc, b1Mo
 }
 
 // ===== Data fetching with fallback cache =====
-let _lastData = { status: {}, b1: {}, b2: {}, energy: {} };
+let _lastData = { status: {}, b1: {}, b2: {}, energy: {}, simpleRule: {} };
 
 async function safeFetch(url) {
   const res = await fetch(url, { cache: 'no-store' });
@@ -1675,11 +1735,12 @@ function mergeData(old, fresh) {
 
 async function fetchData() {
   const ts = Date.now();
-  const [status, b1, b2, energy] = await Promise.all([
+  const [status, b1, b2, energy, simpleRule] = await Promise.all([
     safeFetch(`/api/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_92/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/batteries/venus_ev2_74/status?ts=${ts}`).catch(() => null),
     safeFetch(`/api/energy/today?ts=${ts}`).catch(() => null),
+    safeFetch(`/api/simple_rule/status?ts=${ts}`).catch(() => null),
   ]);
   // Merge: keep previous good values when new ones are null
   _lastData = {
@@ -1687,6 +1748,7 @@ async function fetchData() {
     b1: mergeData(_lastData.b1, b1),
     b2: mergeData(_lastData.b2, b2),
     energy: mergeData(_lastData.energy, energy),
+    simpleRule: mergeData(_lastData.simpleRule, simpleRule),
   };
   return _lastData;
 }
@@ -1734,23 +1796,30 @@ function updateDisplay(data) {
   const b1Mode = b1Der.mode || 'Offline';
   const b2Mode = b2Der.mode || 'Offline';
 
-  // Update day meters (bespaard / gekost in €)
-  const KWH_PRICE = 0.23;
+  // Update day meters (bespaard / gekost in € — Frank uurtarief)
+  const KWH_PRICE_FALLBACK = 0.23;
   if (energy) {
     const genKwh = (energy.pv_kwh || 0) + (energy.batt_discharge_kwh || 0);
     const impKwh = energy.import_kwh || 0;
-    const saved = (genKwh * KWH_PRICE).toFixed(2).replace('.', ',');
-    const cost = (impKwh * KWH_PRICE).toFixed(2).replace('.', ',');
+    const frankImport = energy.import_cost_eur;
+    const frankSaved = energy.saved_cost_eur;
+    const useFrank = frankImport != null && energy.cost_method === 'frank_hourly';
+    const savedNum = useFrank ? frankSaved : (genKwh * KWH_PRICE_FALLBACK);
+    const costNum = useFrank ? frankImport : (impKwh * KWH_PRICE_FALLBACK);
+    const saved = savedNum.toFixed(2).replace('.', ',');
+    const cost = costNum.toFixed(2).replace('.', ',');
     const zappiKwh = energy.zappi_kwh || 0;
-    // Zappi uit net = max wat uit net kan komen voor zappi (niet meer dan totale import)
+    const priceForSplit = impKwh > 0 ? (costNum / impKwh) : KWH_PRICE_FALLBACK;
     const zappiFromGrid = Math.min(zappiKwh, impKwh);
     const zappiFromSun = zappiKwh - zappiFromGrid;
-    const zappiGridCost = (zappiFromGrid * KWH_PRICE).toFixed(2).replace('.', ',');
-    const costMinZappi = ((impKwh - zappiFromGrid) * KWH_PRICE);
+    const zappiGridCost = (zappiFromGrid * priceForSplit).toFixed(2).replace('.', ',');
+    const costMinZappi = ((impKwh - zappiFromGrid) * priceForSplit);
     document.getElementById('daySaved').textContent = `€ ${saved}`;
     document.getElementById('daySavedKwh').textContent = `${genKwh.toFixed(1)} kWh eigen opwek`;
     document.getElementById('dayCost').textContent = `€ ${cost}`;
     document.getElementById('dayCostKwh').textContent = `${impKwh.toFixed(1)} kWh uit net`;
+    const frankEl = document.getElementById('dayCostFrank');
+    if (frankEl) frankEl.textContent = useFrank ? 'Frank uurtarief (dynamisch)' : 'Fallback €0,23/kWh';
     const zappiEl = document.getElementById('dayCostZappi');
     if (zappiKwh > 0.01) {
       let zTxt = `🚗 Zappi ${zappiKwh.toFixed(1)} kWh`;
@@ -2306,7 +2375,7 @@ function _computeSchedule(frankData, liveData) {
 
   const CAPACITY_KWH = 10.0;
   const CHARGE_KW    = 2.5;
-  const TARGET_SOC   = (frankData.plan && frankData.plan.charge_target_soc) || 85;
+  const TARGET_SOC   = (frankData.plan && frankData.plan.charge_target_soc) || 95;
 
   // SOC uit batterij-API data (b1/b2)
   const soc1 = liveData.b1 && liveData.b1.data && liveData.b1.data.soc_percent && liveData.b1.data.soc_percent.value;
@@ -2436,7 +2505,7 @@ function computeSimulation(frankData, liveData) {
   const SIM_NETCHARGE_DELAY_MS = 10 * 60 * 1000;
   const PRICE_VERY_LOW = 0.00;
   const SURPLUS_LOW_W = 150;
-  const TARGET_SOC_CHEAP = 85;
+  const TARGET_SOC_CHEAP = 95;
   const TARGET_SOC_VERY_CHEAP = 95;
   const cur = frankData.current;
   const plan = frankData.plan || {};
@@ -2446,6 +2515,14 @@ function computeSimulation(frankData, liveData) {
   const status = liveData.status || {};
   const b1Der = (liveData.b1 && liveData.b1.derived) || {};
   const b2Der = (liveData.b2 && liveData.b2.derived) || {};
+  const sr = liveData.simpleRule || {};
+  const chargeMode = sr.charge_mode || 'off';
+  const srLast = sr.last || {};
+  const srMode = srLast.mode || '';
+  const sched = _computeSchedule(frankData, liveData);
+  const scheduleActive = !!(sched && !sched.done && sched.slots && sched.slots.some(
+    s => s.day === 'today' && s.hour === cur.hour
+  ));
 
   const pv   = w(status.pv_generation_w);
   const grid = w(status.grid_w);  // >0 = export, <0 = import
@@ -2488,18 +2565,30 @@ function computeSimulation(frankData, liveData) {
   // Volgorde: huis → Eddi → Zappi (als die draait) → pas daarna batterij-zon.
   const pvAfterPriorityW = pv - houseCorrectedW - eddiWantedW - zappi;
   const exportW = grid > 0 ? grid : 0; // flow: positief = export naar net
-  const hasRealSurplus = exportW > 100;
+  const hasRealSurplus = exportW >= 300;
   const lowAfterPriority = !hasRealSurplus;
   const zappiActive = zappi > 200;
+  const frankOn = chargeMode === 'price';
+  const manualOn = chargeMode === 'manual';
+  const gridChargeOn = frankOn || manualOn;
+  const PRICE_LOW_MAX = 0.17;
+  const priceIsLow = price != null && price <= PRICE_LOW_MAX;
+  const priceMeta = (srLast.price) || {};
+  const tomorrowSunLikely = !!(priceMeta.tomorrow_sun_likely);
+  const frankShouldDischarge = frankOn && !hasRealSurplus && pv <= 50 && avgSoc != null && avgSoc > 15
+    && (!priceIsLow || tomorrowSunLikely);
   const veryCheap = !!plan.very_cheap || (price != null && price <= PRICE_VERY_LOW);
   const cheap = plan.band === 'cheap' || (price != null && price <= cheapThr);
   const netChargeTargetSoc = plan.charge_target_soc != null ? plan.charge_target_soc : (veryCheap ? TARGET_SOC_VERY_CHEAP : TARGET_SOC_CHEAP);
   const socBelowCheapTarget = avgSoc != null && avgSoc < netChargeTargetSoc;
 
-  const stableCurtailCandidate = pv > 50 && realSurplusW > SIM_CURTAIL_EXPORT_W && !buffersNeedEnergy;
+  const BATT_MAX_CHARGE_W = 5000;
+  const batteriesSaturated = !batteriesNeedCharge || battChargingW >= BATT_MAX_CHARGE_W * 0.75;
+  // Afschalen op gemeten net-export (niet PV−huis), zodra buffers vol/max laden
+  const exportCurtailCandidate = pv > 50 && exportW >= SIM_CURTAIL_EXPORT_W && batteriesSaturated;
   const now = Date.now();
 
-  if (stableCurtailCandidate) {
+  if (exportCurtailCandidate) {
     if (!_simCurtailCandidateSince) _simCurtailCandidateSince = now;
   } else {
     _simCurtailCandidateSince = null;
@@ -2514,7 +2603,9 @@ function computeSimulation(frankData, liveData) {
   if (hasRealSurplus) {
     surplusAction = `${Math.round(exportW)} W écht overschot (export)`;
     surplusColor  = 'green';
-    surplusSub    = 'Dit moet de batterij in, niet terug naar het net';
+    surplusSub    = batteriesSaturated
+      ? `Batterijen laden max (${Math.round(battChargingW)} W) · omvormers afschalen na 10 min stabiel export`
+      : 'Dit moet de batterij in, niet terug naar het net';
   } else if (pv <= 50) {
     surplusAction = 'Geen zon-overschot';
     surplusColor  = 'blue';
@@ -2525,31 +2616,48 @@ function computeSimulation(frankData, liveData) {
     surplusSub    = `Zon gaat naar huis/Eddi · export ${Math.round(exportW)} W (marge)`;
   }
 
-  // Netladen mag parallel met zon→Eddi. Alleen niet als Zappi hard trekt.
-  // Wel 10 min hysteresis, anders gaat het advies flipperen.
+  // Netladen: parallel met Zappi/Eddi — goedkoop uur + planning bepalen
   let netAction, netColor, netIcon, netSub, doNetCharge = false;
-  const netCandidate =
-    avgSoc != null &&
-    !zappiActive &&
-    lowAfterPriority &&
-    cheap &&
-    socBelowCheapTarget;
-
-  if (zappiActive) {
+  if (!gridChargeOn) {
     _simNetCharge.candidateSince = null;
     _simNetCharge.notCandidateSince = null;
     _simNetCharge.active = false;
-    netAction = 'Niet netladen';
-    netColor  = 'orange';
-    netIcon   = '🚗';
-    netSub    = `Zappi trekt ${Math.round(zappi)} W — te zwaar, batterij wacht`;
-  } else if (avgSoc == null) {
+  }
+  const netCandidate = frankOn && avgSoc != null && !hasRealSurplus && cheap && priceIsLow
+    && !tomorrowSunLikely && socBelowCheapTarget && scheduleActive;
+  const manualCandidate = manualOn && avgSoc != null && socBelowCheapTarget;
+  const activeCandidate = netCandidate || manualCandidate;
+
+  if (!gridChargeOn) {
+    netAction = 'Frank/handmatig uit';
+    netColor  = 'blue';
+    netIcon   = '⏸️';
+    netSub    = 'Alleen zon-overschot regelt batterijen';
+  } else if (manualOn && avgSoc == null) {
     netAction = 'SOC onbekend';
     netColor  = 'blue';
     netIcon   = '🔌';
-    netSub    = 'Geen batterijdata, netladen overslaan';
-  } else {
-    if (netCandidate) {
+    netSub    = 'Geen batterijdata, handmatig laden overslaan';
+  } else if (frankOn && avgSoc == null) {
+    netAction = 'SOC onbekend';
+    netColor  = 'blue';
+    netIcon   = '🔌';
+    netSub    = 'Geen batterijdata, Frank-planning niet mogelijk';
+  } else if (manualOn) {
+    doNetCharge = srMode === 'manual_charge' || manualCandidate;
+    netAction = doNetCharge ? `Handmatig laden tot ${netChargeTargetSoc}%` : 'Handmatig: wacht';
+    netColor  = 'blue';
+    netIcon   = doNetCharge ? '🔧' : '⏳';
+    netSub    = doNetCharge
+      ? `SOC ${Math.round(avgSoc)}% → ${netChargeTargetSoc}% · Zappi mag parallel (${Math.round(zappi)} W)`
+      : `SOC op doel · gem ${Math.round(avgSoc)}%`;
+  } else if (frankOn && hasRealSurplus) {
+    netAction = 'Frank: wacht op zon';
+    netColor  = 'green';
+    netIcon   = '☀️';
+    netSub    = `${Math.round(exportW)} W export → eerst batterij vullen met zon`;
+  } else if (frankOn) {
+    if (activeCandidate) {
       _simNetCharge.notCandidateSince = null;
       if (!_simNetCharge.candidateSince) _simNetCharge.candidateSince = now;
       if (!_simNetCharge.active && (now - _simNetCharge.candidateSince) >= SIM_NETCHARGE_DELAY_MS) {
@@ -2563,91 +2671,116 @@ function computeSimulation(frankData, liveData) {
       }
     }
 
-    doNetCharge = _simNetCharge.active;
+    doNetCharge = _simNetCharge.active || srMode === 'price_charge';
     const waitOnMin = _simNetCharge.candidateSince
       ? Math.floor((now - _simNetCharge.candidateSince) / 60000)
       : 0;
-    const waitOffMin = _simNetCharge.notCandidateSince
-      ? Math.floor((now - _simNetCharge.notCandidateSince) / 60000)
-      : 0;
 
     if (doNetCharge) {
-      netAction = `Laden uit net tot ${netChargeTargetSoc}%`;
+      netAction = `Frank: laden uit net tot ${netChargeTargetSoc}%`;
       netColor  = 'blue';
       netIcon   = '🔌';
-      if (netCandidate) {
-        netSub = eddiNeedsHeat
-          ? `Zon mag naar Eddi, goedkoop net naar batterij · SOC ${Math.round(avgSoc)}% → ${netChargeTargetSoc}%`
-          : `Laag tarief ${fmtEurKwh(price)} · geen overschot na huis+Eddi · tot ${netChargeTargetSoc}%`;
-      } else {
-        netSub = `Nog 10 min vasthouden tegen flipperen (${waitOffMin}/10 min)`;
-      }
+      netSub    = `Laag tarief ${fmtEurKwh(price)} · SOC ${Math.round(avgSoc)}% → ${netChargeTargetSoc}%${zappiActive ? ` · Zappi parallel (${Math.round(zappi)} W)` : ''}`;
     } else if (netCandidate) {
       netAction = 'Nog niet netladen';
       netColor  = 'blue';
       netIcon   = '⏳';
-      netSub    = `Voorwaarden ok${eddiNeedsHeat ? ' (zon→Eddi mag parallel)' : ''} · wacht 10 min stabiel (${waitOnMin}/10 min)`;
-    } else if (!lowAfterPriority) {
-      netAction = 'Niet netladen';
-      netColor  = 'green';
-      netIcon   = '☀️';
-      netSub    = `Eerst ${Math.round(exportW)} W export naar de batterij`;
+      netSub    = `Voorwaarden ok · wacht 10 min stabiel (${waitOnMin}/10 min)`;
+    } else if (!scheduleActive) {
+      netAction = 'Frank: wacht op goedkoop uur';
+      netColor  = 'orange';
+      netIcon   = '⏳';
+      netSub    = `Dit uur niet in planning · geplande uren in sidebar`;
     } else if (!cheap) {
       netAction = 'Niet netladen';
       netColor  = 'orange';
       netIcon   = '⏳';
-      netSub    = `Tarief ${fmtEurKwh(price)} is niet laag voor vandaag (≤ ${fmtEurKwh(cheapThr)}). Wachten op goedkoop uur.`;
+      netSub    = `Tarief ${fmtEurKwh(price)} is niet laag (≤ ${fmtEurKwh(cheapThr)})`;
     } else if (!socBelowCheapTarget) {
       netAction = 'Niet netladen';
       netColor  = 'green';
       netIcon   = '🔋';
       netSub    = `SOC ${Math.round(avgSoc)}% al op/boven doel ${netChargeTargetSoc}%`;
     } else {
-      netAction = 'Niet netladen';
+      netAction = 'Frank: wacht';
       netColor  = 'blue';
-      netIcon   = '🔌';
-      netSub    = 'Voorwaarden niet stabiel genoeg';
+      netIcon   = '⏳';
+      netSub    = 'Voorwaarden nog niet stabiel genoeg';
     }
   }
 
-  // Batterij-advies
+  // Batterij-advies (match backend: Frank blokkeert surplus/ontladen)
   let battAction, battColor, battIcon, battSub;
-  if (avgSoc !== null && avgSoc <= 10 && priceLabel === 'hoog') {
-    battAction = 'Batterij bijna leeg · spaar SOC';
-    battColor  = 'red';
-    battIcon   = '🪫';
-    battSub    = `SOC ${Math.round(avgSoc)}% · tarief hoog, niet volledig leegtrekken`;
+  if (hasRealSurplus && batteriesSaturated) {
+    battAction = 'Batterijen max, rest export';
+    battColor  = 'orange';
+    battIcon   = '☀️';
+    battSub    = `${Math.round(exportW)} W naar net · ${Math.round(battChargingW)} W laden · afschalen na 10 min`;
   } else if (hasRealSurplus && batteriesNeedCharge) {
     battAction = 'Batterijen vullen met export';
     battColor  = 'green';
     battIcon   = '☀️';
-    battSub    = `${Math.round(exportW)} W gaat nu naar het net → moet de batterij in`;
-  } else if (doNetCharge) {
-    battAction = `Batterijen laden uit net tot ${netChargeTargetSoc}%`;
+    battSub    = `${Math.round(exportW)} W export → batterij (ook bij Frank aan)`;
+  } else if (doNetCharge && frankOn) {
+    battAction = `Frank: laden uit net tot ${netChargeTargetSoc}%`;
     battColor  = 'blue';
     battIcon   = '🔌';
-    battSub    = eddiNeedsHeat
-      ? `Zon naar Eddi, goedkoop net naar batterij · tot ${netChargeTargetSoc}%`
-      : netSub;
-  } else if (eddiNeedsHeat && lowAfterPriority) {
+    netSub    = netSub || `Laag tarief ${fmtEurKwh(price)} · geen ontladen door surplus-regel`;
+    battSub    = netSub;
+  } else if (doNetCharge && manualOn) {
+    battAction = `Handmatig laden tot ${netChargeTargetSoc}%`;
+    battColor  = 'blue';
+    battIcon   = '🔧';
+    battSub    = `Override actief · geen surplus/ontladen`;
+  } else if (frankShouldDischarge) {
+    battAction = 'Frank: ontladen naar huis';
+    battColor  = 'orange';
+    battIcon   = '🔋';
+    battSub    = tomorrowSunLikely && priceIsLow
+      ? `Morgen zon verwacht · ook bij laag tarief ruimte maken`
+      : `Tarief ${fmtEurKwh(price)} > €${PRICE_LOW_MAX} · niet vasthouden`;
+  } else if (frankOn && batteriesNeedCharge) {
+    battAction = srMode === 'price_charge' ? 'Frank laadt nu' : 'Frank: wacht op netladen';
+    battColor  = 'blue';
+    battIcon   = srMode === 'price_charge' ? '🔌' : '⏳';
+    battSub    = hasRealSurplus
+      ? 'Eerst zon-export, daarna Frank in goedkoop uur'
+      : tomorrowSunLikely
+        ? 'Morgen zon · geen netladen, wacht op PV'
+        : scheduleActive && cheap && priceIsLow
+          ? 'Geen ontladen · wacht 10 min stabiel goedkoop uur'
+          : 'Geen ontladen · wacht op gepland goedkoop uur';
+  } else if (manualOn && batteriesNeedCharge) {
+    battAction = srMode === 'manual_charge' ? 'Handmatig laden nu' : 'Handmatig: wacht';
+    battColor  = 'blue';
+    battIcon   = '🔧';
+    battSub    = 'Surplus-regel uit · geen flipperen/ontladen';
+  } else if (!gridChargeOn && eddiNeedsHeat && lowAfterPriority && batteriesNeedCharge) {
     battAction = 'Eddi eerst op zon, batterij wacht';
     battColor  = 'orange';
     battIcon   = '🔥';
-    battSub    = `Geen rest-zon na Eddi · netladen pas na 10 min stabiel goedkoop uur`;
-  } else if (priceLabel === 'hoog' && avgSoc != null && avgSoc > 10) {
+    battSub    = `Modus Uit · zon naar Eddi, daarna overschot batterij`;
+  } else if (!gridChargeOn && priceLabel === 'hoog' && avgSoc != null && avgSoc > 10 && pv <= 50) {
     battAction = 'Batterij ontlaadt naar huis';
     battColor  = 'orange';
     battIcon   = '🔋';
-    battSub    = `Tarief hoog · geen overschot voor batterij`;
+    battSub    = `Modus Uit · geen zon · Anti-Feed`;
+  } else if (avgSoc !== null && avgSoc <= 10 && priceLabel === 'hoog' && !gridChargeOn) {
+    battAction = 'Batterij bijna leeg · spaar SOC';
+    battColor  = 'red';
+    battIcon   = '🪫';
+    battSub    = `SOC ${Math.round(avgSoc)}% · tarief hoog, niet volledig leegtrekken`;
   } else {
-    battAction = 'Wachten';
+    battAction = gridChargeOn ? 'Frank/handmatig: wachten' : 'Wachten';
     battColor  = 'green';
     battIcon   = '🔋';
-    battSub    = `Geen overschot na huis+Eddi en tarief niet laag genoeg`;
+    battSub    = gridChargeOn
+      ? 'Geen ontladen door surplus-regel'
+      : `Geen overschot na huis+Eddi en tarief niet laag genoeg`;
   }
   if (avgSoc !== null && battSub.indexOf('SOC') === -1) battSub += ` · gem SOC ${Math.round(avgSoc)}%`;
 
-  // SEC1000-advies: toon gewenste aansturing, niet alleen huidige situatie
+  // SEC1000-advies: afschalen op stabiele net-export (niet op PV-theorie)
   let secAction, secPct = 0, secColor, secIcon, secSub;
   if (pv <= 50) {
     secAction = 'Omvormers leveren nu niets';
@@ -2655,31 +2788,42 @@ function computeSimulation(frankData, liveData) {
     secIcon   = '🌙';
     secSub    = 'Geen of bijna geen zon op dit moment';
     secPct    = 0;
-  } else if (buffersNeedEnergy) {
-    secAction = 'Omvormers op vol vermogen houden';
-    secColor  = 'green';
-    secIcon   = '🌞';
-    if (eddiNeedsHeat && batteriesNeedCharge) {
-      secSub = `Eddi eerst (reserve ${eddiReserveTargetW} W), daarna batterijen · nog niet afschalen`;
-    } else if (eddiNeedsHeat) {
-      secSub = `Eddi eerst tot beide boilers ${EDDI_TARGET_TEMP}°C (reserve ${eddiReserveTargetW} W)`;
-    } else if (batteriesNeedCharge) {
-      secSub = `Eddi klaar · eerst batterijen vullen, nog niet afschalen`;
-    } else {
-      secSub = `Buffers klaar · vol vermogen tot 10 min stabiel overschot`;
-    }
-  } else if (stableCurtailCandidate && !stableCurtailReady) {
+  } else if (exportCurtailCandidate && !stableCurtailReady) {
     secPct    = 0;
     secAction = 'Nog niet afschalen';
     secColor  = 'blue';
     secIcon   = '⏳';
-    secSub    = `${Math.round(realSurplusW)} W echt overschot · wacht op 10 min stabiel (${stableCurtailMinutes}/10 min)`;
-  } else if (exporting && price <= 0) {
-    secPct    = pv > 0 ? Math.min(100, Math.round((realSurplusW / pv) * 100)) : 0;
+    secSub    = `${Math.round(exportW)} W export naar net · wacht 10 min stabiel (${stableCurtailMinutes}/10 min)`;
+  } else if (exportCurtailCandidate && stableCurtailReady) {
+    secPct    = pv > 0 ? Math.min(100, Math.round((exportW / pv) * 100)) : 0;
     secAction = `Omvormers afschalen ~${secPct}%`;
     secColor  = 'red';
     secIcon   = '📉';
-    secSub    = `${Math.round(realSurplusW)} W echt overschot · buffers vol/genoeg warm · >10 min`;
+    secSub    = `${Math.round(exportW)} W export · buffers vol/max laden · >10 min stabiel`;
+  } else if (buffersNeedEnergy && exportW < SIM_CURTAIL_EXPORT_W) {
+    secAction = 'Omvormers op vol vermogen houden';
+    secColor  = 'green';
+    secIcon   = '🌞';
+    if (eddiNeedsHeat && batteriesNeedCharge) {
+      secSub = `Eddi eerst (reserve ${eddiReserveTargetW} W), daarna batterijen · nog export-ruimte`;
+    } else if (eddiNeedsHeat) {
+      secSub = `Eddi eerst tot beide boilers ${EDDI_TARGET_TEMP}°C (reserve ${eddiReserveTargetW} W)`;
+    } else if (batteriesNeedCharge) {
+      secSub = `Eddi klaar · batterijen vullen, export ${Math.round(exportW)} W`;
+    } else {
+      secSub = `Buffers klaar · vol vermogen`;
+    }
+  } else if (exportW >= SIM_CURTAIL_EXPORT_W) {
+    secAction = 'Omvormers op vol vermogen';
+    secColor  = 'green';
+    secIcon   = '🌞';
+    secSub    = `${Math.round(exportW)} W export · batterijen laden ${Math.round(battChargingW)} W, nog niet max`;
+  } else if (exporting && price <= 0) {
+    secPct    = pv > 0 ? Math.min(100, Math.round((exportW / pv) * 100)) : 0;
+    secAction = `Omvormers afschalen ~${secPct}%`;
+    secColor  = 'red';
+    secIcon   = '📉';
+    secSub    = `${Math.round(exportW)} W export · negatief tarief · >10 min stabiel`;
   } else if (exporting && priceLabel === 'laag') {
     secPct    = 0;
     secAction = 'Omvormers op vol vermogen';
@@ -2758,6 +2902,71 @@ function updateSimulation() {
   }
 }
 
+let _chargeMode = 'off';
+
+function _setChargeModeButtons(mode) {
+  document.querySelectorAll('.charge-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+async function setChargeMode(mode) {
+  try {
+    const res = await fetch('/api/simple_rule/charge_mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    const j = await res.json();
+    if (j.success) {
+      _chargeMode = j.charge_mode || mode;
+      _setChargeModeButtons(_chargeMode);
+      updateChargeModeStatus();
+    }
+  } catch (e) {
+    const el = document.getElementById('chargeModeStatus');
+    if (el) el.textContent = 'Fout bij wijzigen laadmodus';
+  }
+}
+
+function initChargeModeControls() {
+  document.querySelectorAll('.charge-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => setChargeMode(btn.dataset.mode || 'off'));
+  });
+}
+
+async function updateChargeModeStatus() {
+  const el = document.getElementById('chargeModeStatus');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/simple_rule/status', { cache: 'no-store' });
+    const j = await res.json();
+    if (!j.success) {
+      el.textContent = 'Status niet beschikbaar';
+      return;
+    }
+    _chargeMode = j.charge_mode || 'off';
+    _setChargeModeButtons(_chargeMode);
+    const last = j.last || {};
+    const price = last.price || {};
+    const mode = last.mode || '';
+    const labels = {
+      off: 'Uit — zon-overschot + ontladen avond/nacht',
+      price: 'Frank — laadt goedkope uren, ontlaadt daarbuiten',
+      manual: 'Handmatig — laden tot 95%, daarna normaal gedrag',
+    };
+    let txt = labels[_chargeMode] || 'Onbekend';
+    if (!j.enabled) txt += ' · Simple Rule staat UIT';
+    if (price.pv_surplus_w > 0) txt += ` · PV-overschot ${Math.round(price.pv_surplus_w)} W → batterij eerst`;
+    if (mode === 'price_charge' || mode === 'manual_charge') txt += ` · nu actief (${mode === 'price_charge' ? 'Frank' : 'handmatig'})`;
+    else if (mode === 'manual_wait') txt += ' · wacht (handmatig aan)';
+    else if (mode === 'price_wait') txt += ' · wacht op goedkoop uur (Frank aan)';
+    el.textContent = txt;
+  } catch (e) {
+    el.textContent = 'Offline';
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   onResize();
   initFlowLines();
@@ -2770,6 +2979,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const simBtn = document.getElementById('simPanelToggleBtn');
   if (simBtn) simBtn.addEventListener('click', toggleSimulationPanelPosition);
   applySimulationPanelPosition();
+  initChargeModeControls();
+  updateChargeModeStatus();
+  setInterval(updateChargeModeStatus, 15000);
   updateFrankPrices();
   updateWeatherSolar();
   setInterval(updateFrankPrices, 5 * 60 * 1000);

@@ -108,15 +108,36 @@ class FrankEnergieClient:
         soc_pct: Optional[float] = None,
         battery_capacity_kwh: float = 10.0,
         charge_power_kw: float = 2.5,
-        target_soc_pct: float = 85.0,
+        target_soc_pct: float = 95.0,
     ) -> Dict[str, Any]:
         import time
         now_ts = time.time()
-        if (
+        cache_hit = (
             not force
             and self._cache
             and (now_ts - self._cache_ts) < self._cache_ttl_s
-        ):
+        )
+        if cache_hit and soc_pct is None:
+            return self._cache
+
+        if cache_hit and soc_pct is not None:
+            # Prijzen gecached, maar laadplanning altijd opnieuw met actuele SOC
+            cached = dict(self._cache)
+            today_prices = (cached.get("today") or {}).get("prices") or []
+            tomorrow_prices = (cached.get("tomorrow") or {}).get("prices") or []
+            current = cached.get("current")
+            cached["plan"] = _build_daily_plan(
+                today_prices,
+                current,
+                tomorrow_prices=tomorrow_prices if tomorrow_prices else None,
+                soc_pct=soc_pct,
+                battery_capacity_kwh=battery_capacity_kwh,
+                charge_power_kw=charge_power_kw,
+                target_soc_pct=target_soc_pct,
+            )
+            return cached
+
+        if cache_hit:
             return self._cache
 
         now_nl = datetime.now(TZ_NL)
@@ -196,7 +217,7 @@ def _build_daily_plan(
     soc_pct: Optional[float] = None,
     battery_capacity_kwh: float = 10.0,
     charge_power_kw: float = 2.5,
-    target_soc_pct: float = 85.0,
+    target_soc_pct: float = 95.0,
 ) -> Dict[str, Any]:
     """Dagelijkse drempels t.o.v. min/max van vandaag — geen vaste €0,10.
 
@@ -220,7 +241,7 @@ def _build_daily_plan(
         "cheap_hours": [],
         "expensive_hours": [],
         "very_cheap": False,
-        "charge_target_soc": 85,
+        "charge_target_soc": 95,
         "charge_schedule": None,
     }
     if not prices:
@@ -271,7 +292,7 @@ def _build_daily_plan(
         "cheap_hours": cheap_hours,
         "expensive_hours": exp_hours,
         "very_cheap": very_cheap,
-        "charge_target_soc": 95 if very_cheap else 85,
+        "charge_target_soc": int(target_soc_pct) if target_soc_pct is not None else 95,
         "charge_schedule": charge_schedule,
     }
 
