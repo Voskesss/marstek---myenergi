@@ -715,6 +715,32 @@
       gap: 2px;
       height: 32px;
     }
+    .price-compare-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .price-prov-btn {
+      background: rgba(15,23,42,0.65);
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 10px;
+      padding: 8px 6px;
+      color: #e2e8f0;
+      cursor: pointer;
+      text-align: left;
+      min-height: 52px;
+    }
+    .price-prov-btn.active {
+      border-color: #38bdf8;
+      background: rgba(56,189,248,0.12);
+    }
+    .price-prov-btn:active { transform: scale(0.98); }
+    .price-prov-name { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
+    .price-prov-val { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: #e2e8f0; }
+    .price-prov-btn.active .price-prov-val { color: #38bdf8; }
+    .price-prov-btn.cheapest:not(.missing) .price-prov-val { color: #22c55e; }
+    .price-prov-btn.missing .price-prov-val { color: #64748b; font-weight: 600; font-size: 11px; }
     .frank-bar-item {
       flex: 1;
       min-width: 0;
@@ -848,12 +874,26 @@
       <div class="charge-mode-status" id="chargeModeStatus">Modus laden…</div>
     </div>
 
-    <!-- Sectie A: Huidig tarief -->
+    <!-- Sectie A: Huidig tarief + vergelijking -->
     <div class="side-section" id="priceSection">
-      <div class="side-section-title">Frank Energie — Tarief Nu</div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      <div class="side-section-title">Tarief Nu — vergelijking</div>
+      <div class="price-compare-row" id="priceCompareRow">
+        <button type="button" class="price-prov-btn active" data-prov="frank" id="provBtnFrank">
+          <div class="price-prov-name">Frank</div>
+          <div class="price-prov-val" id="cmpFrankNow">€ --</div>
+        </button>
+        <button type="button" class="price-prov-btn" data-prov="zonneplan" id="provBtnZp">
+          <div class="price-prov-name">Zonneplan</div>
+          <div class="price-prov-val" id="cmpZpNow">€ --</div>
+        </button>
+        <button type="button" class="price-prov-btn" data-prov="nextenergy" id="provBtnNe">
+          <div class="price-prov-name">NextEnergy</div>
+          <div class="price-prov-val" id="cmpNeNow">€ --</div>
+        </button>
+      </div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:10px;">
         <div>
-          <div style="font-size:26px;font-weight:800;color:#38bdf8;font-variant-numeric:tabular-nums;letter-spacing:-1px;" id="frankPriceNow">€ --</div>
+          <div style="font-size:22px;font-weight:800;color:#38bdf8;font-variant-numeric:tabular-nums;letter-spacing:-1px;" id="frankPriceNow">€ --</div>
           <div style="font-size:10px;color:#64748b;margin-top:2px;" id="frankPriceMeta">laden…</div>
           <div style="margin-top:6px;"><span class="price-label-pill normaal" id="frankPriceLabel">--</span></div>
         </div>
@@ -865,11 +905,12 @@
           <div style="font-size:9px;color:#64748b;">duur ≥ <span id="frankExpThr" style="color:#ef4444;">--</span></div>
         </div>
       </div>
+      <div style="font-size:9px;color:#64748b;margin-top:8px;" id="priceCompareHint">Batterij stuurt op Frank · tabs = alleen bekijken</div>
     </div>
 
     <!-- Sectie B: Staafdiagrammen -->
     <div class="side-section" id="barsSection">
-      <div class="side-section-title">Vandaag</div>
+      <div class="side-section-title">Vandaag <span id="barsProvLabel" style="color:#64748b;font-weight:400;text-transform:none;letter-spacing:0;">· Frank</span></div>
       <div class="frank-bars" id="frankBarsToday"></div>
       <div class="side-section-title" style="margin-top:10px;">Morgen <span id="frankTomorrowLabel" style="color:#64748b;font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
       <div class="frank-bars" id="frankBarsTomorrow"></div>
@@ -2257,6 +2298,8 @@ function renderSolarBars(containerId, hours) {
 let _frankData = null;
 let _solarData = null;
 let _simPanelUp = false;
+let _compareData = null;
+let _priceViewProv = 'frank'; // frank | zonneplan | nextenergy
 
 function applySimulationPanelPosition() {
   const sidePanel = document.getElementById('sidePanel');
@@ -2296,61 +2339,200 @@ async function updateFrankPrices() {
     const d = json.data;
     _frankData = d;
     const cur = d.current;
-    const today = d.today || {};
-    const tomorrow = d.tomorrow || {};
-    const todayPrices = today.prices || [];
-    const tomPrices = tomorrow.prices || [];
-
-    document.getElementById('frankPriceNow').textContent = fmtEurKwh(cur && cur.price_eur_kwh);
-    const hourLabel = cur ? (String(cur.hour).padStart(2, '0') + ':00') : '--';
-    document.getElementById('frankPriceMeta').textContent = `uur ${hourLabel}`;
-    document.getElementById('frankMin').textContent = fmtEurKwh(today.min && today.min.price_eur_kwh);
-    document.getElementById('frankMax').textContent = fmtEurKwh(today.max && today.max.price_eur_kwh);
-    const avgEl = document.getElementById('frankAvg');
-    if (avgEl) avgEl.textContent = fmtEurKwh(today.avg);
-
-    const plan = d.plan || {};
-    const cheapThrEl = document.getElementById('frankCheapThr');
-    const expThrEl = document.getElementById('frankExpThr');
-    if (cheapThrEl) cheapThrEl.textContent = fmtEurKwh(plan.cheap_threshold_eur_kwh);
-    if (expThrEl) expThrEl.textContent = fmtEurKwh(plan.expensive_threshold_eur_kwh);
-
-    // Price label pill: dagelijkse band, geen vaste €0,10
-    const pill = document.getElementById('frankPriceLabel');
-    if (pill) {
-      const band = plan.band || 'unknown';
-      const map = { cheap: 'laag', mid: 'normaal', expensive: 'hoog', unknown: 'normaal' };
-      const label = map[band] || 'normaal';
-      pill.textContent = band === 'cheap' ? 'laag (vandaag)' : band === 'expensive' ? 'hoog (vandaag)' : band === 'mid' ? 'midden' : '--';
-      pill.className = `price-label-pill ${label}`;
-    }
-
-    const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
-    const sharedMin = allVals.length ? Math.min(...allVals) : null;
-    const sharedMax = allVals.length ? Math.max(...allVals) : null;
-
-    // Geplande laaduren uit charge_schedule
-    const schedule = plan.charge_schedule || {};
-    const plannedSlots = schedule.planned_slots || [];
-    const plannedTodayHours = plannedSlots.filter(s => s.day === 'today').map(s => s.hour);
-    const plannedTomHours = plannedSlots.filter(s => s.day === 'tomorrow').map(s => s.hour);
-
-    renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax, plan.cheap_hours, plan.expensive_hours, plannedTodayHours);
-    const tomLabel = document.getElementById('frankTomorrowLabel');
-    if (tomorrow.available && tomPrices.length) {
-      tomLabel.textContent = `(min ${fmtEurKwh(tomorrow.min && tomorrow.min.price_eur_kwh)})`;
-      renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax, [], [], plannedTomHours);
-    } else {
-      tomLabel.textContent = '(na ~15:00)';
-      renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
-    }
-
-    // Laadplanning wordt bijgewerkt via updateSimulation() met live SOC uit b1/b2
+    const cmpFrank = document.getElementById('cmpFrankNow');
+    if (cmpFrank) cmpFrank.textContent = fmtEurKwh(cur && cur.price_eur_kwh);
+    if (_priceViewProv === 'frank') _renderProviderDetailFromFrank(d);
+    updateComparePrices();
   } catch (e) {
+    console.warn('Frank prices error:', e);
     document.getElementById('frankPriceNow').textContent = '€ --';
     document.getElementById('frankPriceMeta').textContent = 'Frank offline';
+    const cmpFrank = document.getElementById('cmpFrankNow');
+    if (cmpFrank) cmpFrank.textContent = '—';
   }
 }
+
+function _splitTodayTomorrow(prices) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), day = now.getDate();
+  const today = [], tomorrow = [];
+  (prices || []).forEach(p => {
+    const d = new Date(p.from);
+    if (Number.isNaN(d.getTime())) return;
+    if (d.getFullYear() === y && d.getMonth() === m && d.getDate() === day) today.push(p);
+    else if (d.getTime() > now.getTime()) tomorrow.push(p);
+  });
+  if (!today.length && prices && prices.length) {
+    const sorted = [...prices].sort((a, b) => String(a.from).localeCompare(String(b.from)));
+    return { today: sorted.slice(0, 24), tomorrow: sorted.slice(24, 48) };
+  }
+  return { today, tomorrow };
+}
+
+function _renderProviderDetail(summary, label) {
+  if (!summary || !summary.available) {
+    document.getElementById('frankPriceNow').textContent = '€ --';
+    document.getElementById('frankPriceMeta').textContent = summary && summary.error
+      ? String(summary.error).slice(0, 90)
+      : `${label} niet beschikbaar`;
+    document.getElementById('frankMin').textContent = '--';
+    document.getElementById('frankMax').textContent = '--';
+    const avgEl = document.getElementById('frankAvg');
+    if (avgEl) avgEl.textContent = '--';
+    const pill = document.getElementById('frankPriceLabel');
+    if (pill) { pill.textContent = '--'; pill.className = 'price-label-pill normaal'; }
+    renderFrankBars('frankBarsToday', [], null, null, null);
+    renderFrankBars('frankBarsTomorrow', [], null, null, null);
+    const barsLbl = document.getElementById('barsProvLabel');
+    if (barsLbl) barsLbl.textContent = `· ${label}`;
+    return;
+  }
+  const cur = summary.current;
+  const split = _splitTodayTomorrow(summary.prices);
+  const todayPrices = summary.today_prices || split.today;
+  const tomPrices = split.tomorrow;
+  document.getElementById('frankPriceNow').textContent = fmtEurKwh(cur && cur.price_eur_kwh);
+  const hourLabel = cur ? (String(cur.hour).padStart(2, '0') + ':00') : '--';
+  const src = summary.source ? ` · ${summary.source}` : '';
+  document.getElementById('frankPriceMeta').textContent = `${label} · uur ${hourLabel}${src}`;
+  document.getElementById('frankMin').textContent = fmtEurKwh(summary.min && summary.min.price_eur_kwh);
+  document.getElementById('frankMax').textContent = fmtEurKwh(summary.max && summary.max.price_eur_kwh);
+  const avgEl = document.getElementById('frankAvg');
+  if (avgEl) avgEl.textContent = fmtEurKwh(summary.avg);
+  const cheapThrEl = document.getElementById('frankCheapThr');
+  const expThrEl = document.getElementById('frankExpThr');
+  if (cheapThrEl) cheapThrEl.textContent = '--';
+  if (expThrEl) expThrEl.textContent = '--';
+  const pill = document.getElementById('frankPriceLabel');
+  if (pill) { pill.textContent = 'vergelijking'; pill.className = 'price-label-pill normaal'; }
+  const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
+  const sharedMin = allVals.length ? Math.min(...allVals) : null;
+  const sharedMax = allVals.length ? Math.max(...allVals) : null;
+  renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax, [], [], []);
+  const tomLabel = document.getElementById('frankTomorrowLabel');
+  if (tomPrices.length) {
+    if (tomLabel) tomLabel.textContent = `(${tomPrices.length} u)`;
+    renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax, [], [], []);
+  } else {
+    if (tomLabel) tomLabel.textContent = '(nog niet)';
+    renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
+  }
+  const barsLbl = document.getElementById('barsProvLabel');
+  if (barsLbl) barsLbl.textContent = `· ${label}`;
+}
+
+function _renderProviderDetailFromFrank(d) {
+  const cur = d.current;
+  const today = d.today || {};
+  const tomorrow = d.tomorrow || {};
+  const todayPrices = today.prices || [];
+  const tomPrices = tomorrow.prices || [];
+  document.getElementById('frankPriceNow').textContent = fmtEurKwh(cur && cur.price_eur_kwh);
+  const hourLabel = cur ? (String(cur.hour).padStart(2, '0') + ':00') : '--';
+  document.getElementById('frankPriceMeta').textContent = `Frank · uur ${hourLabel}`;
+  document.getElementById('frankMin').textContent = fmtEurKwh(today.min && today.min.price_eur_kwh);
+  document.getElementById('frankMax').textContent = fmtEurKwh(today.max && today.max.price_eur_kwh);
+  const avgEl = document.getElementById('frankAvg');
+  if (avgEl) avgEl.textContent = fmtEurKwh(today.avg);
+  const plan = d.plan || {};
+  const cheapThrEl = document.getElementById('frankCheapThr');
+  const expThrEl = document.getElementById('frankExpThr');
+  if (cheapThrEl) cheapThrEl.textContent = fmtEurKwh(plan.cheap_threshold_eur_kwh);
+  if (expThrEl) expThrEl.textContent = fmtEurKwh(plan.expensive_threshold_eur_kwh);
+  const pill = document.getElementById('frankPriceLabel');
+  if (pill) {
+    const band = plan.band || 'unknown';
+    const map = { cheap: 'laag', mid: 'normaal', expensive: 'hoog', unknown: 'normaal' };
+    const label = map[band] || 'normaal';
+    pill.textContent = band === 'cheap' ? 'laag (vandaag)' : band === 'expensive' ? 'hoog (vandaag)' : band === 'mid' ? 'midden' : '--';
+    pill.className = `price-label-pill ${label}`;
+  }
+  const allVals = todayPrices.concat(tomPrices).map(p => p.price_eur_kwh);
+  const sharedMin = allVals.length ? Math.min(...allVals) : null;
+  const sharedMax = allVals.length ? Math.max(...allVals) : null;
+  const schedule = plan.charge_schedule || {};
+  const plannedSlots = schedule.planned_slots || [];
+  const plannedTodayHours = plannedSlots.filter(s => s.day === 'today').map(s => s.hour);
+  const plannedTomHours = plannedSlots.filter(s => s.day === 'tomorrow').map(s => s.hour);
+  renderFrankBars('frankBarsToday', todayPrices, cur ? cur.hour : null, sharedMin, sharedMax, plan.cheap_hours, plan.expensive_hours, plannedTodayHours);
+  const tomLabel = document.getElementById('frankTomorrowLabel');
+  if (tomorrow.available && tomPrices.length) {
+    if (tomLabel) tomLabel.textContent = `(min ${fmtEurKwh(tomorrow.min && tomorrow.min.price_eur_kwh)})`;
+    renderFrankBars('frankBarsTomorrow', tomPrices, null, sharedMin, sharedMax, [], [], plannedTomHours);
+  } else {
+    if (tomLabel) tomLabel.textContent = '(na ~15:00)';
+    renderFrankBars('frankBarsTomorrow', [], null, sharedMin, sharedMax);
+  }
+  const barsLbl = document.getElementById('barsProvLabel');
+  if (barsLbl) barsLbl.textContent = '· Frank';
+}
+
+async function updateComparePrices() {
+  try {
+    const res = await fetch('/api/prices/compare');
+    const json = await res.json();
+    if (!json.success || !json.data) throw new Error(json.error || 'geen data');
+    _compareData = json.data;
+    const zp = _compareData.zonneplan || {};
+    const ne = _compareData.nextenergy || {};
+    const cmpZp = document.getElementById('cmpZpNow');
+    const cmpNe = document.getElementById('cmpNeNow');
+    const btnZp = document.getElementById('provBtnZp');
+    const btnNe = document.getElementById('provBtnNe');
+    if (cmpZp) {
+      if (zp.available && zp.current) {
+        cmpZp.textContent = fmtEurKwh(zp.current.price_eur_kwh);
+        if (btnZp) btnZp.classList.remove('missing');
+      } else {
+        cmpZp.textContent = 'n.b.';
+        if (btnZp) btnZp.classList.add('missing');
+      }
+    }
+    if (cmpNe) {
+      if (ne.available && ne.current) {
+        cmpNe.textContent = fmtEurKwh(ne.current.price_eur_kwh);
+        if (btnNe) btnNe.classList.remove('missing');
+      } else {
+        cmpNe.textContent = _compareData.enever_token_configured ? 'n.b.' : 'token?';
+        if (btnNe) btnNe.classList.add('missing');
+      }
+    }
+    const vals = [];
+    if (_frankData && _frankData.current) vals.push({ id: 'provBtnFrank', v: _frankData.current.price_eur_kwh });
+    if (zp.available && zp.current) vals.push({ id: 'provBtnZp', v: zp.current.price_eur_kwh });
+    if (ne.available && ne.current) vals.push({ id: 'provBtnNe', v: ne.current.price_eur_kwh });
+    document.querySelectorAll('.price-prov-btn').forEach(b => b.classList.remove('cheapest'));
+    if (vals.length) {
+      const best = vals.reduce((a, b) => (a.v <= b.v ? a : b));
+      const el = document.getElementById(best.id);
+      if (el) el.classList.add('cheapest');
+    }
+    const hint = document.getElementById('priceCompareHint');
+    if (hint) {
+      hint.textContent = _compareData.enever_token_configured
+        ? 'Batterij stuurt op Frank · tabs = alleen bekijken'
+        : 'NextEnergy: zet ENEVER_TOKEN in .env (gratis enever.nl) · tabs = alleen bekijken';
+    }
+    if (_priceViewProv === 'zonneplan') _renderProviderDetail(zp, 'Zonneplan');
+    if (_priceViewProv === 'nextenergy') _renderProviderDetail(ne, 'NextEnergy');
+  } catch (e) {
+    console.warn('Compare prices error:', e);
+  }
+}
+
+function setPriceViewProvider(prov) {
+  _priceViewProv = prov || 'frank';
+  document.querySelectorAll('.price-prov-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.prov === _priceViewProv);
+  });
+  if (_priceViewProv === 'frank' && _frankData) _renderProviderDetailFromFrank(_frankData);
+  else if (_priceViewProv === 'zonneplan' && _compareData) _renderProviderDetail(_compareData.zonneplan, 'Zonneplan');
+  else if (_priceViewProv === 'nextenergy' && _compareData) _renderProviderDetail(_compareData.nextenergy, 'NextEnergy');
+}
+
+document.querySelectorAll('.price-prov-btn').forEach(btn => {
+  btn.addEventListener('click', () => setPriceViewProvider(btn.dataset.prov));
+});
 
 async function updateWeatherSolar() {
   try {

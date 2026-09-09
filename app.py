@@ -4045,6 +4045,22 @@ async def get_frank_prices(force: bool = False):
         logger.error(f"Frank prices error: {e}")
         return {"success": False, "error": str(e)}
 
+
+@app.get("/api/prices/compare")
+async def get_prices_compare(force: bool = False):
+    """Vergelijk uurtarieven: Zonneplan + NextEnergy (naast Frank).
+
+    Zonneplan: publieke scrape. NextEnergy: Enever (ENEVER_TOKEN in .env).
+    Alleen tonen — stuurt de batterij niet.
+    """
+    try:
+        from price_providers import price_providers
+        data = await price_providers.get_compare(force=force)
+        return {"success": True, "data": data}
+    except Exception as e:
+        logger.error(f"Price compare error: {e}")
+        return {"success": False, "error": str(e)}
+
 # =========================
 # WhatsApp Test Endpoint
 # =========================
